@@ -43,7 +43,7 @@ from preflight.runner.probe_user import probe_user_ok as _probe_user_ok
 ops = modal.App(APP_NAME + "-ops")
 
 
-FILL_DEADLINE_S = 3300.0  # one archive's download, inside the function's hour
+FILL_DEADLINE_S = 3300.0  # the container's downloads, inside the function's hour (from its start)
 
 
 @ops.function(image=probe_image, volumes={DATASETS_DIR: datasets_vol}, timeout=3600)  # CPU
@@ -58,6 +58,7 @@ def fill_dataset_cache(only: str = "") -> list[dict]:
 	from preflight.recorder.dataset_cache import resources
 
 	want = {x for x in only.split(",") if x}
+	started = time.monotonic()  # the deadline is the container's, not each archive's (review)
 	root = Path(DATASETS_DIR) / "by-md5"
 	root.mkdir(parents=True, exist_ok=True)
 	out = []
@@ -78,7 +79,7 @@ def fill_dataset_cache(only: str = "") -> list[dict]:
 					h.update(chunk)
 					n += len(chunk)
 					if (
-						time.monotonic() - t0 > FILL_DEADLINE_S
+						time.monotonic() - started > FILL_DEADLINE_S
 					):  # a slow host: say how slow, before the container ends
 						raise TimeoutError(
 							f"{n / 1024 / (time.monotonic() - t0):.0f} kB/s, {n:,} bytes in {FILL_DEADLINE_S:.0f} s"
@@ -110,10 +111,18 @@ def fill_datasets(only: str = ""):
 	from preflight.recorder.dataset_cache import DATASETS
 
 	names = [n for n in (only.split(",") if only else DATASETS) if n]
+	unknown = [n for n in names if n not in DATASETS]
+	if unknown:
+		raise SystemExit(f"not datasets the cache holds: {unknown} (it holds {list(DATASETS)})")
 	calls = [
-		fill_dataset_cache.spawn(n) for n in names
-	]  # one container a dataset: a slow host holds up only its own
-	res = [r for c in calls for r in c.get()]
+		(n, fill_dataset_cache.spawn(n)) for n in names
+	]  # one container a dataset: a slow host holds up its own
+	res = []
+	for n, c in calls:
+		try:
+			res += c.get()
+		except Exception as exc:  # a container killed at its hour: the others' results still count
+			res.append({"dataset": n, "status": f"failed: {type(exc).__name__}: {exc}"[:300]})
 	Path("out").mkdir(exist_ok=True)
 	Path("out/fill_datasets.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(res, indent=2), flush=True)
@@ -765,7 +774,12 @@ def ground_truth(
 			from preflight.runner.sources import _clone_read
 
 			files, sha, part = _clone_read(repo, commit or None, entrypoint, data=install_repo)
-			print(f"[ground truth] read the entry point's closure: {part}", flush=True)
+			print(
+				f"[ground truth] read the entry point's closure: {part}"
+				if part
+				else "[ground truth] read it whole",
+				flush=True,
+			)
 		else:
 			files, sha = _clone(repo, commit or None, data=install_repo)
 		if edit_hex:

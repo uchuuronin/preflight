@@ -366,6 +366,19 @@ def gpu_power_reader():
 		return None
 
 
+def gpu_clock_reader():
+	"""probes.step_clock (off; B's step-time ask, Nov 3): a callable giving the GPU's SM clock in MHz now
+	(NVML), or None when it can't be read here."""
+	try:
+		import pynvml
+
+		pynvml.nvmlInit()
+		h = pynvml.nvmlDeviceGetHandleByIndex(_device_index("CUDA_VISIBLE_DEVICES"))
+		return lambda: float(pynvml.nvmlDeviceGetClockInfo(h, pynvml.NVML_CLOCK_SM))
+	except Exception:
+		return None
+
+
 class Recorder:
 	def __init__(
 		self,
@@ -382,6 +395,7 @@ class Recorder:
 		generate_calls: int = 0,
 		lr_range: dict | None = None,
 		eval_units: int = 0,
+		step_clock: bool = False,
 	):
 		if warmup + timed < 2:
 			raise ValueError("a probe runs at least 2 optimizer steps; optimizer state appears at the first")
@@ -396,6 +410,9 @@ class Recorder:
 		# generate call (lm_eval's loglikelihood tasks: arc_easy, hellaswag, piqa make no generate call), measured
 		# as units like generate calls; the probe ends as the next one starts after this many
 		self.eval_units = eval_units
+		# probes.step_clock (off): the SM clock the sampler last read, kept on each step (no NVML call in the step)
+		self.step_clock = step_clock
+		self._clock_now: float | None = None
 		self._fwd: list[dict] = []
 		self._fwd_depth = 0
 		self.target = warmup + timed + (0 if alternate_sync else PHASE_STEPS)
@@ -1474,7 +1491,12 @@ class Recorder:
 		except Exception:
 			proc = None
 		read_power = gpu_power_reader() if self.cuda else None
+		read_clock = gpu_clock_reader() if self.cuda and self.step_clock else None
 		while not self._sampler_stop.wait(SAMPLE_EVERY_S):
+			if read_clock is not None:
+				with suppress(Exception):
+					c = read_clock()
+					self._clock_now = c if math.isfinite(c) and 0 < c < 10_000 else self._clock_now
 			if proc is not None:
 				with suppress(Exception):
 					rss = proc.memory_info().rss + sum(
@@ -1805,6 +1827,8 @@ class Recorder:
 				"profiled": self._prof is not None,
 			}
 		)
+		if self.step_clock:
+			self.steps[-1]["sm_clock_mhz"] = self._clock_now
 		self._reset_acc()
 		n = len(self.steps)
 		if kind == "timed" and n == self.warmup + self.timed and not self.alternate_sync:
@@ -1980,6 +2004,13 @@ class Recorder:
 				out["arch"] = model_shape(self._roots, sdpa_seen=self._sdpa_seen)
 			except Exception as exc:  # shape is a nice-to-have; never fail the probe over it
 				out["arch"] = {"error": f"{type(exc).__name__}: {exc}"[:300]}
+		clocks = [s["sm_clock_mhz"] for s in timed if s.get("sm_clock_mhz")] if self.step_clock else []
+		if (
+			clocks
+		):  # probes.step_clock: the SM clock at each timed step (the sampler's last read, every 0.25 s)
+			out["sm_clock_mhz_p50"] = statistics.median(clocks)
+			out["sm_clock_mhz_min"], out["sm_clock_mhz_max"] = min(clocks), max(clocks)
+			out["sm_clock_timed_steps"] = float(len(clocks))
 		if self._power:
 			out["power"] = {
 				"mean_w": statistics.fmean(self._power),

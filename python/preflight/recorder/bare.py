@@ -70,7 +70,9 @@ def main(argv: list[str] | None = None) -> int:
 			from .dataset_cache import patch
 
 			patch(tvu, cache, log=lambda m: print(m, file=sys.stderr, flush=True))
-		except ImportError:
+		except (
+			Exception
+		):  # a torchvision that doesn't load here (one built for another torch): the script's to find
 			pass
 	ended, error = "finished", None
 	t0 = time.perf_counter()

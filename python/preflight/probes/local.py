@@ -104,6 +104,11 @@ VALID_STATUS = {"ok", "oom", "error", "timeout", "cancelled"}
 
 # Probe.extras keys B reads by name (docs/requests.md, B -> A); keep them stable
 EXTRAS_KEYS = (
+	# probes.step_clock: the GPU's SM clock over the timed steps (B, Nov 3)
+	"sm_clock_mhz_p50",
+	"sm_clock_mhz_min",
+	"sm_clock_mhz_max",
+	"sm_clock_timed_steps",
 	# probes.eval_units: an eval probe's scoring batches (a forward under no_grad outside generate)
 	"eval_forward_batches",
 	"eval_forward_s_p50",
@@ -219,6 +224,7 @@ class ProbeSpec:
 		False  # probes.torch_new: stop, saying so, when the code's torch is newer than the image's
 	)
 	dataset_cache: bool = False  # probes.dataset_cache: torchvision's datasets from the read-only volume
+	step_clock: bool = False  # probes.step_clock: the GPU's SM clock on each timed step
 	install_sdists: tuple[
 		str, ...
 	] = ()  # a check-in by command's source-only dependencies (sources.COMMANDS)
@@ -996,6 +1002,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"install_exec": spec.install_exec,
 				"torch_stop": spec.torch_stop,
 				"dataset_cache": spec.dataset_cache,
+				"step_clock": spec.step_clock,
 				"install_sdists": list(spec.install_sdists),
 				"eval_units": spec.eval_units,
 				"deps": str(box / "deps"),

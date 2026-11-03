@@ -213,6 +213,7 @@ def main(spec_path: str) -> int:
 		generate_calls=int(spec.get("generate_calls") or 0),
 		lr_range=spec.get("lr_range") or None,  # D's range test, behind probes.lr_range
 		eval_units=int(spec.get("eval_units") or 0),  # probes.eval_units
+		step_clock=bool(spec.get("step_clock")),  # probes.step_clock
 	).install()
 	if spec.get(
 		"dataset_cache"
