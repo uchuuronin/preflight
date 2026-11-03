@@ -4,7 +4,10 @@
  * carries from its parent. The same three checks as A's collector, so the cockpit and the terminal
  * raise the same alerts:
  *
- * - step time: a window's mean outside the predicted band, two windows in a row (one slow window is noise)
+ * - step time: a window's mean above the predicted band, two windows in a row (one slow window is
+ *   noise). Faster than the band, two windows in a row, is a note, not an alert (B's `preflight
+ *   watch`, Nov 2: a quick run's first steps beat the probe's timed ones; D's shot 9b). Each side
+ *   keeps its own streak, so a fast window never hastens or blocks a slow alert.
  * - peak memory: a window's peak above the band's top, at once
  * - total time: time so far plus the remaining steps at the last three windows' pace, above the top
  */
@@ -16,9 +19,12 @@ export const REPEAT_TO_ALERT = 2;
 const PACE_WINDOWS = 3;
 
 export type LiveAlert =
-	| { kind: "step"; step: number; value: number; lo: number; hi: number; side: "above" | "below" }
+	| { kind: "step"; step: number; value: number; lo: number; hi: number; side: "above" }
 	| { kind: "peak"; step: number; value: number; lo: number; hi: number }
 	| { kind: "total"; step: number; value: number; lo: number; hi: number };
+
+/** In the record's favour, said once and not raised: steps faster than the band. */
+export type LiveNote = { kind: "step_fast"; step: number; value: number; lo: number; hi: number };
 
 export interface LiveReading {
 	status: Probe["status"];
@@ -31,6 +37,8 @@ export interface LiveReading {
 	bands: { step: [number, number] | null; peak: [number, number] | null; total: [number, number] | null };
 	/** Out of band now: the last window's alerts, as the collector would print them. */
 	alerts: LiveAlert[];
+	/** Out of band in the run's favour (faster steps): said, not alerted. */
+	notes: LiveNote[];
 }
 
 function band(rec: FlightRecord, id: string): [number, number] | null {
@@ -63,13 +71,13 @@ export function readLive(rec: FlightRecord): LiveReading | null {
 	const peakOf = (w: (typeof windows)[number]) => w.peak_reserved_bytes ?? w.peak_allocated_bytes ?? null;
 	const peaks = windows.map(peakOf).filter((v): v is number => typeof v === "number");
 	const alerts: LiveAlert[] = [];
+	const notes: LiveNote[] = [];
 	if (last && bands.step) {
 		const [lo, hi] = bands.step;
-		const side = (w: (typeof windows)[number]) => (w.wall_s > hi ? "above" : w.wall_s < lo ? "below" : null);
 		const tail = windows.slice(-REPEAT_TO_ALERT);
-		const s = side(last);
-		// as A's streak: any window out of band counts, whichever side; the last one's side is said
-		if (s && tail.length === REPEAT_TO_ALERT && tail.every((w) => side(w) !== null)) alerts.push({ kind: "step", step: last.index, value: last.wall_s, lo, hi, side: s });
+		const full = tail.length === REPEAT_TO_ALERT;
+		if (full && tail.every((w) => w.wall_s > hi)) alerts.push({ kind: "step", step: last.index, value: last.wall_s, lo, hi, side: "above" });
+		else if (full && tail.every((w) => w.wall_s < lo)) notes.push({ kind: "step_fast", step: last.index, value: last.wall_s, lo, hi });
 	}
 	const lastPeak = last ? peakOf(last) : null;
 	if (last && bands.peak && lastPeak !== null && lastPeak > bands.peak[1]) alerts.push({ kind: "peak", step: last.index, value: lastPeak, lo: bands.peak[0], hi: bands.peak[1] });
@@ -84,5 +92,6 @@ export function readLive(rec: FlightRecord): LiveReading | null {
 		totalSteps,
 		bands,
 		alerts,
+		notes,
 	};
 }

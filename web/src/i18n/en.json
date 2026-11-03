@@ -1010,7 +1010,6 @@
 	"live.total": "At this pace, {value} in all (predicted {lo} to {hi}).",
 	"live.in_band": "Inside its predicted band.",
 	"live.alert.step_above": "Step {step}: steps take {value}, above the predicted {lo} to {hi}, two windows running.",
-	"live.alert.step_below": "Step {step}: steps take {value}, below the predicted {lo} to {hi}, two windows running.",
 	"live.alert.peak": "Step {step}: peak memory reached {value}, above the predicted {lo} to {hi}.",
 	"live.alert.total": "Step {step}: at this pace the run takes {value}, past the predicted {lo} to {hi}.",
 	"live.following": "Following {name}: it refreshes as the run writes it.",
@@ -1225,5 +1224,6 @@
 	"datause.who.glimmer": "Muse Glimmer (on Preflight's own GPU, if you pick private triage)",
 	"datause.who.code": "Muse Code (fixes, when you ask for one)",
 	"newflight.gpu.hint": "L4 or A10 starts on an L4; when none is free within two minutes it moves to an A10, then an L40S, and a script that runs out of memory may be measured on a bigger card.",
-	"dial.if_it_fits": "If it didn't run out of memory"
+	"dial.if_it_fits": "If it didn't run out of memory",
+	"live.note.step_fast": "Step {step}: steps take {value}, faster than the predicted {lo} to {hi}. Not a problem: a run often steps faster once it's warm than the probe's few timed steps."
 }
