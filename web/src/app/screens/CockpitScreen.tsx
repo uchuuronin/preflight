@@ -39,7 +39,7 @@ import { isFixture, targetFor } from "../../workspace/record/model";
 import type { LoadedRecord } from "../../workspace/record/types";
 import { useWorkspace, WorkspaceProvider } from "../../workspace/state";
 import { logFlight } from "../logbook";
-import { href } from "../route";
+import { go, href } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
 
 type Load = { kind: "loading" } | { kind: "ready"; record: LoadedRecord } | { kind: "error"; message: string };
@@ -144,7 +144,7 @@ function Cockpit() {
 				<section className="pf-cockpit">
 					<header className="pf-cockpit__head">
 						<h1>{record.job.title ?? t(`lens.${record.job.lens}`)}</h1>
-						{isFixture(record) ? <span className="pf-tag">{t("cockpit.illustrative")}</span> : null}
+
 						{/* A sample's own cost is part of its fixture, not money anyone spent. */}
 						{spent > 0 && !isFixture(record) ? <span className="pf-tag">{t("cockpit.made_for", { cost: fmt(spent, "usd") })}</span> : null}
 						<Measured />
@@ -161,6 +161,14 @@ function Cockpit() {
 						<FindingsChip />
 						<ProbeHere />
 					</header>
+					{isFixture(record) ? (
+						<p className="pf-sample-banner" role="note">
+							<b>{t("cockpit.illustrative")}</b>{" "}
+							<button type="button" className="pf-link" onClick={() => go("new")}>
+								{t("cockpit.check_in_own")}
+							</button>
+						</p>
+					) : null}
 					{/* A node's detail widens the side column, so its text runs wide instead of long. */}
 					<div className={`pf-deck${fit ? " is-fit" : ""}${state.focus ? " has-detail" : ""}`}>
 						<Dials />

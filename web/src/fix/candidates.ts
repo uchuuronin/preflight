@@ -122,6 +122,22 @@ export function candidatesFor(finding: Finding, ctx: Ctx): Candidate[] {
 	return out;
 }
 
+/**
+ * Why a finding's own fix can't be written here, when `candidatesFor` gives nothing (D's walkthrough,
+ * Nov 2: "the value it needs isn't known, or its knob is pinned" left the visitor to guess which).
+ */
+export function whyNoFix(finding: Finding, ctx: Ctx): "lens" | "pinned" | "frozen" | "already" | "ruled_out" | "no_value" {
+	const t = template(finding.fix_template);
+	if (!t || !t.lenses.includes(ctx.record.job.lens)) return "lens";
+	const limits = ctx.limits ?? NO_LIMITS;
+	if (t.knob && ctx.pinned.has(t.knob)) return "pinned";
+	if (t.knob && limits.frozen.includes(t.knob)) return "frozen";
+	const knob = t.knob ? ctx.record.knobs.find((k) => k.id === t.knob) : undefined;
+	if (knob?.kind === "bool" && ctx.knobs[knob.id] === true) return "already";
+	if (knob?.kind === "bool" && !valueAllowed(limits, knob.id, true)) return "ruled_out";
+	return "no_value";
+}
+
 const GPU_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
 
 /**

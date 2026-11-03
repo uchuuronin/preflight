@@ -44,5 +44,6 @@
 	"d.freetier": false,
 	"d.notebook": false,
 	"d.exports_cli": false,
-	"probes.lr_range": false
+	"probes.lr_range": false,
+	"c.sample_agent_golden": false
 }

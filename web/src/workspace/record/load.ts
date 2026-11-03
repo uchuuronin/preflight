@@ -61,12 +61,15 @@ export const SAMPLES: Sample[] = [
 		load: () => import("../../../../schema/examples/pretrain.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
+		// Hidden from Departures (D's walkthrough, Nov 2: every dial abstains and no knob moves anything);
+		// PF331, the measured agent eval, shows the agent cockpit. Its link still opens.
 		id: "agent",
 		code: "PF330",
 		titleKey: "sample.agent",
 		lens: "agent",
 		gpu: "API",
 		numbers: "illustrative",
+		flag: "c.sample_agent_golden",
 		load: () => import("../../../../schema/examples/agent.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{

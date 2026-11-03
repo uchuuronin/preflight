@@ -163,7 +163,8 @@ export function sizeClass(text: string): string | undefined {
 
 function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => void; goalOn: boolean; wake?: Wake | undefined }) {
 	const est = spec.est;
-	const illustrative = isFixture(useWorkspace().record);
+	const { record: rec, estimates: all } = useWorkspace();
+	const illustrative = isFixture(rec);
 	const ok = trusted(est) && !!spec.scale;
 	const scale = spec.scale;
 	const point = ok ? est.point : 0;
@@ -181,7 +182,12 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 	const title = [spec.reason, scaleNote].filter(Boolean).join("\n");
 	// The engine abstains at a setting a probe ran out of memory at: that was measured (review, Nov 2).
 	const failedHere = !ok && /\bran out of memory\b/i.test(est?.reason ?? "");
-	const value = ok ? spec.format(point) : t(failedHere ? "readout.abstain_failed" : "readout.abstain_short");
+	// The engine knows the step but not how many steps the run has (D's walkthrough, Nov 2: four
+	// measured samples looked as if nothing was measured): say that, with the measured step under it.
+	const lengthUnknown = !ok && !failedHere && /run's length isn't known/i.test(est?.reason ?? "");
+	const stepEst = all["time.step"];
+	const stepNote = lengthUnknown && trusted(stepEst) ? t("dial.step_known", { step: fmt(stepEst.point, stepEst.unit) }) : null;
+	const value = ok ? spec.format(point) : t(failedHere ? "readout.abstain_failed" : lengthUnknown ? "readout.length_unknown" : "readout.abstain_short");
 	const valueRef = useRef<HTMLElement>(null);
 	useTweenedText(valueRef, ok ? point : null, spec.format, { classFor: (text) => (ok ? sizeClass(text) : "is-abstain") });
 	const aria = ok
@@ -241,11 +247,17 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 			)}
 			<span className="pf-dial__label">{spec.label}</span>
 			<span className="pf-dial__status">
-				{failedHere ? <span className="pf-prov pf-prov--abstain">{t("readout.abstain_failed")}</span> : <Provenance status={est?.status ?? "abstain"} />}
+				{failedHere ? (
+					<span className="pf-prov pf-prov--abstain">{t("readout.abstain_failed")}</span>
+				) : lengthUnknown ? null : (
+					<Provenance status={est?.status ?? "abstain"} />
+				)}
 				{at.off ? <span className="pf-dial__off">{t("dial.off_scale_short")}</span> : null}
 			</span>
+			{stepNote ? <span className="pf-dial__note">{stepNote}</span> : null}
 			{spec.note ? <span className={`pf-dial__note${spec.noteRisk ? " is-risk" : spec.noteTight ? " is-tight" : spec.noteFits ? " is-fits" : ""}`}>{spec.note}</span> : null}
-			{goalOn ? <span className="pf-dial__goal">{t("dial.your_goal")}</span> : null}
+			{/* No "Your goal" under a dial with no number (D's walkthrough): the aim still shows as pressed. */}
+			{goalOn && ok ? <span className="pf-dial__goal">{t("dial.your_goal")}</span> : null}
 		</div>
 	);
 }

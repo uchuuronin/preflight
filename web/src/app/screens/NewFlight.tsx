@@ -504,6 +504,8 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								{error}
 							</p>
 						) : null}
+						{/* "Got it" right above Check in (D's walkthrough: it sat a screen below, under Departures). */}
+						<DataUseNotice onChange={onDataUse} />
 						<div className="pf-desk__foot">
 							{accepted ? (
 								// Source: measured, A's run a-smoke-l4-main-4 (Oct 28): the LoRA zoo script from
@@ -545,7 +547,6 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						<p className="pf-departures__foot">{t("newflight.departures.foot")}</p>
 					</section>
 				</div>
-				<DataUseNotice onChange={onDataUse} />
 				<p className="pf-notice">{t("newflight.notice")}</p>
 			</div>
 		</div>
