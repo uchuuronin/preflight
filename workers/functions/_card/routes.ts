@@ -10,7 +10,7 @@
  * A running job revises its record, so responses are cached for two minutes only, and an API outage
  * is never cached (no-store), so no link preview keeps a generic card.
  */
-import { headline, type Headline } from "./headline";
+import { atRiskLine, headline, type Headline } from "./headline";
 import { HERO_CARDS } from "./hero";
 import { type CardEnv, type Fetched, fetchRecord, TOKEN } from "./record";
 import { badgeSvg, CARD_W, cardSvg, esc } from "./svg";
@@ -31,9 +31,9 @@ function outcome(got: Fetched): { status: number; cache: string } {
 
 const NONE: Headline = { title: "A Preflight flight record", subtitle: "", lines: [], illustrative: false };
 
-async function load(request: Request, env: CardEnv, token: string, fetchImpl?: typeof fetch): Promise<{ h: Headline; got: Fetched }> {
+async function load(request: Request, env: CardEnv, token: string, fetchImpl?: typeof fetch): Promise<{ h: Headline; got: Fetched; risk: string | null }> {
 	const got = await fetchRecord(token, request, env, fetchImpl);
-	return { h: got.ok ? headline(got.record) : NONE, got };
+	return { h: got.ok ? headline(got.record) : NONE, got, risk: got.ok ? atRiskLine(got.record) : null };
 }
 
 function describe(h: Headline): string {
@@ -44,12 +44,12 @@ function describe(h: Headline): string {
 export async function sharePage(request: Request, env: CardEnv, token: string, fetchImpl?: typeof fetch): Promise<Response> {
 	const origin = new URL(request.url).origin;
 	const safe = TOKEN.test(token) ? token : "";
-	const { h, got } = await load(request, env, token, fetchImpl);
+	const { h, got, risk } = await load(request, env, token, fetchImpl);
 	const cockpit = safe ? `${origin}/#/cockpit/${safe}` : `${origin}/`;
 	const missing = !got.ok && got.status === 404;
 	const out = outcome(got);
 	const title = missing ? "No flight record matches this link" : `${h.title} · Preflight`;
-	const desc = missing ? "Check the link, or open a sample in Preflight." : describe(h);
+	const desc = missing ? "Check the link, or open a sample in Preflight." : [describe(h), risk].filter(Boolean).join(" · ");
 	// A hero record has a card pre-rendered as a plain file (scripts/hero-cards.ts), which previews
 	// with an image on the Free plan; others get the rendered card only where the deploy allows it.
 	const image = !safe ? "" : HERO_CARDS.has(safe) ? `${origin}/cards/${safe}.png` : env.PREFLIGHT_SHARE_CARD_IMAGES === "on" ? `${origin}/card/${safe}` : "";
@@ -65,12 +65,12 @@ export async function sharePage(request: Request, env: CardEnv, token: string, f
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(`${origin}/s/${safe}`)}">
-${image && got.ok ? `<meta property="og:image" content="${esc(image)}">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta property="og:image:alt" content="${esc(desc)}">\n<meta name="twitter:card" content="summary_large_image">` : '<meta name="twitter:card" content="summary">'}
+${image && got.ok ? `<meta property="og:image" content="${esc(image)}">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta property="og:image:alt" content="${esc(missing ? desc : describe(h))}">\n<meta name="twitter:card" content="summary_large_image">` : '<meta name="twitter:card" content="summary">'}
 <meta http-equiv="refresh" content="0; url=${esc(cockpit)}">
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0E2634;color:#FFF5D1;font:16px/1.5 system-ui,sans-serif;padding:16px}a{color:#FFF5D1}</style>
 </head>
 <body>
-<p>${missing ? "No flight record matches this link. " : ""}<a href="${esc(cockpit)}">${missing ? "Open Preflight" : "Open this flight in Preflight"}</a></p>
+${risk ? `<p>${esc(risk)}</p>\n` : ""}<p>${missing ? "No flight record matches this link. " : ""}<a href="${esc(cockpit)}">${missing ? "Open Preflight" : "Open this flight in Preflight"}</a></p>
 </body>
 </html>`;
 	return new Response(html, {

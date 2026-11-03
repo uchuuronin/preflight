@@ -114,3 +114,20 @@
 		transition: none;
 	}
 }
+
+/* The beginner's line (PlainLine): a full-width row in the cockpit head, right above the status
+   line (same order, earlier in the page). Body text colour, not dimmed: it is the first thing a
+   beginner reads. */
+.pf-addon-plainline {
+	flex-basis: 100%;
+	order: 6;
+	margin: 2px 0 0;
+	font-size: 15px;
+	line-height: 1.45;
+	color: var(--pf-fg);
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+	.pf-addon-plainline { font-size: 14px; }
+}
