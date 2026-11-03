@@ -95,8 +95,9 @@ describe("the fix race on screen", () => {
 		});
 		expect(screen.getByText(/Rejected: the re-run still ran out of memory\./)).toBeTruthy();
 		expect(screen.getByText(/Passed: eval peak 10\.4 GiB, loss within 0\.11%\./)).toBeTruthy();
-		expect(screen.getAllByText(/Checked on 2 Nov:/).length).toBe(2);
-		expect(screen.queryByText(en["fix.not_verified"])).toBeNull();
+		expect(screen.getAllByText(/An earlier patch for this fix, checked on 2 Nov on an A10:/).length).toBe(2);
+		// this race's patches are still not verified themselves
+		expect(screen.getAllByText(en["fix.not_verified"]).length).toBe(2);
 	});
 
 	it("stays away when the fix loop is off or the finding has no fix", () => {

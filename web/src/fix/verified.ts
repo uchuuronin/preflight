@@ -14,8 +14,10 @@ export interface Verdict {
 	evalPeakBytes?: number;
 	/** The loss's change at the same seed, as a fraction (0.0011 is 0.11%). */
 	lossDelta?: number;
-	/** When Preflight ran this check (a verify run before this race), YYYY-MM-DD. */
+	/** When Preflight checked an earlier patch for the same fix (a verify run before this race), YYYY-MM-DD. */
 	checkedOn?: string;
+	/** The GPU that earlier check ran on. */
+	gpu?: string;
 }
 
 /**
@@ -26,8 +28,8 @@ export interface Verdict {
  * 11,153,155,072 bytes, loss within 0.11% at the same seed (record 01M6EHYYCM3JRHXKJ9XM5EPJ41).
  */
 const CHECKED: ReadonlyArray<{ sample: string; templateId: string; value: unknown; verdict: Verdict }> = [
-	{ sample: "lora-qwen", templateId: "eval.wrap_no_grad", value: null, verdict: { passed: false, reason: "oom", checkedOn: "2026-11-02" } },
-	{ sample: "lora-qwen", templateId: "eval.no_grad_and_batch", value: 8, verdict: { passed: true, evalPeakBytes: 11_153_155_072, lossDelta: 0.0011, checkedOn: "2026-11-02" } },
+	{ sample: "lora-qwen", templateId: "eval.wrap_no_grad", value: null, verdict: { passed: false, reason: "oom", checkedOn: "2026-11-02", gpu: "A10" } },
+	{ sample: "lora-qwen", templateId: "eval.no_grad_and_batch", value: 8, verdict: { passed: true, evalPeakBytes: 11_153_155_072, lossDelta: 0.0011, checkedOn: "2026-11-02", gpu: "A10" } },
 ];
 
 type RaceVerify = { passed?: boolean; reason?: string | null; eval_peak_bytes?: number | null; loss_delta?: number | null };

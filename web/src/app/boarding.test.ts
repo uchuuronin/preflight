@@ -145,7 +145,8 @@ describe("metaModelsOnRecord (PM, Nov 3: the record's header line)", () => {
 			{ name: "Muse Spark", did: ["models.did.script_map"] },
 			{ name: "Muse Spark Open", did: ["models.did.triage"] },
 		]);
-		expect(m!.usd).toBeCloseTo(0.029, 6);
+		// the failed Meta call was billed too; the non-Meta one isn't counted
+		expect(m!.usd).toBeCloseTo(0.039, 6);
 	});
 	it("is nothing when no Meta model was called", () => {
 		expect(metaModelsOnRecord([])).toBeNull();

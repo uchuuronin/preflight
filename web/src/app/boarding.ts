@@ -70,11 +70,13 @@ export function metaModelsOnRecord(provenance: ReadonlyArray<ModelCallSeen & { c
 	let usd = 0;
 	for (const c of provenance ?? []) {
 		const name = metaModelName(c.model);
-		if (!name || c.ok === false) continue;
+		if (!name) continue;
+		// A failed call is billed too (a timed-out Glimmer call by its seconds): counted in the cost, not in what it did.
+		usd += typeof c.cost_usd === "number" && Number.isFinite(c.cost_usd) ? c.cost_usd : 0;
+		if (c.ok === false) continue;
 		if (!by.has(name)) by.set(name, new Set());
 		const key = c.purpose ? DID[c.purpose] : undefined;
 		if (key) by.get(name)!.add(key);
-		usd += typeof c.cost_usd === "number" && Number.isFinite(c.cost_usd) ? c.cost_usd : 0;
 	}
 	if (!by.size) return null;
 	return { models: [...by].map(([name, did]) => ({ name, did: [...did] })), usd };

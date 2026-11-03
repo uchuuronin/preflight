@@ -64,14 +64,18 @@ function Lane({ c, running, elapsed, verdict }: { c: { template_id: string; valu
 						<summary>{t("fix.diff")}</summary>
 						<pre>{c.diff}</pre>
 					</details>
-					{verdict ? (
-						<p className={`pf-fix__verdict ${verdict.passed ? "is-passed" : "is-rejected"}`}>
-							{verdict.checkedOn ? <span className="pf-dim">{t("fix.verdict.checked_on", { date: fmtDay(verdict.checkedOn) })} </span> : null}
-							{verdictText(verdict)}
-						</p>
+					{verdict && !verdict.checkedOn ? (
+						<p className={`pf-fix__verdict ${verdict.passed ? "is-passed" : "is-rejected"}`}>{verdictText(verdict)}</p>
 					) : (
 						<p className="pf-fix__unverified">{t("fix.not_verified")}</p>
 					)}
+					{verdict?.checkedOn ? (
+						// An earlier patch for the same fix, checked by verify: said as that, never as this patch's result (review, Nov 3).
+						<p className="pf-fix__verdict">
+							<span className="pf-dim">{t("fix.verdict.earlier", { date: fmtDay(verdict.checkedOn), gpu: verdict.gpu ?? "?" })} </span>
+							<span className={verdict.passed ? "is-passed" : "is-rejected"}>{verdictText(verdict)}</span>
+						</p>
+					) : null}
 				</>
 			) : null}
 		</li>
