@@ -48,7 +48,9 @@ const GOALS: Array<{ kind: ObjectiveKind; key: string }> = [
 // minutes (A's GPU_FALLBACK, runner/pipeline.py), and an out-of-memory can move it to a bigger card:
 // "L4 or A10" (PM, Nov 3) with a line saying the rest. Bigger cards are a choice, never a default.
 const DEFAULT_GPU = "L4";
-const GPUS = ["L40S", "A100-SXM-80GB", "H100-SXM-80GB", "MI300X"];
+// The GPUs the runner rents (Modal's): an MI300X check-in would be refused (B, Nov 3). The cockpit's GPU
+// knob still predicts it.
+const GPUS = ["L40S", "A100-SXM-80GB", "H100-SXM-80GB"];
 
 type Intake = "repo" | "upload" | "command" | string;
 
@@ -103,7 +105,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 		return fn;
 	};
 	const smooth = (): ScrollBehavior => (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
-	// From the hint to the box and, once it's ticked, back to Check in (two panels up on a phone).
+	// From the hint to the box and, once it's ticked, back to Check in (both in the last panel).
 	const fromHint = useRef(false);
 	const checkInBtn = useRef<HTMLButtonElement>(null);
 	const focusDataUse = () => {
@@ -431,7 +433,9 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						</div>
 						{/* Goal and GPU share a row where the desk is wide enough (Chiya, Nov 2: less scrolling). */}
 						<div className="pf-desk__pair">
-							<div className="pf-desk__row">
+							{/* The aim, the GPU choices beside it, and under the aim what you're trying to do (Chiya's mockup,
+							    Nov 3). In the page in reading and Tab order, aim, GPU, goal box; placed by the grid. */}
+							<div className="pf-desk__row pf-desk__aim">
 								<span className="pf-desk__label" id={`${ids.describe}-goal`}>
 									{t("newflight.goal")}
 								</span>
@@ -449,7 +453,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									))}
 								</div>
 							</div>
-							<div className="pf-desk__row">
+							<div className="pf-desk__row pf-desk__gpu">
 								<span className="pf-desk__label" id={`${ids.describe}-gpu`}>
 									{t("newflight.gpu")}
 								</span>
@@ -467,6 +471,10 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									</button>
 								</div>
 								{gpu === DEFAULT_GPU ? <p className="pf-hint">{t("newflight.gpu.hint")}</p> : null}
+							</div>
+							<div className="pf-field pf-desk__goalbox">
+								<label htmlFor={ids.describe}>{t("newflight.describe.label")}</label>
+								<textarea id={ids.describe} rows={2} placeholder={t("newflight.describe.placeholder")} value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
 							</div>
 						</div>
 						{privateOffered ? (
@@ -497,33 +505,6 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								</div>
 							</div>
 						) : null}
-						<div className="pf-field">
-							<label htmlFor={ids.describe}>{t("newflight.describe.label")}</label>
-							<textarea id={ids.describe} rows={2} placeholder={t("newflight.describe.placeholder")} value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
-						</div>
-						{error ? (
-							<p className="pf-error" role="alert">
-								{error}
-							</p>
-						) : null}
-						{/* "Got it" right above Check in (D's walkthrough: it sat a screen below, under Departures). */}
-						<DataUseNotice onChange={onDataUse} />
-						<div className="pf-desk__foot">
-							{accepted ? (
-								// Source: measured, A's run a-smoke-l4-main-4 (Oct 28): the LoRA zoo script from
-								// upload to record in 6 min 45 s on an L4 (docs/status/a.md). No dollar figure until
-								// the sandbox's CPU and memory cost is read off the bill.
-								<span className="pf-hint">{t("newflight.cost_hint")}</span>
-							) : (
-								// On a phone the box is two panels down: the hint takes the visitor there.
-								<button type="button" className="pf-link pf-hint" onClick={focusDataUse}>
-									{t("datause.needed")}
-								</button>
-							)}
-							<button ref={checkInBtn} type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy || !accepted} onClick={() => void submit()}>
-								{busy ? t("newflight.checking_in") : t("newflight.check_in")}
-							</button>
-						</div>
 					</section>
 					<section className="glass pf-departures" aria-label={t("newflight.samples")}>
 						<div className="pf-departures__head">
@@ -548,6 +529,41 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						))}
 						<p className="pf-departures__foot">{t("newflight.departures.foot")}</p>
 					</section>
+					{/* The documentation link's own card, under the samples (Chiya's mockup, Nov 3); with the Help page. */}
+					{flag("c.help") ? (
+						<section className="glass pf-checkin__doc" aria-label={t("newflight.help_card")}>
+							<a className="pf-link" href="#/help">
+								{t("newflight.help_link")}
+							</a>
+						</section>
+					) : null}
+				</div>
+				{/* Where the code goes, "Got it" and Check in: one panel across both columns, last (Chiya's mockup). */}
+				{/* A plain box: the notice inside is its own region, named "Where your code goes" (review, Nov 3: two
+				    nested regions with one name). */}
+				<div className="glass pf-checkin__confirm">
+				{error ? (
+					<p className="pf-error" role="alert">
+						{error}
+					</p>
+				) : null}
+				{/* "Got it" right above Check in (D's walkthrough: it sat a screen below, under Departures). */}
+				<DataUseNotice onChange={onDataUse} />
+				<div className="pf-desk__foot">
+					{accepted ? (
+						// Source: measured, production check-ins of the LoRA sample on an L4: 4 min 59 s and
+						// 10 min 21 s (B, from-b.md, Nov 3; the first smoke run, Oct 28, took 6 min 45 s).
+						<span className="pf-hint">{t("newflight.cost_hint")}</span>
+					) : (
+						// The box sits above, in the same panel: the hint takes the visitor there.
+						<button type="button" className="pf-link pf-hint" onClick={focusDataUse}>
+							{t("datause.needed")}
+						</button>
+					)}
+					<button ref={checkInBtn} type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy || !accepted} onClick={() => void submit()}>
+						{busy ? t("newflight.checking_in") : t("newflight.check_in")}
+					</button>
+				</div>
 				</div>
 				<p className="pf-notice">{t("newflight.notice")}</p>
 			</div>

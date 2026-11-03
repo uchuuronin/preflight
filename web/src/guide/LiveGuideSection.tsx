@@ -12,7 +12,7 @@ import { beat, bestCombo, bestSingleRisk, comboKeys, comboVisit, comboWords, sin
 import { valueText } from "./GuidePanel";
 import { withinLimits, NO_LIMITS } from "./limits";
 import { isFailing } from "./ruleTour";
-import { GuideFallback, LiveTour, type LiveView, type TourContext } from "./liveGuide";
+import { GuideFallback, LiveTour, TourCancelled, type LiveView, type TourContext } from "./liveGuide";
 import { MoveChoices } from "./MoveChoices";
 
 export function LiveGuideSection({
@@ -30,7 +30,10 @@ export function LiveGuideSection({
 	latest.current = ws;
 	const [view, setView] = useState<LiveView | null>(null);
 	const [busy, setBusy] = useState(false);
-	const [ask, setAsk] = useState("");
+	// What the visitor wrote on New flight ("What are you trying to do? The guide reads this."), saved as the
+	// record's objective.description: it waits in the guide's own box, so Muse Spark reads it when they
+	// press Ask the guide (PM, Nov 3). Theirs to edit or clear first.
+	const [ask, setAsk] = useState(() => (record.job.objective?.description ?? "").trim().slice(0, 500));
 	const [unpinAsk, setUnpinAsk] = useState<string | null>(null);
 	// Combined moves turned down on the card: the guide's sensitivity doesn't offer them again.
 	const [turnedDown, setTurnedDown] = useState<ReadonlySet<string>>(new Set());
@@ -59,9 +62,16 @@ export function LiveGuideSection({
 		tourRef.current = new LiveTour(recordRef, ctx, setView);
 	}
 	const tour = tourRef.current;
+	// Closed (the visitor took the quick read, the guide fell back, another record): the tour stops, so a
+	// late answer can't move a knob behind the rule-based tour.
+	useEffect(() => {
+		tour.reopen(); // React's development double mount closes it once on the way in
+		return () => tour.cancel();
+	}, [tour]);
 
 	useEffect(() => {
-		onStatus?.(busy ? "thinking" : view ? view.awaiting : "ready");
+		// "working": busy after a round came back (Muse Spark has spoken or moved a knob and goes on).
+		onStatus?.(busy ? (view ? "working" : "thinking") : view ? view.awaiting : "ready");
 	}, [busy, view, onStatus]);
 
 	const run = async (step: (tour: LiveTour) => Promise<LiveView>) => {
@@ -69,6 +79,7 @@ export function LiveGuideSection({
 		try {
 			await step(tour);
 		} catch (e) {
+			if (e instanceof TourCancelled) return;
 			onFallback(e instanceof GuideFallback && e.message ? e.message : t("guide.fallback"));
 		} finally {
 			setBusy(false);
