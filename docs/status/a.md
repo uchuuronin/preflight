@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Nov 3, 10:55 AM ET.
+Updated Tue Nov 3, 12:05 PM ET.
 
 **Production runner: fixes live, deployed from ws-a c146cf11** (= main d9e6b555, the main the PM posted at 10:45, plus OGB's and BEIR's dataset hosts in the probe egress; `a-deploy-main-29`, GitHub 41668262328, Nov 3 15:52 UTC / 10:52 AM ET), after three startup checks passed (`a-startup-check-29` 41667268503, `a-startup-check-serving-15` 41667695263, `a-startup-torch-new-3` 41668003979: the torch 2.7.1 image); the limit check passed after it (`a-limit-check-10`, 41668393969). **On in production:** `runner.read_closure`, `probes.repo_install_exec`, `runner.probe_without_map`, `harness.lens_by_entry`, `probes.torch_new`, `probes.dataset_cache`, with the morning's flags; the probe sees PyG's wheel index; the probe egress adds snap.stanford.edu and public.ukp.informatik.tu-darmstadt.de. Off: `probes.step_clock`, `probes.uv_install`, `probes.agent_single_task`. **Rollback: `modal deploy --env main` from 28fc9b62** (the 10:20 deploy), or ad12da7 for the morning's.
 
@@ -57,6 +57,19 @@ The flag is on only in each ops run's own process (`ground_truth --install-repo`
 | 6, vLLM bench | by command | not tried: the serving image's vLLM 0.6.4 has no `bench` subcommand, so vllm is off the command list | n/a |
 | 2, LitGPT | install check on CPU, pip against uv (`probes.uv_install`) | **neither installs**: pip ran out at 420 s; uv's resolve overflowed its stack, then pip ran out (code fix since, not yet rerun when written: a 64 MiB stack, and "no solution" ends the install with uv's reason). The cause isn't the resolver: LitGPT at that commit asks for torch>=2.7 and lightning>=2.6.1, and the image has torch 2.5.1 | `a-trial-litgpt-install-pip` 41545743492, `-uv` 41545748477 |
 | 8, OGB arxiv | install check, uv and PyG's index (`probes.extra_hosts`) | **installs in 12.9 s**, every import the scan sees present; torch_sparse, which PyG imports at run time, wasn't among them (fixed: torch_geometric now brings torch-scatter and torch-sparse from PyG's index) | `a-trial-ogb-install-pyg` 41545754612 |
+
+## Fresh scripts (Nov 3): pinned before any probe
+
+The PM's second held-out list (`docs/validation/fresh-hash.txt`), read 12:00 ET: the file Chiya sent hashes to the
+committed SHA-256 (497b052d…94df3). Each pinned to its default branch's head at A's first clone (17:01 UTC), before
+any of them was probed, and run once through production (the runner deployed from ws-a c146cf11 at 10:52 AM), first
+attempt only, with no Preflight change in between:
+
+| # | Repo, entry | Commit | Command, as published |
+| --- | --- | --- | --- |
+| F1 | pytorch/examples, `word_language_model/main.py` | acc295dc7b90714f1bf47f06004fc19a7fe235c4 | `python main.py --cuda --epochs 6` |
+| F2 | huggingface/notebooks, `examples/text_classification.ipynb` (as a notebook) | c31b9837028eeb7b46b63b6a2758e66f2c758643 | as it ships (file sha256 6b7bb716…c7db33, in `validation/fresh/f2/` for the check-in) |
+| F3 | kuangliu/pytorch-cifar, `main.py` | 49b7aa97b0c12fe0d4054e670403a16b6b834ddd | `python main.py` |
 
 ## Decisions Nov 3 (the PM's 8:04 AM list; decide and log)
 
