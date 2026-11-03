@@ -4,6 +4,12 @@ Updated Mon Nov 2, about 1 AM ET, on `ws-b` (merges, not rebases, for pushed com
 
 **Unseen scripts:** B has not opened `unseen-scripts.md` in the Project, and won't before Monday's scoring.
 
+## Decisions Tue Nov 3 (from 8 AM ET; the PM's 8:04 list)
+
+| # | What | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- |
+| 39 | **D's search fixes, final re-check on main ad12da7:** must-fixes (a) bounded scan, (b) failed calls' fee, (c) no model text: pass; (d) a page only opened can be cited: **fail**, re-tested (a completed `open_page`, annotated, is kept and titled from the open). Posted; `harness.spark_search` shouldn't ship until (d) is fixed. | PM's item 1, by 9 AM, for Chiya's noon call. | none | — |
+
 ## Decisions today (Nov 2, from 11:15 AM ET; Chiya out until about 5 PM)
 
 | # | What | Why | Cost | How to undo |
