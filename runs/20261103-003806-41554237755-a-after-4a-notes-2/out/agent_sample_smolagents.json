@@ -1,0 +1,41 @@
+{
+  "sample": {
+    "tasks": [
+      {
+        "task_id": "s1-d55e2c038ac0",
+        "model": null,
+        "turns": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 1,
+        "latency_s": 0.082,
+        "success": null,
+        "context_tokens_by_turn": [],
+        "cost_usd": 0.0,
+        "stop_reason": "error",
+        "trace": null
+      }
+    ],
+    "population": null,
+    "selection": "the first 1 tasks the script started; script wall 8 s; script failed: smolagents.utils.AgentGenerationError: Error while generating output: Error code: 400; 1 one-call tasks (side calls may split...",
+    "rate_limit_rpm": null,
+    "rate_limit_tpm": null,
+    "ended": "finished",
+    "concurrency": 1
+  },
+  "usd": 0,
+  "task_ends": {
+    "s1-d55e2c038ac0": {
+      "opened_rank": 0,
+      "last_finish": null,
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    }
+  },
+  "task_rows": {},
+  "provider": "meta"
+}
