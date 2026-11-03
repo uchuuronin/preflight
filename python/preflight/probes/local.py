@@ -224,7 +224,7 @@ class ProbeSpec:
 	install_pyg: bool = False  # probes.extra_hosts: PyG's wheel index (the sandbox reaches data.pyg.org)
 	# probes.repo_install_exec: a setup.py that builds its list in code is run, in the sandbox, to read it
 	install_exec: bool = False
-	torch_stop: bool = (
+	torch_note: bool = (
 		False  # probes.torch_new: stop, saying so, when the code's torch is newer than the image's
 	)
 	dataset_cache: bool = False  # probes.dataset_cache: torchvision's datasets from the read-only volume
@@ -1004,7 +1004,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"install_uv": spec.install_uv,
 				"install_pyg": spec.install_pyg,
 				"install_exec": spec.install_exec,
-				"torch_stop": spec.torch_stop,
+				"torch_note": spec.torch_note,
 				"dataset_cache": spec.dataset_cache,
 				"step_clock": spec.step_clock,
 				"install_sdists": list(spec.install_sdists),

@@ -104,7 +104,7 @@ def test_code_that_asks_for_a_newer_torch_reads_its_ask():
 	assert R.torch_asks({"requirements.txt": "torch\nnumpy\n"}) == []  # no version asked: the image's is fine
 	assert (
 		R.torch_too_old(["torch>=2.6"], "2.5.1")
-		== "needs torch>=2.6; Preflight's probe image has torch 2.5.1"
+		== "asks for torch>=2.6; Preflight's probe image has torch 2.5.1"
 	)
 	assert R.torch_too_old(["torch>=2.4"], "2.5.1") is None
 
@@ -122,18 +122,22 @@ def test_the_image_is_picked_by_the_ask_only_with_the_flag(monkeypatch):
 	assert P._image(sm, files) == "probe"
 	monkeypatch.setattr(P, "_flag", lambda name: name == "probes.torch_new")
 	assert P._image(sm, files) == "torch27"
+	assert P._image(sm, {**files, "requirements.txt": "torch>=2.8\n"}) == "torch27"  # the nearest torch here
 	assert (
-		P._image(sm, {**files, "requirements.txt": "torch>=2.8\n"}) == "probe"
-	)  # neither image fits: the stop says so
+		P._image(sm, {**files, "requirements.txt": "torch==2.6.0\n"}) == "torch27"
+	)  # pip freeze's pin (review)
+	assert P._image(sm, {**files, "requirements.txt": "torch==2.4.0\n"}) == "probe"  # an older pin: as before
 	assert P._image(sm, {**files, "requirements.txt": "torch\n"}) == "probe"
 
 
-def test_a_torch_the_image_cant_give_stops_before_any_install(tmp_path, monkeypatch):
-	(tmp_path / "requirements.txt").write_text("torch>=2.8\neinops\n")
+def test_a_newer_torch_ask_is_said_plainly_and_the_install_runs_on(tmp_path, monkeypatch):
+	(tmp_path / "requirements.txt").write_text("torch==2.6.0\neinops\n")
 	monkeypatch.setattr(R, "installed", lambda: {"torch": "2.5.1+cu124"})
-	monkeypatch.setattr(R, "_pip", lambda *a, **k: (_ for _ in ()).throw(AssertionError("installed")))
-	err, dirs = R.install(tmp_path, tmp_path / "deps", log=lambda m: None, torch_stop=True)
-	assert err == "needs torch>=2.8; Preflight's probe image has torch 2.5.1" and dirs == []
+	ran, said = [], []
+	monkeypatch.setattr(R, "_pip", lambda keep, *a, **k: ran.append(keep))
+	err, _ = R.install(tmp_path, tmp_path / "deps", log=said.append, torch_note=True)
+	assert err is None and ran == [["einops"]]  # a pip-freeze pin no longer stops the job (review)
+	assert any("asks for torch==2.6.0; Preflight's probe image has torch 2.5.1" in m for m in said)
 
 
 def test_the_stop_is_only_for_a_newer_torch_review():

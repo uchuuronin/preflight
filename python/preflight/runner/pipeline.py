@@ -153,7 +153,6 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
 		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
 		**({"install_exec": True} if spec.install_exec else {}),  # a list read from the build installs more
-		**({"torch_stop": True} if spec.torch_stop else {}),  # a stop instead of a run
 		**({"dataset_cache": True} if spec.dataset_cache else {}),  # no download in the measured time
 		**({"step_clock": True} if spec.step_clock else {}),  # a probe that reports more
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
@@ -313,10 +312,11 @@ def _image(sm: ScriptMap, files: dict[str, str]) -> str:
 	if _uses_vllm(sm, files):
 		return "serving"
 	if _flag("probes.torch_new"):
-		from preflight.recorder.requirements import IMAGE_TORCH, NEW_IMAGE_TORCH, torch_asks, torch_fits
+		from preflight.recorder.requirements import IMAGE_TORCH, torch_asks, torch_too_old
 
-		asks = torch_asks(files)
-		if asks and not torch_fits(asks, IMAGE_TORCH) and torch_fits(asks, NEW_IMAGE_TORCH):
+		# any ask that rules the image's 2.5.1 out from below (>=2.6, ==2.6.0, ~=2.6, >=2.8): the newer image, the
+		# nearest torch Preflight has; an exact pin it doesn't match runs on 2.7.1, as one runs on 2.5.1 today (review)
+		if torch_too_old(torch_asks(files), IMAGE_TORCH):
 			return "torch27"
 	return "probe"
 
@@ -350,7 +350,7 @@ def _spec(
 		install_uv=deps.install_requirements and _flag("probes.uv_install"),
 		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
 		install_exec=deps.install_requirements and _repo_install_on() and _flag("probes.repo_install_exec"),
-		torch_stop=deps.install_requirements and _flag("probes.torch_new"),
+		torch_note=deps.install_requirements and _flag("probes.torch_new"),
 		# only code that imports torchvision: the flag re-keys no other job's probes (review, Nov 3)
 		dataset_cache=_flag("probes.dataset_cache") and _uses_torchvision(fetched.files),
 		step_clock=_flag("probes.step_clock"),

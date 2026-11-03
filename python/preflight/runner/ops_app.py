@@ -834,18 +834,13 @@ def ground_truth(
 
 		p = {**p, "lens": command_lens, "generate_calls": EVAL_PROBE_CALLS if command_lens == "eval" else 0,
 			"generate_sample": SERVING_PROBE_PROMPTS if command_lens == "serving" else 0}  # fmt: skip
-	if torch_new:  # probes.torch_new in this process only: the image pick and the plain stop
-		from preflight.recorder.requirements import IMAGE_TORCH, NEW_IMAGE_TORCH, torch_asks, torch_fits
+	if torch_new:  # probes.torch_new in this process only: the image pick and the plain note
+		from preflight.recorder.requirements import IMAGE_TORCH, torch_asks, torch_too_old
 
 		asks = torch_asks(files)
-		if (
-			p["image"] == "probe"
-			and asks
-			and not torch_fits(asks, IMAGE_TORCH)
-			and torch_fits(asks, NEW_IMAGE_TORCH)
-		):
+		if p["image"] == "probe" and torch_too_old(asks, IMAGE_TORCH):
 			p = {**p, "image": "torch27"}
-		opts["torch_stop"] = True
+		opts["torch_note"] = True
 		print(f"[ground truth] torch asks {asks}: {p['image']} image", flush=True)
 	if p["lens"] == "agent":
 		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")

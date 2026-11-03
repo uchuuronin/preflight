@@ -171,7 +171,7 @@ def torch_too_old(asks: list[str], version: str) -> str | None:
 			newer = True
 		else:
 			return None  # an older pin, a cap or an exclusion: not a newer torch
-	return f"needs {', '.join(asks[:2])}; Preflight's probe image has torch {version}" if newer else None
+	return f"asks for {', '.join(asks[:2])}; Preflight's probe image has torch {version}" if newer else None
 
 
 # ---------------------------------------------------------------- probes.repo_install (off)
@@ -750,7 +750,7 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 
 def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None,
 	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = (),
-	build: bool = False, torch_stop: bool = False) -> tuple[str | None, list[Path]]:  # fmt: skip
+	build: bool = False, torch_note: bool = False) -> tuple[str | None, list[Path]]:  # fmt: skip
 	"""Install workdir/requirements.txt. Returns (pip's error tail or None, the dirs to import from).
 
 	target: this probe's own prefix; a shared one under PREFLIGHT_DEPS_DIR is used instead when set.
@@ -763,8 +763,8 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	uv (probes.uv_install): uv before pip. pyg (probes.extra_hosts): PyG's wheel index too, so torch-sparse
 	and the other NO_WHEELS packages install, and a repo's imports of them count as known. build
 	(probes.repo_install_exec): a setup.py that builds its list in code is run to read it (requires_from_build).
-	torch_stop (probes.torch_new): when what's installed asks for a torch the image's excludes, stop with that,
-	said plainly (torch_too_old), before any install."""
+	torch_note (probes.torch_new): when what's installed asks for a newer torch than the image's, say so plainly
+	(torch_too_old) and run on with the image's (the PM, Nov 3; never a stop: review)."""
 	import time
 
 	started = time.monotonic() if build else None  # the build's own read counts against the install's limit
@@ -789,12 +789,12 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	if extra:  # first, so the requirements' own cap (MAX_REQUIREMENTS) never drops them
 		text = "\n".join([*extra, text])
 	have = installed()
-	if torch_stop and "torch" in have:
+	if torch_note and "torch" in have:
 		asks = [f"torch{m['spec'].replace(' ', '')}" for raw in text.splitlines()
 			if (m := _LINE.fullmatch(raw.split(' #', 1)[0].strip())) and _norm(m['name']) == 'torch' and m['spec'] and not m['marker']]  # fmt: skip
-		stop = torch_too_old(asks, have["torch"].split("+", 1)[0])
-		if stop:
-			return stop, []
+		newer = torch_too_old(asks, have["torch"].split("+", 1)[0])
+		if newer:  # said plainly and run on: a pin pip freeze wrote (torch==2.6.0) often runs on a near torch (review)
+			log(f"[preflight] requirements: the code {newer}, and runs on it")
 	keep, notes = plan(text, have)
 	for n in notes:
 		log(f"[preflight] requirements: {n}")
