@@ -1,0 +1,107 @@
+{
+  "script": "lm-evaluation-harness",
+  "entrypoint": "lm_eval/__main__.py",
+  "args": [
+    "--model",
+    "hf",
+    "--model_args",
+    "pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,dtype=bfloat16",
+    "--tasks",
+    "arc_easy,hellaswag,piqa",
+    "--batch_size",
+    "auto"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ValueError",
+    "error": "ValueError: Tasks not found: arc_easy, hellaswag, piqa\n",
+    "seconds": 1.5849115720000029,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 32.8
+  },
+  "recorder": {
+    "status": "error",
+    "error": "ValueError: Tasks not found: arc_easy, hellaswag, piqa. ValueError: Tasks not found: arc_easy, hellaswag, piqa at lm_eval/config/evaluate_config.py:477, before the first optimizer step (stage: running script)",
+    "error_code": "user_error",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 29.361,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 3625295872.0
+    },
+    "step_log": [],
+    "log_tail": "YTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n[preflight] requirements: the repo declares 14 dependencies (pyproject.toml, setup.cfg or setup.py)\n[preflight] requirements: the script imports promptsource, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports pytest, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports trackio, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports wandb: installing wandb\n[preflight] requirements: kept the image's datasets 3.1.0 (asked for 'datasets>=2.16.0')\n[preflight] requirements: kept the image's numpy 2.1.3 (asked for 'numpy')\n[preflight] requirements: kept the image's jinja2 3.1.6 (asked for 'jinja2')\n[preflight] requirements: kept the image's dill 0.3.8 (asked for 'dill')\n[preflight] requirements: kept the image's typing_extensions 4.16.0 (asked for 'typing_extensions')\n[preflight] requirements: kept the image's tqdm 4.70.1 (asked for 'tqdm>=4.59.0')\n[preflight] requirements: installing evaluate>=0.4.0, pytablewriter, rouge-score>=0.0.4, sacrebleu>=1.5.0, scikit-learn>=0.24.1, sqlitedict, word2number, more_itertools, wandb\n[preflight] requirements: wrote the repo's own package metadata (an editable install, no dependencies)\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T14:43:17Z",
+      "duration_s": 29.361,
+      "error": "ValueError: Tasks not found: arc_easy, hellaswag, piqa. ValueError: Tasks not found: arc_easy, hellaswag, piqa at lm_eval/config/evaluate_config.py:477, before the first optimizer step (stage: running script)",
+      "error_code": "user_error",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 16.05,
+        "max_w": 16.05,
+        "samples": 3
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 3625295872.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 29.361,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "eval",
+  "image": "probe"
+}

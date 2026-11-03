@@ -1,0 +1,11 @@
+{
+	"name": "20261103-144211-41656267326-a-all4-5s-r",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41656267326",
+	"ref": "f94792d9ffae7c180ad280d065eafe7d9046a351",
+	"sha": "f94792d9ffae7c180ad280d065eafe7d9046a351",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/EleutherAI/lm-evaluation-harness --commit ddd67220430a2470529f25fd5c05a576ca1057a0 --entrypoint lm_eval/__main__.py --args=--model,hf,--model_args,pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,,dtype=bfloat16,--tasks,arc_easy,,hellaswag,,piqa,--batch_size,auto --bare-steps 100000 --budget-min 20 --first-gpu A10 --install-requirements --install-repo --pyg --build --torch-new --dataset-cache --eval-units --sdists sqlitedict,rouge-score,word2number --flags runner.read_closure,harness.lens_by_entry,runner.probe_without_map,probes.repo_install,probes.extra_hosts,probes.eval_units",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T14:43:51Z"
+}
