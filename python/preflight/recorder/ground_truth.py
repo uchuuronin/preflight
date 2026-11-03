@@ -170,7 +170,7 @@ def _bare(
 			how = {
 				k: v
 				for k, v in (install_opts or {}).items()
-				if k in ("uv", "pyg", "sdists", "build", "torch_note")
+				if k in ("uv", "pyg", "sdists", "build", "torch_note", "requirements")
 			}  # the installer's own
 			err, dirs = install(work, caches / "deps", log=lambda m: print(m, flush=True), **repo_kw, **how)  # fmt: skip
 		finally:
@@ -278,6 +278,7 @@ def measure(
 			eval_units=int((install_opts or {}).get("eval_units") or 0),
 			entry_path=bool((install_opts or {}).get("entry_path")), tty=bool((install_opts or {}).get("tty")),
 			torch_hint=bool((install_opts or {}).get("torch_hint")),
+			requirements=str((install_opts or {}).get("requirements") or "requirements.txt"),
 			generate_calls=generate_calls))  # fmt: skip
 		_say(f"recorder run ended ({r.probe.status}) after {r.probe.steps} steps")
 	finally:

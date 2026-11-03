@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.6.5. Generated; do not edit.
+ * Preflight contract v0.6.6. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -55,6 +55,10 @@ export interface FlightRecord {
 	 * The run cost breakdown, written by B
 	 */
 	job_cost?: JobCost | null;
+	/**
+	 * 0.6.6: the runner commit and flags that made it (A)
+	 */
+	made_by?: MadeBy | null;
 }
 /**
  * Written by A.
@@ -1589,6 +1593,22 @@ export interface Estimate1 {
 	rate?: EstimateRate | null;
 }
 /**
+ * 0.6.6: what made this record (the re-validation, Nov 3): the runner's commit and the flags on in it.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "MadeBy".
+ */
+export interface MadeBy {
+	/**
+	 * The git commit the runner was deployed from
+	 */
+	runner_commit?: string | null;
+	/**
+	 * Every flag on in the runner when it made the record (flags.json, then its environment's overrides), sorted
+	 */
+	flags_on?: string[];
+}
+/**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
  * via the `definition` "JobEvent".
  */
@@ -1635,13 +1655,17 @@ export interface JobEvent {
 	 */
 	retryable?: boolean | null;
 	/**
-	 * On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')
+	 * On failed (and 0.6.6: on done with nothing_measured): a stable code in Probe.error_code's families; the UI shows t('error.<code>')
 	 */
 	error_code?: string | null;
 	/**
 	 * 0.6.5: every probe stopped at an import before its first step (or the job was refused for a package); with runner.free_resend on, one resend of this job today doesn't count against the visitor's daily probe jobs (JobRequest.resend_of names it)
 	 */
 	import_stop?: boolean | null;
+	/**
+	 * 0.6.6: on done, no probe reached its first step, so every readout abstains; error_code is the first stopped probe's cause, and the record carries the job.nothing_measured finding. With runner.nothing_measured on, a resend of this job today is free (JobRequest.resend_of), whatever the cause
+	 */
+	nothing_measured?: boolean | null;
 	/**
 	 * 0.6.5: on queued, this job is a free resend: it doesn't count against the visitor's daily probe jobs (the daily GPU dollar cap still holds)
 	 */
@@ -1758,4 +1782,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.6.5";
+export const SCHEMA_VERSION = "0.6.6";

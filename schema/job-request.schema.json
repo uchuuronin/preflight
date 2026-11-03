@@ -390,5 +390,5 @@
 	"title": "JobRequest",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.5/JobRequest"
+	"$id": "https://preflight.dev/schema/0.6.6/JobRequest"
 }

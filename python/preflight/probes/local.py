@@ -239,6 +239,8 @@ class ProbeSpec:
 	tty: bool = False
 	# probes.torch_hint: a torch attribute only a newer torch has is said as that, not as the script's own error
 	torch_hint: bool = False
+	# probes.entry_requirements: the requirements file to install, relative to the work dir (the entry point's nearest)
+	requirements: str = "requirements.txt"
 	step_clock: bool = False  # probes.step_clock: the GPU's SM clock on each timed step
 	install_sdists: tuple[
 		str, ...
@@ -1104,6 +1106,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"dataset_cache": spec.dataset_cache,
 				"entry_path": spec.entry_path,
 				"torch_hint": spec.torch_hint,
+				"requirements": spec.requirements,
 				"step_clock": spec.step_clock,
 				"install_sdists": list(spec.install_sdists),
 				"eval_units": spec.eval_units,

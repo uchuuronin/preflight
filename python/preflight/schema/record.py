@@ -15,7 +15,7 @@ from .ids import new_share_token, new_ulid
 from .prediction import Estimate, Objective, Predictions
 from .script_map import Framework, ScriptMap
 
-SCHEMA_VERSION = "0.6.5"
+SCHEMA_VERSION = "0.6.6"
 
 
 def _now() -> datetime:
@@ -807,6 +807,19 @@ class JobCost(Strict):
 # ---------------------------------------------------------------- the record
 
 
+class MadeBy(Strict):
+	"""0.6.6: what made this record (the re-validation, Nov 3): the runner's commit and the flags on in it."""
+
+	runner_commit: str | None = Field(
+		default=None, pattern=r"^[0-9a-f]{7,40}$", description="The git commit the runner was deployed from"
+	)
+	flags_on: list[str] = Field(
+		default_factory=list,
+		description="Every flag on in the runner when it made the record (flags.json, then its "
+		"environment's overrides), sorted",
+	)
+
+
 class FlightRecord(Strict):
 	schema_version: str = Field(default=SCHEMA_VERSION, pattern=r"^\d+\.\d+\.\d+$")
 	record_id: str = Field(default_factory=new_ulid, description="ULID, internal only")
@@ -831,6 +844,9 @@ class FlightRecord(Strict):
 	)
 	cost_basis: CostBasis | None = Field(default=None, description="Where the run cost's rates come from (B)")
 	job_cost: JobCost | None = Field(default=None, description="The run cost breakdown, written by B")
+	made_by: MadeBy | None = Field(
+		default=None, description="0.6.6: the runner commit and flags that made it (A)"
+	)
 
 	@model_validator(mode="after")
 	def _check(self):

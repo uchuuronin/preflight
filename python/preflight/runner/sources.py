@@ -96,8 +96,8 @@ def _too_big(
 			"the script you run, and Preflight reads that file and the files it imports",
 			code="submission.too_large",
 		)
-	return InvalidSubmission(f"the source{size} is more than Preflight reads ({limits}); point it at a smaller "
-		"directory, or probe it on your machine", code="submission.too_large")  # fmt: skip
+	return InvalidSubmission(f"the source{size} is more than Preflight reads ({limits}); upload only the folder "
+		"that holds the script, or probe it on your machine", code="submission.too_large")  # fmt: skip
 
 
 def _read_tree(root: Path) -> dict[str, str]:
@@ -354,7 +354,8 @@ def _git_read(
 	if not only_entry and not flag("runner.read_closure"):
 		raise InvalidSubmission(
 			f"the repository ({len(keep):,} text files, {total / 2**20:.0f} MB) is more than Preflight reads "
-			f"({MAX_FILES:,} files and {MAX_TOTAL_BYTES // 2**20} MB of text); probe it on your machine",
+			f"({MAX_FILES:,} files and {MAX_TOTAL_BYTES // 2**20} MB of text), and reading only the files its entry "
+			"point imports is off here; probe it on your machine",
 			code="submission.too_large",
 		)
 	if not entry:

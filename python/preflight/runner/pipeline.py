@@ -33,6 +33,7 @@ import contextlib
 import hashlib
 import json
 import logging
+import os
 import re
 import threading
 import time
@@ -157,6 +158,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"step_clock": True} if spec.step_clock else {}),  # a probe that reports more
 		**({"entry_path": True} if spec.entry_path else {}),  # another path can import other code
 		**({"tty": True} if spec.tty else {}),  # a terminal can change what the script does
+		**({"requirements": spec.requirements} if spec.requirements != "requirements.txt" else {}),  # another file
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
@@ -226,6 +228,53 @@ def _emit(ctx, stage: str, rec: FlightRecord | None = None, rev: int | None = No
 # ---------------------------------------------------------------- stages
 
 
+NOTHING_MEASURED = "job.nothing_measured"
+
+
+def _nothing_measured(probes: list) -> Probe | None:
+	"""runner.nothing_measured (off; the re-validation, Nov 3): the first stopped probe when no probe of this job
+	reached its first step (every readout then abstains), else None."""
+	if not _flag("runner.nothing_measured") or not probes:
+		return None
+	if any(
+		q.steps > 0 or q.status in ("ok", "cached", "oom") for q in probes
+	):  # an OOM is a measurement (review)
+		return None
+	return next((q for q in probes if q.error_code), probes[0])
+
+
+def _nothing_finding(first: Probe | None, fetched: Fetched) -> list:
+	if first is None:
+		return []
+	from preflight.schema import Evidence, Finding
+
+	from .failures import with_step
+
+	how = with_step(
+		f"The first stopped ({first.error_code or 'an error'})",
+		first.error_code,
+		entrypoint=fetched.entrypoint,
+	)
+	resend = (" Once it's fixed, check this code in again: one such resend a day is free (the daily GPU budget "
+		"still applies)." if _flag("runner.free_resend") else "")  # fmt: skip
+	return [Finding(id=NOTHING_MEASURED, severity="error", code=NOTHING_MEASURED, source="rule", title="Nothing measured",
+		detail=f"No probe reached its first step, so there are no measurements: every readout abstains. {how}{resend}",
+		evidence=[Evidence(metric="probes.reached_first_step", value=0.0, probe_id=first.id)])]  # fmt: skip
+
+
+def _made_by():
+	"""runner.made_by (off until the API reads 0.6.6): the runner's commit (PREFLIGHT_RUNNER_COMMIT, baked into the worker image at deploy) and every flag on."""
+	import re as _re
+
+	from preflight.schema import MadeBy
+
+	from .flags import _resolved
+
+	sha = (os.environ.get("PREFLIGHT_RUNNER_COMMIT") or "").strip().lower()
+	return MadeBy(runner_commit=sha if _re.fullmatch(r"[0-9a-f]{7,40}", sha) else None,
+		flags_on=sorted(k for k, v in _resolved().items() if v))  # fmt: skip
+
+
 def _skeleton(
 	fetched: Fetched, sm: ScriptMap, request: dict, base: FlightRecord | None = None
 ) -> FlightRecord:
@@ -241,7 +290,7 @@ def _skeleton(
 				"created_at": base.created_at,
 			}
 		)
-	return rec
+	return rec.model_copy(update={"made_by": _made_by()}) if _flag("runner.made_by") else rec
 
 
 def _skipped(p: PlannedProbe, why: str) -> Probe:
@@ -316,7 +365,16 @@ def _image_pins(image: str) -> str:
 	return "@" + hashlib.sha256("\n".join(PROBE_NEW_PACKAGES).encode()).hexdigest()[:12]
 
 
-def _image(sm: ScriptMap, files: dict[str, str]) -> str:
+def _requirements(fetched) -> str:
+	"""probes.entry_requirements: the requirements file nearest the entry point; else the top's requirements.txt."""
+	if not _flag("probes.entry_requirements"):
+		return "requirements.txt"
+	from preflight.recorder.requirements import entry_requirements
+
+	return entry_requirements(fetched.files, fetched.entrypoint)
+
+
+def _image(sm: ScriptMap, files: dict[str, str], req: str = "requirements.txt") -> str:
 	"""The sandbox image: "serving" for vLLM (its own image); with probes.torch_new, "torch27" when the code's
 	own torch requirement rules out the probe image's 2.5.1 and admits 2.7.1 (LitGPT's torch>=2.7, Nov 2);
 	else "probe"."""
@@ -327,7 +385,7 @@ def _image(sm: ScriptMap, files: dict[str, str]) -> str:
 
 		# any ask that rules the image's 2.5.1 out from below (>=2.6, ==2.6.0, ~=2.6, >=2.8): the newer image, the
 		# nearest torch Preflight has; an exact pin it doesn't match runs on 2.7.1, as one runs on 2.5.1 today (review)
-		if torch_too_old(torch_asks(files), IMAGE_TORCH):
+		if torch_too_old(torch_asks(files, req), IMAGE_TORCH):
 			return "torch27"
 	return "probe"
 
@@ -368,9 +426,10 @@ def _spec(
 		entry_path=_flag("runner.entrypoint_path"),
 		tty=_flag("probes.tty"),
 		torch_hint=_flag("probes.torch_hint"),
+		requirements=_requirements(fetched),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
-		image=_image(sm, fetched.files),
+		image=_image(sm, fetched.files, _requirements(fetched)),
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
 	)
@@ -503,7 +562,14 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		had = source.get("extra_packages") or []
 		source = {**source, "extra_packages": list(dict.fromkeys([*had, *req.extra_packages]))}
 	_emit(ctx, "fetching")
-	fetched = fetch(source, blobs=deps.blobs)
+	try:
+		fetched = fetch(source, blobs=deps.blobs)
+	except Exception as exc:  # a size refusal's way past names the script the job runs (review, Nov 3)
+		entry = source.get("entrypoint") if isinstance(source, dict) else None
+		if isinstance(entry, str) and getattr(exc, "entrypoint", None) is None:
+			with contextlib.suppress(AttributeError):
+				exc.entrypoint = entry
+		raise
 	if origin is not None and origin.parent is not None:
 		was = origin.parent.job.source.content_hash
 		# a record read before the closure read data files (B's must-fix 3, Nov 3) hashed its imports alone: the same
@@ -525,6 +591,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	if followup and origin.parent is not None:
 		# the parent's map and knobs carry over (no Muse Spark call): a new record, same script
 		rec = record_jobs.derive(origin.parent, ids)
+		if _flag("runner.made_by"):  # this job's runner, not the parent's
+			rec = rec.model_copy(update={"made_by": _made_by()})
 		if fetched.source.extra_packages != rec.job.source.extra_packages:  # this job added packages
 			src = rec.job.source.model_copy(update={"extra_packages": fetched.source.extra_packages})
 			rec = rec.model_copy(update={"job": rec.job.model_copy(update={"source": src})})
@@ -698,6 +766,12 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			import_stop=True,
 			message="every probe stopped at an import before its first step",
 		)
+	nothing = _nothing_measured(probes)
+	if (
+		nothing is not None
+	):  # runner.nothing_measured: the done event says so, with the cause (queue.complete)
+		_emit(ctx, "probing", rec, rev, nothing_measured=True, error_code=nothing.error_code,
+			message="no probe reached its first step: nothing was measured")  # fmt: skip
 	probes = [_with_step(q, fetched.entrypoint) for q in probes]
 	if patched_for:
 		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
@@ -733,8 +807,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		for f in keep
 		if not f.id.startswith(afresh)
 		and f.id != "source.login_skipped"  # said afresh: every job fetches its source
+		and f.id != NOTHING_MEASURED  # said afresh from this job's probes
 	]
-	read = [*_reading_findings(fetched), *_image_findings(sm, fetched)]
+	read = [*_reading_findings(fetched), *_image_findings(sm, fetched), *_nothing_finding(nothing, fetched)]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *read]})
 	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
 	# or Baseten for a diagnosis (private mode, contract 0.6.2)
@@ -903,6 +978,18 @@ def _n_files(n: int, word: str) -> str:
 
 
 def _map_or_skip(fetched: Fetched) -> tuple[ScriptMap, Fetched]:
+	"""_map_or_skip_inner; a refusal carries the entry point, so its way past names the script the job runs (the
+	re-validation, Nov 3: "preflight run train.py" for recipes/lora_finetune_single_device.py)."""
+	try:
+		return _map_or_skip_inner(fetched)
+	except Exception as exc:
+		if getattr(exc, "entrypoint", None) is None:
+			with contextlib.suppress(AttributeError):
+				exc.entrypoint = fetched.entrypoint
+		raise
+
+
+def _map_or_skip_inner(fetched: Fetched) -> tuple[ScriptMap, Fetched]:
 	"""The static map. With runner.probe_without_map (off; the PM, Nov 3), when the whole source doesn't map
 	(over 2 MB of Python, a file the reader can't parse, the reader's own failure), the entry point alone is
 	mapped and the job probes on as usual, the plain recorder on every file, saying the map was skipped and
@@ -1000,14 +1087,14 @@ def _image_findings(sm: ScriptMap, fetched: Fetched) -> list:
 	"""probes.torch_new (B's review, Nov 3; the PM's fix): when the torch 2.7.1 image was picked and its packages
 	override any of the code's own pins, say each one: "measured on transformers 4.52.3; your code pins 4.46.3".
 	The title is that line; the engine adds it to the estimates' reasons (api._image_note)."""
-	if _image(sm, fetched.files) != "torch27":
+	if _image(sm, fetched.files, _requirements(fetched)) != "torch27":
 		return []
 	from preflight.recorder.requirements import image_overrides, overrides_note
 	from preflight.schema import Evidence, Finding
 
 	from .images import PROBE_NEW_PACKAGES
 
-	over = image_overrides(fetched.files, PROBE_NEW_PACKAGES)
+	over = image_overrides(fetched.files, PROBE_NEW_PACKAGES, _requirements(fetched))
 	if not over:
 		return []
 	note = overrides_note(over)
