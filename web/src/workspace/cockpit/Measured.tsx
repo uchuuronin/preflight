@@ -69,7 +69,7 @@ export function Measured() {
 			>
 				{illustrative
 					? t("measured.capsule_illustrative", { n: fmt(record.probes.length, "count") })
-					: t("measured.capsule", { n: fmt(record.probes.length, "count"), cost: fmt(total, "usd") })}
+					: t(record.probes.length === 1 ? "measured.capsule_one" : "measured.capsule", { n: fmt(record.probes.length, "count"), cost: fmt(total, "usd") })}
 				{failed ? <FitMark fit="fails" label={t(allOom ? (failed === 1 ? "measured.oom_one" : "measured.oom_many") : failed === 1 ? "measured.failed_one" : "measured.failed_many", { n: fmt(failed, "count") })} /> : null}
 			</button>
 			<aside
