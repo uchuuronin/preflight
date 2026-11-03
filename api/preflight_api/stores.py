@@ -148,6 +148,13 @@ SAMPLES: dict[str, str] = {
 	"pretrain": "schema/examples/pretrain.json",
 	"agent": "schema/examples/agent.json",
 	"agent-eval": "web/src/workspace/fixtures/agent-eval-oct31.record.json",
+	# The other five the web lists (D's walkthrough, Nov 2: /predict and the guide's limits answered
+	# 404 for them, so their knobs moved nothing).
+	"campaign-grid": "web/src/workspace/fixtures/campaign-grid.record.json",
+	"grpo": "web/src/workspace/fixtures/grpo-l4.record.json",
+	"retrieval": "web/src/workspace/fixtures/retrieval_st-nov1.record.json",
+	"gnn": "web/src/workspace/fixtures/gnn_pyg-nov1.record.json",
+	"vision": "web/src/workspace/fixtures/vision_timm-nov1.record.json",
 }
 
 

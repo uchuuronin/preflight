@@ -51,20 +51,22 @@ describe("the check-in desk and intake panels", () => {
 		const body = JSON.parse(fetch.mock.calls[0][1].body as string);
 		expect(body.source).toEqual(SOURCE);
 		expect(body.objective.kind).toBe("min_cost");
-		expect(body.gpu).toBeNull(); // "Not sure" by default: the runner picks the GPU
+		expect(body.gpu).toBe("L4"); // "L4 or A10" by default: the runner gives way to an A10 when no L4 is free
+		expect(body).not.toHaveProperty("extra_packages");
 	});
 
-	it("starts on Not sure for the GPU, so a visitor who doesn't know isn't sent to an A100", () => {
+	it("starts on an L4 (or an A10), marked default, so a visitor who doesn't know isn't sent to an A100", () => {
 		render(<NewFlight onSample={() => {}} />);
-		const unsure = screen.getByRole("button", { name: new RegExp(`^${en["newflight.gpu.unsure"]}`) });
-		expect(unsure.textContent).toBe(`${en["newflight.gpu.unsure"]} ${en["newflight.default"]}`);
-		expect(unsure.getAttribute("aria-pressed")).toBe("true");
-		// The starting picks say they're defaults, not choices already made.
+		const l4 = screen.getByRole("button", { name: new RegExp(`^${en["newflight.gpu.default"]}`) });
+		expect(l4.textContent).toBe(`${en["newflight.gpu.default"]} ${en["newflight.default"]}`);
+		expect(l4.getAttribute("aria-pressed")).toBe("true");
+		expect(screen.getByRole("button", { name: "A100-SXM-80GB" }).getAttribute("aria-pressed")).toBe("false");
+		// The starting picks say they're defaults, not choices already made; nothing else is marked.
 		const cheap = screen.getByRole("button", { name: new RegExp(`^${en["goal.min_cost"]}`) });
 		expect(cheap.textContent).toBe(`${en["goal.min_cost"]} ${en["newflight.default"]}`);
 		expect(cheap.getAttribute("aria-pressed")).toBe("true");
 		expect(screen.getByRole("button", { name: en["goal.min_time"] }).textContent).not.toContain(en["newflight.default"]);
-		expect(screen.getByRole("button", { name: "A100-SXM-80GB" }).getAttribute("aria-pressed")).toBe("false");
+		expect(screen.getByRole("button", { name: en["newflight.gpu.unsure"] }).getAttribute("aria-pressed")).toBe("false");
 	});
 
 	it("drops a tab's source when the visitor leaves it, since the panel forgets it too", () => {
@@ -163,6 +165,68 @@ describe("the check-in desk and intake panels", () => {
 		const hint = screen.getByText(en["newflight.cost_hint"]);
 		expect(hint.textContent).toMatch(/measured/i);
 		expect(hint.textContent).not.toMatch(/\$|US\$|£/);
+	});
+});
+
+describe("check in by command, and extra packages", () => {
+	const send = async (setup: () => void) => {
+		const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ job_id: "01JOB" }), { status: 202 }));
+		vi.stubGlobal("fetch", fetch);
+		render(<NewFlight onSample={() => {}} />);
+		fireEvent.click(screen.getByRole("checkbox", { name: en["datause.accept"] }));
+		setup();
+		const go = screen.getByRole("button", { name: "Check in" }) as HTMLButtonElement;
+		if (go.disabled) return null;
+		await act(async () => {
+			fireEvent.click(go);
+		});
+		return JSON.parse(fetch.mock.calls[0][1].body as string);
+	};
+
+	it("offers Run a command only with runner.command_checkin on", () => {
+		render(<NewFlight onSample={() => {}} />);
+		expect(screen.queryByRole("tab", { name: en["newflight.tab.command"] })).toBeNull();
+	});
+
+	it("sends the command as its words, quotes kept together", async () => {
+		flagsOn.add("runner.command_checkin");
+		const body = await send(() => {
+			fireEvent.click(screen.getByRole("tab", { name: en["newflight.tab.command"] }));
+			fireEvent.change(screen.getByLabelText(en["newflight.command.label"]), {
+				target: { value: `lm_eval --model hf --model_args "pretrained=EleutherAI/pythia-160m,dtype=float16" --tasks arc_easy` },
+			});
+		});
+		expect(body.source).toEqual({
+			kind: "command",
+			args: ["lm_eval", "--model", "hf", "--model_args", "pretrained=EleutherAI/pythia-160m,dtype=float16", "--tasks", "arc_easy"],
+		});
+	});
+
+	it("won't send a command Preflight doesn't run, and says which it does", async () => {
+		flagsOn.add("runner.command_checkin");
+		const body = await send(() => {
+			fireEvent.click(screen.getByRole("tab", { name: en["newflight.tab.command"] }));
+			const field = screen.getByLabelText(en["newflight.command.label"]);
+			fireEvent.change(field, { target: { value: "vllm bench throughput" } });
+			fireEvent.blur(field);
+		});
+		expect(body).toBeNull();
+		expect(screen.getByText(/doesn't run “vllm” by name. It runs: lm_eval/)).toBeTruthy();
+	});
+
+	it("sends extra packages with any check-in, and holds Check in on a bad name", async () => {
+		const body = await send(() => {
+			fireEvent.change(screen.getByLabelText("GitHub repository"), { target: { value: "github.com/karpathy/nanoGPT" } });
+			fireEvent.change(screen.getByLabelText(/Extra packages/), { target: { value: "einops, timm" } });
+		});
+		expect(body.extra_packages).toEqual(["einops", "timm"]);
+		cleanup();
+		localStorage.clear();
+		const none = await send(() => {
+			fireEvent.change(screen.getByLabelText("GitHub repository"), { target: { value: "github.com/karpathy/nanoGPT" } });
+			fireEvent.change(screen.getByLabelText(/Extra packages/), { target: { value: "einops; rm -rf" } });
+		});
+		expect(none).toBeNull();
 	});
 });
 

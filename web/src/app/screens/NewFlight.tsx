@@ -11,7 +11,8 @@ import { useAppPanels } from "../../registry";
 import { SAMPLES } from "../../workspace/record/load";
 import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
-import { rememberRequest } from "../checkinTrouble";
+import { MAX_EXTRA_PACKAGES, parsePackages, rememberRequest } from "../checkinTrouble";
+import { COMMANDS, commandWords } from "../command";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { DATA_USE_OK_ID, DataUseNotice, dataUseAccepted } from "../DataUse";
 import { ACCEPT, ACCEPT_SCRIPTS, checkinBytes, MAX_TOTAL_BYTES, type PickedFile, precheck, uploadSource } from "../upload";
@@ -43,9 +44,12 @@ const GOALS: Array<{ kind: ObjectiveKind; key: string }> = [
 ];
 
 /** Canonical names from B's GPU table (engine/gpus.py, generated into gpus.json). */
-const GPUS = ["A100-SXM-80GB", "H100-SXM-80GB", "L40S", "L4", "MI300X"];
+// The default is an L4, which gives way to an A10 when none is free within two minutes (A's
+// GPU_FALLBACK, runner/pipeline.py): "L4 or A10" (PM, Nov 3). Bigger cards are a choice, never a default.
+const DEFAULT_GPU = "L4";
+const GPUS = ["L40S", "A100-SXM-80GB", "H100-SXM-80GB", "MI300X"];
 
-type Intake = "repo" | "upload" | string;
+type Intake = "repo" | "upload" | "command" | string;
 
 function newKey(): string {
 	return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
@@ -58,7 +62,10 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [goal, setGoal] = useState<ObjectiveKind>(DEFAULT_GOAL);
 	// "Not sure" by default: the runner picks the GPU (pipeline.choose_probe_gpu; PM, Nov 1: the
 	// demo probes go no higher than an L40S).
-	const [gpu, setGpu] = useState<string | null>(null);
+	const [gpu, setGpu] = useState<string | null>(DEFAULT_GPU);
+	const [command, setCommand] = useState("");
+	const [packages, setPackages] = useState("");
+	const commandOn = flag("runner.command_checkin");
 	const [description, setDescription] = useState("");
 	// Private mode (contract 0.6.2): offered only while probe logs are triaged at all and Muse
 	// Glimmer triages private jobs (pipeline._triage_client). The flag also needs the runner's
@@ -72,7 +79,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [entry, setEntry] = useState<string | undefined>();
 	const [reading, setReading] = useState(false);
 	const idem = useRef<{ key: string; body: string | null }>({ key: newKey(), body: null });
-	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId(), repoHint: useId(), repoError: useId(), privateHint: useId() };
+	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId(), repoHint: useId(), repoError: useId(), privateHint: useId(), command: useId(), commandHint: useId(), commandError: useId(), packages: useId() };
 	// Uploads open with live probes (the same flag the API checks before taking a job).
 	const uploadsOpen = flag("runner.queue");
 	// A notebook tab (D's intake panel) previews what will run, so notebooks go through it there.
@@ -81,7 +88,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	// Sources handed over by intake panels, by panel id. A panel unmounts when its tab is left and
 	// forgets what it showed, so leaving a tab drops its source too (switchTab).
 	const [handed, setHanded] = useState<Record<string, JobRequest["source"] | null>>({});
-	const handedSource = intake !== "repo" && intake !== "upload" ? (handed[intake] ?? null) : null;
+	const handedSource = intake !== "repo" && intake !== "upload" && intake !== "command" ? (handed[intake] ?? null) : null;
 	// Measured once per source, not on every keystroke elsewhere on the desk.
 	const handedTooBig = useMemo(() => handedSource !== null && checkinBytes(handedSource) > MAX_TOTAL_BYTES, [handedSource]);
 	// One stable setSource per panel, so a panel may call it from an effect without a render loop.
@@ -133,8 +140,20 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 		return () => clearTimeout(id);
 	}, [repo]);
 	const repoBad = intake === "repo" && repoSettled && repo.trim() !== "" && !repoOk;
+	const cmd = commandWords(command);
+	const [commandSettled, setCommandSettled] = useState(false);
+	useEffect(() => {
+		const id = setTimeout(() => setCommandSettled(true), REPO_PAUSE_MS);
+		return () => clearTimeout(id);
+	}, [command]);
+	const commandBad = intake === "command" && commandSettled && command.trim() !== "" && !cmd.ok;
+	// Extra packages (contract 0.6.3): optional, for any source; names Preflight installs.
+	const pkgs = parsePackages(packages);
+	const pkgAsked = packages.split(/[\s,]+/).filter(Boolean).length;
+	const pkgBad = pkgs.bad.length > 0 || pkgAsked > MAX_EXTRA_PACKAGES;
 	const canSubmit =
-		intake === "repo" ? repoOk : intake === "upload" ? uploadsOpen && check.ok : uploadsOpen && handedSource !== null && !handedTooBig;
+		!pkgBad &&
+		(intake === "repo" ? repoOk : intake === "upload" ? uploadsOpen && check.ok : intake === "command" ? cmd.ok : uploadsOpen && handedSource !== null && !handedTooBig);
 
 	const pick = async (list: FileList | null) => {
 		if (!list?.length) return;
@@ -164,15 +183,19 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 		if (intake === "upload" && !check.ok) return;
 		if (handedTooBig) return;
 		setBusy(true);
+		if (intake === "command" && !cmd.ok) return;
 		const body: JobRequest = {
 			source:
-				intake === "upload" && check.ok
-					? check.source
-					: (handedSource ?? { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` }),
+				intake === "command" && cmd.ok
+					? { kind: "command", args: cmd.words }
+					: intake === "upload" && check.ok
+						? check.source
+						: (handedSource ?? { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` }),
 			objective: { kind: goal, description: description.trim() || null },
 			gpu,
 			description: description.trim() || null,
 			...(privateOffered && privateMode ? { private: true } : {}),
+			...(pkgs.names.length ? { extra_packages: pkgs.names as JobRequest["extra_packages"] } : {}),
 		};
 		// One key per distinct check-in: a retry of the same body reuses it (the API returns the job
 		// it already made), and any change to the body is a new check-in with a new key.
@@ -219,6 +242,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 							{[
 								{ id: "repo", key: "newflight.tab.repo" },
 								{ id: "upload", key: "newflight.tab.upload" },
+								...(commandOn ? [{ id: "command", key: "newflight.tab.command" }] : []),
 								...extraIntake.map((p) => ({ id: p.id, key: p.titleKey })),
 							].map((tab) => (
 								<button key={tab.id} type="button" role="tab" aria-selected={intake === tab.id} onClick={() => switchTab(tab.id)}>
@@ -254,6 +278,38 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									</div>
 									<p id={ids.repoHint} className="pf-hint">
 										{t("newflight.repo.hint")}
+									</p>
+								</div>
+							) : intake === "command" ? (
+								<div className="pf-pane">
+									<div className="pf-field">
+										<label htmlFor={ids.command}>{t("newflight.command.label")}</label>
+										<input
+											id={ids.command}
+											placeholder={t("newflight.command.placeholder")}
+											value={command}
+											spellCheck={false}
+											autoComplete="off"
+											autoCapitalize="off"
+											aria-invalid={commandBad || undefined}
+											aria-describedby={commandBad ? `${ids.commandError} ${ids.commandHint}` : ids.commandHint}
+											onChange={(e) => {
+												setCommand(e.currentTarget.value);
+												setCommandSettled(false);
+											}}
+											onPaste={() => setTimeout(() => setCommandSettled(true), 0)}
+											onBlur={() => setCommandSettled(true)}
+										/>
+									</div>
+									<div role="status" aria-live="polite">
+										{commandBad && !cmd.ok ? (
+											<p id={ids.commandError} className="pf-error pf-field__error">
+												{t(`newflight.command.${cmd.reason}`, { word: cmd.word ?? "", names: COMMANDS.join(", ") })}
+											</p>
+										) : null}
+									</div>
+									<p id={ids.commandHint} className="pf-hint">
+										{t("newflight.command.hint", { names: COMMANDS.join(", ") })}
 									</p>
 								</div>
 							) : intake === "upload" ? (
@@ -344,6 +400,34 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									))
 							)}
 						</div>
+						<div className="pf-field">
+							<label htmlFor={ids.packages}>
+								{t("newflight.packages.label")} <span className="pf-choice__default">{t("newflight.optional")}</span>
+							</label>
+							<input
+								id={ids.packages}
+								placeholder={t("newflight.packages.placeholder")}
+								value={packages}
+								spellCheck={false}
+								autoComplete="off"
+								autoCapitalize="off"
+								aria-invalid={pkgBad || undefined}
+								aria-describedby={pkgBad ? `${ids.packages}-bad ${ids.packages}-hint` : `${ids.packages}-hint`}
+								onChange={(e) => setPackages(e.currentTarget.value)}
+							/>
+							{pkgs.bad.length ? (
+								<p id={`${ids.packages}-bad`} className="pf-error pf-field__error">
+									{t("checkin.bad_names", { names: pkgs.bad.join(", ") })}
+								</p>
+							) : pkgAsked > MAX_EXTRA_PACKAGES ? (
+								<p id={`${ids.packages}-bad`} className="pf-error pf-field__error">
+									{t("checkin.too_many", { n: String(MAX_EXTRA_PACKAGES) })}
+								</p>
+							) : null}
+							<p id={`${ids.packages}-hint`} className="pf-hint">
+								{t("newflight.packages.hint", { n: String(MAX_EXTRA_PACKAGES) })}
+							</p>
+						</div>
 						{/* Goal and GPU share a row where the desk is wide enough (Chiya, Nov 2: less scrolling). */}
 						<div className="pf-desk__pair">
 							<div className="pf-desk__row">
@@ -369,13 +453,16 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									{t("newflight.gpu")}
 								</span>
 								<div className="pf-choice" role="group" aria-labelledby={`${ids.describe}-gpu`}>
+									<button type="button" aria-pressed={gpu === DEFAULT_GPU} onClick={() => setGpu(DEFAULT_GPU)}>
+										{t("newflight.gpu.default")} <DefaultMark />
+									</button>
 									{GPUS.map((g) => (
 										<button key={g} type="button" aria-pressed={gpu === g} onClick={() => setGpu(g)}>
 											{g}
 										</button>
 									))}
 									<button type="button" aria-pressed={gpu === null} onClick={() => setGpu(null)}>
-										{t("newflight.gpu.unsure")} <DefaultMark />
+										{t("newflight.gpu.unsure")}
 									</button>
 								</div>
 							</div>
