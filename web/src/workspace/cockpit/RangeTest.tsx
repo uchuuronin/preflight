@@ -12,7 +12,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { t } from "../../lib/i18n";
 import type { KnobValue } from "../record/types";
-import { nearestRate, rateText, rateVerdict, smoothed, type RangeTest as Test } from "./rangeTest";
+import { nearestRate, rateText, rateVerdict, smoothed, type RangeTest as Test } from "./lrRange";
 
 const H = 168;
 const PAD = { l: 40, r: 12, t: 26, b: 26 };

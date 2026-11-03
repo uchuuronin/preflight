@@ -13,7 +13,7 @@ import { isFixture } from "../record/model";
 import type { KnobValue } from "../record/types";
 import { useWorkspace } from "../state";
 import type { Fit } from "../status";
-import { isRangeTest } from "./rangeTest";
+import { isRangeTest } from "./lrRange";
 
 const PROBE_FIT: Record<string, Fit> = {
 	ok: "fits",

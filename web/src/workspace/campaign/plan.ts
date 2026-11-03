@@ -6,7 +6,7 @@
 import type { Campaign, CampaignCell, ModelCard } from "../../../../schema/ts/contract";
 import { t } from "../../lib/i18n";
 import type { Estimate, LoadedRecord } from "../record/types";
-import { isRangeTest } from "../cockpit/rangeTest";
+import { isRangeTest } from "../cockpit/lrRange";
 
 export interface PlanCell {
 	id: string;

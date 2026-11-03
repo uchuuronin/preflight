@@ -13,7 +13,7 @@ import type { Knob, KnobValue } from "../record/types";
 import { guidedKnobs, useRanked, useWorkspace } from "../state";
 import { fitOf, type Fit } from "../status";
 import { flag } from "../../lib/flags";
-import { rangeTestOf } from "./rangeTest";
+import { rangeTestOf } from "./lrRange";
 import { RangeTestCurve } from "./RangeTest";
 import { Info } from "../components/Info";
 import { FitMark } from "../components/StatusMark";

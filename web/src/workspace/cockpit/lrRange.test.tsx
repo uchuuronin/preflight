@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { t } from "../../lib/i18n";
 import real from "../fixtures/lr-range-nov2.json";
-import { isRangeTest, nearestRate, rangeTestOf, rateVerdict, readRangeTest, smoothed } from "./rangeTest";
+import { isRangeTest, nearestRate, rangeTestOf, rateVerdict, readRangeTest, smoothed } from "./lrRange";
 import { RangeTestCurve } from "./RangeTest";
 
 afterEach(cleanup);
