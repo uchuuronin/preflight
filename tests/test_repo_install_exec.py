@@ -10,6 +10,14 @@ import pytest
 
 from preflight.recorder import requirements as R
 
+
+@pytest.fixture(autouse=True)
+def _fresh_builds():
+	R._BUILT.clear()  # the build is kept by its files' digest: each test's fake pip runs afresh
+	yield
+	R._BUILT.clear()
+
+
 BUILT = """from setuptools import setup
 _deps = {"einops": "einops>=0.8.0", "tqdm": "tqdm"}
 def deps_list(*names):
@@ -54,6 +62,7 @@ def _fake_pip(requires, rc=0):
 def test_the_build_s_list_is_read_without_extras(tmp_path, monkeypatch):
 	monkeypatch.setattr(R.subprocess, "run", _fake_pip(["einops>=0.8.0", "tqdm", 'pytest; extra == "dev"',
 		"numpy<2; python_version < '3.9'"]))  # fmt: skip
+	(tmp_path / "setup.py").write_text(BUILT)  # built in code: the only case the build runs
 	got = R.requires_from_build(tmp_path, log=lambda m: None)
 	assert got == ["einops>=0.8.0", "tqdm", "numpy<2; python_version < '3.9'"]
 
@@ -61,6 +70,7 @@ def test_the_build_s_list_is_read_without_extras(tmp_path, monkeypatch):
 def test_a_failed_build_installs_nothing_from_it_and_says_why(tmp_path, monkeypatch):
 	monkeypatch.setattr(R.subprocess, "run", _fake_pip([], rc=1))
 	said = []
+	(tmp_path / "setup.py").write_text(BUILT)  # built in code: the only case the build runs
 	assert R.requires_from_build(tmp_path, log=said.append) == []
 	assert "metadata-generation-failed" in said[0]
 
@@ -80,6 +90,7 @@ def test_pip_s_real_metadata_build_reads_a_list_built_in_code(tmp_path):
 	pytest.importorskip("pip")
 	pytest.importorskip("setuptools")
 	(tmp_path / "setup.py").write_text(BUILT)
+	(tmp_path / "setup.py").write_text(BUILT)  # built in code: the only case the build runs
 	got = R.requires_from_build(tmp_path, log=lambda m: None)
 	if not got:
 		pytest.skip("pip couldn't build here (no network for setuptools)")
@@ -158,6 +169,7 @@ def test_a_hostile_report_installs_nothing_from_it(tmp_path, monkeypatch):
 			return subprocess.CompletedProcess(cmd, 0, "", "")
 
 		monkeypatch.setattr(R.subprocess, "run", run)
+		(tmp_path / "setup.py").write_text(BUILT)  # built in code: the only case the build runs
 		assert R.requires_from_build(tmp_path, log=lambda m: None) == []
 
 
@@ -190,15 +202,117 @@ def test_lm_eval_s_own_repo_builds_the_same_source_only_packages_as_its_command(
 	assert P._command_sdists(f) == tuple(COMMANDS["lm_eval"]["sdists"])
 
 
-def test_the_repo_s_own_metadata_is_an_editable_no_deps_install(tmp_path, monkeypatch):
+def test_the_build_runs_only_when_the_list_is_built_in_code(tmp_path, monkeypatch):
+	seen = []
+	monkeypatch.setattr(R.subprocess, "run", lambda cmd, **kw: seen.append(cmd))
+	(tmp_path / "pyproject.toml").write_text(
+		'[project]\nname = "x"\nversion = "1"\ndependencies = ["tqdm"]\n'
+	)
+	assert R.build_metadata(tmp_path, log=lambda m: None) is None
+	assert R.requires_from_build(tmp_path, log=lambda m: None) == []
+	(tmp_path / "pyproject.toml").unlink()
+	(tmp_path / "setup.py").write_text(
+		"from setuptools import setup\nsetup(name='x', install_requires=['tqdm'])\n"
+	)
+	assert R.build_metadata(tmp_path, log=lambda m: None) is None
+	assert seen == []  # a literal list is read, never run
+
+
+def test_the_build_runs_on_a_copy_with_compilers_that_fail(tmp_path, monkeypatch):
+	(tmp_path / "setup.py").write_text(BUILT)
+	(tmp_path / "pkg").mkdir()
+	(tmp_path / "pkg" / "fast.c").write_text("int f(void){return 1;}")
 	seen = []
 
 	def run(cmd, **kw):
-		seen.append(cmd)
+		seen.append((cmd, kw))
+		where = Path(cmd[-1])
+		(where / "demo.egg-info").mkdir()  # what pip's metadata step leaves beside setup.py
+		Path(cmd[cmd.index("--report") + 1]).write_text(
+			json.dumps(
+				{"install": [{"metadata": {"name": "demo", "version": "0.1", "requires_dist": ["tqdm"]}}]}
+			)
+		)
 		return subprocess.CompletedProcess(cmd, 0, "", "")
 
 	monkeypatch.setattr(R.subprocess, "run", run)
-	assert R.own_metadata(tmp_path, tmp_path / "deps", log=lambda m: None)
-	cmd = seen[0]
-	assert "--no-deps" in cmd and cmd[cmd.index("-e") + 1] == str(tmp_path) and "--prefix" in cmd
-	assert "--ignore-installed" in cmd  # never uninstalls the image's own copy
+	before = sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*"))
+	(tmp_path / "setup.py").write_text(BUILT)  # built in code: the only case the build runs
+	assert R.requires_from_build(tmp_path, log=lambda m: None) == ["tqdm"]
+	cmd, kw = seen[0]
+	assert (
+		Path(cmd[-1]) != tmp_path and (Path(cmd[-1]) / "setup.py").exists() is False
+	)  # a scratch copy, gone
+	assert (
+		kw["env"]["CC"] == "false"
+		and kw["env"]["CXX"] == "false"
+		and kw["env"]["CUDA_HOME"] == "/nonexistent"
+	)
+	assert (
+		sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*")) == before
+	)  # the visitor's copy untouched
+
+
+def test_the_repo_s_own_metadata_is_written_from_its_files_without_running_them(tmp_path, monkeypatch):
+	monkeypatch.setattr(R.subprocess, "run", lambda *a, **k: pytest.fail("nothing runs for stated metadata"))
+	repo = tmp_path / "repo"
+	repo.mkdir()
+	(repo / "pyproject.toml").write_text(
+		'[project]\nname = "lm_eval"\nversion = "0.4.8"\ndependencies = []\n'
+	)
+	before = sorted(repo.rglob("*"))
+	assert R.own_metadata(repo, tmp_path / "own", log=lambda m: None)
+	assert sorted(repo.rglob("*")) == before
+	import importlib.metadata as md
+
+	(site,) = R.site_dirs(tmp_path / "own")
+	(dist,) = md.distributions(path=[str(site)])
+	assert (dist.metadata["Name"], dist.version) == ("lm_eval", "0.4.8")
+
+
+def test_the_repo_s_own_metadata_builds_only_when_built_in_code(tmp_path, monkeypatch):
+	(tmp_path / "setup.py").write_text(BUILT.replace('name="demo", version="0.1"', "name=NAME, version=VER"))
+	monkeypatch.setattr(R, "build_metadata", lambda w, **k: {"name": "demo", "version": "0.1"})
+	assert R.own_metadata(tmp_path, tmp_path.parent / "own-b", log=lambda m: None)
+	nobuild = tmp_path.parent / "nobuild"
+	nobuild.mkdir()
+	(nobuild / "setup.py").write_text("from setuptools import setup\nsetup(name=NAME, version=VER)\n")
+	monkeypatch.setattr(R, "build_metadata", lambda w, **k: pytest.fail("not built in code: never run"))
+	assert not R.own_metadata(nobuild, tmp_path.parent / "own-c", log=lambda m: None)
+
+
+def test_one_build_for_the_same_files_and_a_new_one_when_they_change(tmp_path, monkeypatch):
+	(tmp_path / "setup.py").write_text(BUILT)
+	runs = []
+
+	def run(cmd, **kw):
+		runs.append(cmd)
+		return _fake_pip(["tqdm"])(cmd, **kw)
+
+	monkeypatch.setattr(R.subprocess, "run", run)
+	assert R.requires_from_build(tmp_path, log=lambda m: None) == ["tqdm"]
+	assert R.requires_from_build(tmp_path, log=lambda m: None) == ["tqdm"] and len(runs) == 1
+	(tmp_path / "setup.py").write_text(BUILT + "# changed\n")
+	R.requires_from_build(tmp_path, log=lambda m: None)
+	assert len(runs) == 2
+
+
+def test_the_own_metadata_goes_in_the_probe_s_prefix_never_the_shared_one(tmp_path, monkeypatch):
+	work = tmp_path / "repo"
+	work.mkdir()
+	(work / "train.py").write_text("print(1)\n")
+	(work / "pyproject.toml").write_text(
+		'[project]\nname = "lm_eval"\nversion = "0.4.8"\ndependencies = ["zzz-not-here"]\n'
+	)
+	shared = tmp_path / "shared"
+	shared.mkdir()
+	monkeypatch.setenv("PREFLIGHT_DEPS_DIR", str(shared))
+	monkeypatch.setattr(R, "_pip", lambda keep, target, *a, **k: None)
+	before = sorted(work.rglob("*"))
+	for _ in range(2):  # the second probe finds the shared install done and still gets its own metadata
+		err, dirs = R.install(
+			work, tmp_path / "p-deps", log=lambda m: None, repo=True, entrypoint="train.py", build=True
+		)
+		assert err is None
+		assert any("p-deps-own" in str(d) for d in dirs)
+	assert not list(shared.rglob("*.dist-info")) and sorted(work.rglob("*")) == before

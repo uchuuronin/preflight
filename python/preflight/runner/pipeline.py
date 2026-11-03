@@ -704,11 +704,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
 	keep = [
-		f for f in keep if not f.id.startswith(("source.partial", "source.map_skipped"))
+		f for f in keep if not f.id.startswith(("source.partial", "source.map_skipped", IMAGE_OVERRIDES))
 	]  # said afresh below
-	out = out.model_copy(
-		update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *_reading_findings(fetched)]}
-	)
+	read = [*_reading_findings(fetched), *_image_findings(sm, fetched)]
+	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *read]})
 	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
 	# or Baseten for a diagnosis (private mode, contract 0.6.2)
 	touched = req.private or _private_history(out)
@@ -945,6 +944,33 @@ def _reading_findings(fetched: Fetched) -> list:
 				f"it imports ({_mb(m['bytes'])}). Settings in other files aren't on the map."),
 			evidence=[Evidence(metric="map.files_read", value=float(m["files"]))]))  # fmt: skip
 	return out
+
+
+IMAGE_OVERRIDES = "probe.image_overrides"  # the engine reads it (api._image_note): keep the id as it is
+
+
+def _image_findings(sm: ScriptMap, fetched: Fetched) -> list:
+	"""probes.torch_new (B's review, Nov 3; the PM's fix): when the torch 2.7.1 image was picked and its packages
+	override any of the code's own pins, say each one: "measured on transformers 4.52.3; your code pins 4.46.3".
+	The title is that line; the engine adds it to the estimates' reasons (api._image_note)."""
+	if _image(sm, fetched.files) != "torch27":
+		return []
+	from preflight.recorder.requirements import image_overrides, overrides_note
+	from preflight.schema import Evidence, Finding
+
+	from .images import PROBE_NEW_PACKAGES
+
+	over = image_overrides(fetched.files, PROBE_NEW_PACKAGES)
+	if not over:
+		return []
+	note = overrides_note(over)
+	return [Finding(id=IMAGE_OVERRIDES, severity="warn", code=IMAGE_OVERRIDES, source="rule",
+		title=note[0].upper() + note[1:],
+		detail=("Your code asks for a newer torch than Preflight's default probe image (torch 2.5.1), so the probes "
+			"ran on its torch 2.7.1 image, whose own packages replace these pins of your code: "
+			f"{', '.join(f'{n} {s} (measured on {v})' for n, v, s in over)}. The numbers are for that stack, not "
+			"the one your code pins; a run on your pinned versions can differ, or fail where these ran."),
+		evidence=[Evidence(metric="image.overrides", value=float(len(over)))])]  # fmt: skip
 
 
 def _why_partial(p: dict) -> str:

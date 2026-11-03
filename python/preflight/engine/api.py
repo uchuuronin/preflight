@@ -2641,7 +2641,20 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.divergence"] = _divergence(record, values)
 	if feature("serving") and record.job.lens == "serving" and not _QUIET.get():
 		out.update(_serving_targets(record, values))
+	note = _image_note(record)
+	if note:
+		out = {k: v if v.status == "abstain" else _with_note(v, note) for k, v in out.items()}
 	return Prediction(out)
+
+
+IMAGE_OVERRIDES = "probe.image_overrides"  # runner/pipeline.py's finding: probes.torch_new's overridden pins
+
+
+def _image_note(record: FlightRecord) -> str | None:
+	"""The overridden pins, as the runner's finding says them ("measured on transformers 4.52.3; your code pins
+	4.46.3"), for every estimate's reason (B's review of probes.torch_new, Nov 3: the PM's fix)."""
+	f = next((f for f in record.findings if f.id == IMAGE_OVERRIDES and f.source == "rule"), None)
+	return (f.title[0].lower() + f.title[1:]) if f is not None and f.title else None
 
 
 # the serving simulation takes tens of milliseconds; grids and rankings that don't read it skip it. A context

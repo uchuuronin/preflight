@@ -110,9 +110,9 @@ IMAGE_TORCH = "2.5.1"
 NEW_IMAGE_TORCH = "2.7.1"
 
 
-def torch_asks(files: dict[str, str]) -> list[str]:
-	"""The torch requirements the code's own files state (requirements.txt, pyproject.toml, setup.cfg, a
-	literal setup.py list), without a marker: "torch>=2.7" from LitGPT's pyproject.toml, Nov 2."""
+def _code_lines(files: dict[str, str]) -> list[str]:
+	"""The requirement lines the code's own files state (requirements.txt, pyproject.toml, setup.cfg, a
+	literal setup.py list)."""
 	import tempfile
 
 	lines = []
@@ -123,12 +123,61 @@ def torch_asks(files: dict[str, str]) -> list[str]:
 			if name in files:
 				(Path(tmp) / name).write_text(files[name], encoding="utf-8", errors="replace")
 		lines += declared(Path(tmp))
+	return lines
+
+
+def torch_asks(files: dict[str, str]) -> list[str]:
+	"""The torch requirements the code's own files state (requirements.txt, pyproject.toml, setup.cfg, a
+	literal setup.py list), without a marker: "torch>=2.7" from LitGPT's pyproject.toml, Nov 2."""
 	out = []
-	for raw in lines:
+	for raw in _code_lines(files):
 		m = _LINE.fullmatch(raw.split(" #", 1)[0].strip())
 		if m and _norm(m["name"]) == "torch" and m["spec"] and not m["marker"]:
 			out.append(f"torch{m['spec'].replace(' ', '')}")
 	return out
+
+
+def image_overrides(files: dict[str, str], packages: list[str]) -> list[tuple[str, str, str]]:
+	"""(name, the image's version, the code's ask) for each of the code's own pins an image's packages
+	override (packages: "name==version" lines, PROBE_NEW_PACKAGES): torch 2.6.0 with transformers 4.46.3 and
+	TRL 0.14.0, probed on the torch 2.7.1 image, runs on transformers 4.52.3 and TRL 0.18.0 (B's review, Nov 3).
+	plan() keeps the image's copy of every package it has, so each is measured on the image's version."""
+	try:
+		from packaging.specifiers import InvalidSpecifier, SpecifierSet
+		from packaging.version import InvalidVersion, Version
+	except ImportError:
+		return []
+	have = {}
+	for p in packages:
+		name, sep, ver = p.partition("==")
+		if sep:
+			have[_norm(name)] = ver.strip()
+	out, seen = [], set()
+	for raw in _code_lines(files):
+		m = _LINE.fullmatch(raw.split(" #", 1)[0].strip())
+		# a marker may not apply here; a local label (+cu124) isn't a version of the package
+		if m is None or not m["spec"] or m["marker"] or _norm(m["name"]) not in have:
+			continue
+		name, spec = _norm(m["name"]), re.sub(r"\+[0-9A-Za-z.]+", "", m["spec"].replace(" ", ""))
+		if name in seen:
+			continue
+		try:
+			if not SpecifierSet(spec).contains(Version(have[name]), prereleases=True):
+				out.append((m["name"], have[name], spec))
+				seen.add(name)
+		except (InvalidSpecifier, InvalidVersion):
+			continue
+	return out
+
+
+def overrides_note(overrides: list[tuple[str, str, str]]) -> str:
+	""" "measured on transformers 4.52.3; your code pins 4.46.3" (the PM, Nov 3), every override in one line."""
+
+	def ask(name: str, spec: str) -> str:
+		exact = spec.startswith("==") and "," not in spec and "*" not in spec
+		return f"pins {spec[2:]}" if exact else f"asks for {name}{spec}"
+
+	return "; ".join(f"measured on {n} {v}; your code {ask(n, s)}" for n, v, s in overrides)
 
 
 def _torch_specs(asks: list[str]):
@@ -469,55 +518,129 @@ def built_in_code(workdir: Path) -> bool:
 	return any(isinstance(n, ast.keyword) and n.arg == "install_requires" for n in ast.walk(tree))
 
 
+def needs_build(workdir: Path) -> bool:
+	"""Only running the build can list the dependencies (the PM, Nov 3): no literal list is declared, and the
+	setup.py computes install_requires or the pyproject's dependencies are dynamic (built_in_code)."""
+	return not declared(workdir) and built_in_code(workdir)
+
+
 BUILD_TIMEOUT_S = (
 	120.0  # guess: pip's metadata build of one project (open-r1's took 6 s with setuptools fetched)
 )
 MAX_BUILD_REPORT = 4 * 2**20  # guess: bytes of pip's report read back; one project's metadata is a few kB
 
 
-def requires_from_build(workdir: Path, *, log=print, timeout_s: float = BUILD_TIMEOUT_S) -> list[str]:
-	"""probes.repo_install_exec (off): the requirements the repo's own build lists, by pip's metadata-only
-	build (`pip install --dry-run --no-deps --report`). That runs the visitor's setup.py, so it is only
-	called inside the probe's sandbox, where their training code runs too. Nothing is installed here, so
-	the repo's own code stays the copy the probe imports (an installed copy would shadow a patched file);
-	the lines go through the usual install (the image's stack pinned, wheels only). Extras are left out.
-	[] when the build fails, saying why."""
+# a build that tries to compile gets a compiler that fails (the PM, Nov 3: never compile an extension); pip's
+# metadata step needs none, so only a setup.py that compiles as it's read is stopped
+_NO_COMPILER = {"CC": "false", "CXX": "false", "LDSHARED": "false", "NVCC": "false", "CUDA_HOME": "/nonexistent",
+	"CUDA_PATH": "/nonexistent", "MAX_JOBS": "1"}  # fmt: skip
+MAX_COPY_BYTES = (
+	64 * 2**20
+)  # guess: the repo's text a build copy carries; a fetched repo is capped below this
+
+
+def _build_copy(workdir: Path, dest: Path) -> bool:
+	"""The working copy's files, copied for a build to run in (the PM, Nov 3: never write into the visitor's
+	copy): pip's metadata step writes an .egg-info, and a build may write anything, beside its setup.py."""
+	total = 0
+	for src in sorted(workdir.rglob("*")):
+		if src.is_symlink() or not src.is_file() or ".git" in src.relative_to(workdir).parts:
+			continue
+		total += src.stat().st_size
+		if total > MAX_COPY_BYTES:
+			return False
+		out = dest / src.relative_to(workdir)
+		out.parent.mkdir(parents=True, exist_ok=True)
+		shutil.copyfile(src, out)
+	return True
+
+
+def build_metadata(workdir: Path, *, log=print, timeout_s: float = BUILD_TIMEOUT_S) -> dict | None:
+	"""probes.repo_install_exec (off): the repo's own package metadata, by pip's metadata-only build
+	(`pip install --dry-run --no-deps --report`), only when the dependency list is built in code (built_in_code;
+	the PM, Nov 3). That runs the visitor's setup.py, so it is only called inside the probe's sandbox, where their
+	training code runs too, and on a copy of the repo in a scratch folder, with compilers that fail: nothing is
+	written into the visitor's copy, nothing is installed, and no extension is compiled. None, saying why, when
+	it isn't built in code or the build fails."""
+	if not needs_build(workdir):
+		return None
+	key = _tree_digest(workdir)
+	if key is None or key not in _BUILT:  # one build for the same files: the list's read and the metadata's
+		meta = _build_metadata(workdir, log=log, timeout_s=timeout_s)
+		if key is None:
+			return meta
+		_BUILT[key] = meta
+	return _BUILT[key]
+
+
+_BUILT: dict[str, dict | None] = {}  # by the files' digest, never by path: a worker reuses its folders
+
+
+def _tree_digest(workdir: Path) -> str | None:
+	"""The working copy's files (paths and bytes), as one digest; None past MAX_COPY_BYTES."""
+	h, total = hashlib.sha256(), 0
+	for src in sorted(workdir.rglob("*")):
+		if src.is_symlink() or not src.is_file() or ".git" in src.relative_to(workdir).parts:
+			continue
+		data = src.read_bytes()
+		total += len(data)
+		if total > MAX_COPY_BYTES:
+			return None
+		h.update(str(src.relative_to(workdir)).encode() + b"\0" + hashlib.sha256(data).digest())
+	return h.hexdigest()
+
+
+def _build_metadata(workdir: Path, *, log, timeout_s: float) -> dict | None:
 	import json
 	import tempfile
 
 	with tempfile.TemporaryDirectory() as tmp:
+		copy = Path(tmp) / "repo"
+		if not _build_copy(workdir, copy):
+			log("[preflight] requirements: the repo is too big to copy for its build; its build wasn't run")
+			return None
 		report = Path(tmp) / "report.json"
 		cmd = [sys.executable, "-I", "-m", "pip", "install", "--dry-run", "--no-deps", "--ignore-installed",
-			"--disable-pip-version-check", "--no-input", "--quiet", "--report", str(report), str(workdir)]  # fmt: skip
-		env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+			"--disable-pip-version-check", "--no-input", "--quiet", "--report", str(report), str(copy)]  # fmt: skip
+		env = {**{k: v for k, v in os.environ.items() if k != "PYTHONPATH"}, **_NO_COMPILER}
 		try:
 			r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, cwd=tmp, env=env)
 		except subprocess.TimeoutExpired:
 			log(
 				f"[preflight] requirements: the repo's build didn't list its dependencies in {timeout_s:.0f} s"
 			)
-			return []
+			return None
 		except OSError as exc:
 			log(f"[preflight] requirements: pip didn't start to read the repo's build ({type(exc).__name__})")
-			return []
+			return None
 		if r.returncode != 0 or not report.is_file() or report.stat().st_size > MAX_BUILD_REPORT:
 			tail = ((r.stderr or r.stdout or "").strip().splitlines() or [f"pip exited with {r.returncode}"])[
 				-1
 			]
 			log(f"[preflight] requirements: the repo's build didn't list its dependencies: {tail[:300]}")
-			return []
+			return None
 		try:
 			doc = json.loads(report.read_text(encoding="utf-8", errors="replace"))
 		except (ValueError, RecursionError):
 			doc = None
-	# the report is the visitor's build's output: only a list of one item whose requires_dist is a list of strings
+	# the report is the visitor's build's output: only a list of one item whose metadata is a dict
 	items = doc.get("install") if isinstance(doc, dict) else None
 	meta = (
 		items[0].get("metadata")
 		if isinstance(items, list) and len(items) == 1 and isinstance(items[0], dict)
 		else None
 	)
-	reqs = meta.get("requires_dist") if isinstance(meta, dict) else None
+	return meta if isinstance(meta, dict) else None
+
+
+def requires_from_build(workdir: Path, *, log=print, timeout_s: float = BUILD_TIMEOUT_S) -> list[str]:
+	"""probes.repo_install_exec (off): the requirements the repo's own build lists (build_metadata). The lines
+	go through the usual install (the image's stack pinned, wheels only). Extras are left out. [] when the
+	list isn't built in code or the build fails, saying why."""
+	meta = build_metadata(workdir, log=log, timeout_s=timeout_s)
+	if meta is None:
+		return []
+	reqs = meta.get("requires_dist")
 	if not isinstance(reqs, list):
 		log("[preflight] requirements: the repo's build gave no dependency list Preflight could read")
 		return []
@@ -527,35 +650,84 @@ def requires_from_build(workdir: Path, *, log=print, timeout_s: float = BUILD_TI
 		if isinstance(x, str) and "extra" not in x.partition(";")[2]
 	]
 	log(f"[preflight] requirements: the repo's setup.py builds its list in code; its build lists {len(out)} "
-		"dependencies (read by running it in this sandbox)")  # fmt: skip
+		"dependencies (read by running it on a copy in this sandbox)")  # fmt: skip
 	return out
 
 
+def static_name_version(workdir: Path) -> tuple[str, str] | None:
+	"""The project's name and version as its files state them, read without running anything: pyproject's
+	[project], setup.cfg's [metadata], or literal name= and version= strings in setup.py."""
+	import ast
+	import configparser
+	import tomllib
+
+	py = workdir / "pyproject.toml"
+	if py.is_file():
+		with contextlib.suppress(
+			tomllib.TOMLDecodeError, AttributeError, RecursionError, MemoryError, OSError
+		):
+			proj = tomllib.loads(py.read_text(encoding="utf-8", errors="replace")).get("project", {})
+			if (
+				isinstance(proj, dict)
+				and isinstance(proj.get("name"), str)
+				and isinstance(proj.get("version"), str)
+			):
+				return proj["name"], proj["version"]
+	cfg = workdir / "setup.cfg"
+	if cfg.is_file():
+		cp = configparser.ConfigParser(interpolation=None)
+		with contextlib.suppress(configparser.Error, RecursionError, MemoryError, OSError):
+			cp.read_string(cfg.read_text(encoding="utf-8", errors="replace"))
+			n, v = cp.get("metadata", "name", fallback=""), cp.get("metadata", "version", fallback="")
+			if n and v and not v.startswith(("attr:", "file:")):
+				return n.strip(), v.strip()
+	setup = workdir / "setup.py"
+	if setup.is_file():
+		try:
+			tree = ast.parse(setup.read_text(encoding="utf-8", errors="replace"))
+		except (SyntaxError, ValueError, RecursionError, MemoryError, OSError):
+			return None
+		kw = {n.arg: n.value.value for n in ast.walk(tree) if isinstance(n, ast.keyword)
+			and n.arg in ("name", "version") and isinstance(n.value, ast.Constant) and isinstance(n.value.value, str)}  # fmt: skip
+		if "name" in kw and "version" in kw:
+			return kw["name"], kw["version"]
+	return None
+
+
 def own_metadata(workdir: Path, target: Path, *, log=print, timeout_s: float = BUILD_TIMEOUT_S) -> bool:
-	"""probes.repo_install_exec: the repo's own package metadata, by an editable install with no dependencies
-	into the probe's prefix, for code that reads its own version (lm-evaluation-harness's lm_eval/__init__.py
-	calls importlib.metadata.version("lm_eval"): a-all4-5s, Nov 3). Editable, so nothing of the repo is copied:
-	its working copy stays what the probe imports. Runs the repo's build, so only in the probe's sandbox;
-	a failure is said and the probe runs on."""
-	# --ignore-installed: never uninstall the image's own copy of the same project (a trl or peft checkout; review)
-	cmd = [sys.executable, "-I", "-m", "pip", "install", "--no-deps", "--ignore-installed", "--no-input",
-		"--disable-pip-version-check", "--no-warn-script-location", "--quiet", "--prefix", str(target), "-e", str(workdir)]  # fmt: skip
-	cache = os.environ.get("PREFLIGHT_PIP_CACHE")
-	if cache and os.access(cache, os.W_OK):
-		cmd[4:4] = ["--cache-dir", cache]
-	env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+	"""probes.repo_install_exec: the repo's own package metadata in the probe's own prefix, for code that reads its
+	own version (lm-evaluation-harness's lm_eval/__init__.py calls importlib.metadata.version("lm_eval"):
+	a-all4-5s, Nov 3). A dist-info folder with the project's name and version, read from its files; the build runs
+	(build_metadata) only when the dependency list is built in code and the files don't state both (the PM,
+	Nov 3). Nothing of the repo is installed or written into its copy, and nothing compiled: the working copy stays
+	what the probe imports. A failure is said and the probe runs on."""
+	nv = static_name_version(workdir)
+	if nv is None and needs_build(workdir):
+		meta = build_metadata(workdir, log=log, timeout_s=timeout_s) or {}
+		if isinstance(meta.get("name"), str) and isinstance(meta.get("version"), str):
+			nv = meta["name"], meta["version"]
+	if nv is None:
+		log(
+			"[preflight] requirements: the repo's own name and version aren't stated in its files; no metadata written"
+		)
+		return False
+	name, version = (re.sub(r"[^A-Za-z0-9._+!-]", "", x)[:100] for x in nv)
+	if not re.fullmatch(_NAME, name) or not version:
+		log(
+			"[preflight] requirements: the repo's own name or version isn't one Preflight can write; no metadata written"
+		)
+		return False
+	site = target / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
+	info = site / f"{re.sub(r'[-.]+', '_', name)}-{version}.dist-info"
 	try:
-		target.mkdir(parents=True, exist_ok=True)
-		r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, cwd=target, env=env)
-	except (subprocess.TimeoutExpired, OSError) as exc:
+		info.mkdir(parents=True, exist_ok=True)
+		(info / "METADATA").write_text(f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n")
+		(info / "INSTALLER").write_text("preflight\n")
+	except OSError as exc:
 		log(f"[preflight] requirements: the repo's own metadata wasn't written ({type(exc).__name__})")
 		return False
-	if r.returncode != 0:
-		tail = ((r.stderr or r.stdout or "").strip().splitlines() or [f"pip exited with {r.returncode}"])[-1]
-		log(f"[preflight] requirements: the repo's own metadata wasn't written: {tail[:300]}")
-		return False
 	log(
-		"[preflight] requirements: wrote the repo's own package metadata (an editable install, no dependencies)"
+		f"[preflight] requirements: wrote the repo's own package metadata ({name} {version}; nothing installed)"
 	)
 	return True
 
@@ -748,6 +920,10 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 	return None
 
 
+def _project(workdir: Path) -> bool:
+	return (workdir / "pyproject.toml").is_file() or (workdir / "setup.py").is_file()
+
+
 def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None,
 	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = (),
 	build: bool = False, torch_note: bool = False) -> tuple[str | None, list[Path]]:  # fmt: skip
@@ -768,6 +944,9 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	import time
 
 	started = time.monotonic() if build else None  # the build's own read counts against the install's limit
+	own = (
+		target.parent / f"{target.name}-own"
+	)  # the repo's own metadata: this probe's prefix, never the shared one keyed by its deps
 	req = workdir / "requirements.txt"
 	roots = [r for r in _roots(workdir) if r != workdir] if repo else []
 	optional: list[str] = []
@@ -801,8 +980,8 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	if not keep:
 		project = (workdir / "pyproject.toml").is_file() or (workdir / "setup.py").is_file()
 		# every dependency is the image's already: the repo's own metadata still (review)
-		if build and repo and project and own_metadata(workdir, target, log=log, timeout_s=BUILD_TIMEOUT_S):
-			return None, [*site_dirs(target), *roots]
+		if build and repo and project and own_metadata(workdir, own, log=log, timeout_s=BUILD_TIMEOUT_S):
+			return None, [*site_dirs(own), *roots]
 		return None, roots
 	pins = "".join(f"{n}=={v.split('+', 1)[0]}\n" for n, v in sorted(have.items()))
 	shared = os.environ.get("PREFLIGHT_DEPS_DIR")
@@ -813,7 +992,8 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		target = Path(shared) / key
 		if (target / ".ok").is_file():
 			log("[preflight] requirements: already installed for this job")
-			return None, [*site_dirs(target), *roots]
+			mine = build and repo and _project(workdir) and own_metadata(workdir, own, log=log)
+			return None, [*site_dirs(target), *(site_dirs(own) if mine else []), *roots]
 		shutil.rmtree(target, ignore_errors=True)  # a half-finished install from a killed probe
 	target.mkdir(parents=True, exist_ok=True)
 	constraints = target / "constraints.txt"
@@ -853,9 +1033,7 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		if clash:  # the likeliest reason, ahead of pip's or uv's tail: no installer fixes the image's own pin
 			err = f"the code asks for {'; '.join(clash)}, which the probe image can't change. {err}"
 		return err, []
-	if build and repo and ((workdir / "pyproject.toml").is_file() or (workdir / "setup.py").is_file()):
-		own_metadata(
-			workdir, target, log=log, timeout_s=min(BUILD_TIMEOUT_S, max(5.0, deadline - time.monotonic()))
-		)
 	(target / ".ok").write_text("ok")
-	return None, [*site_dirs(target), *roots]
+	mine = (build and repo and _project(workdir) and own_metadata(workdir, own, log=log,
+		timeout_s=min(BUILD_TIMEOUT_S, max(5.0, deadline - time.monotonic()))))  # fmt: skip
+	return None, [*site_dirs(target), *(site_dirs(own) if mine else []), *roots]
