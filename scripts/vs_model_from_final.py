@@ -29,9 +29,9 @@ SCRIPTS = {  # manifest script id -> (label, Muse Spark's answer file, notes)
 	"gnn_pyg": ("GNN (PyG GraphSAGE)", "ask_model_zoo_nov2.json", []),
 	"retrieval_st": ("Retrieval (sentence-transformers)", "ask_model_zoo_nov2.json", []),
 	"vision_timm": ("Vision (timm ResNet-50)", "ask_model_zoo_nov2.json",
-		["the full run got an A10G, about 11% slower than the A10 both sides predicted for"]),
+		["the full run got an A10G, which ran the LoRA script about 11% slower than the A10 both sides predicted for"]),
 	"pretrain_nanogpt": ("Pretrain (nanoGPT)", "ask_model_zoo_nov2.json",
-		["the full run got an A10G, about 11% slower than the A10 both sides predicted for"]),
+		["the full run got an A10G, which ran the LoRA script about 11% slower than the A10 both sides predicted for"]),
 	"finetune_lora_hf": ("LoRA fine-tune (zoo)", "ask_model_nov2.json",
 		["ran out of memory at its first eval (step 200), so its full peak was never seen; its step time was used "
 		"to calibrate Preflight's step band, so Preflight's step isn't a fair test and is left out"]),
@@ -84,22 +84,33 @@ def main() -> int:
 			if run.get("record") and (FINAL / run["record"]).exists():
 				rec = V._record(FINAL / run["record"])
 				pred = api.predict(rec, run.get("values") or None).root
-				pre = {"step_s": None if "step" in (run.get("calibrates") or ()) else _est(pred.get("time.step")),
+				no_probe = not any(p.status in api.OK_PROBE for p in rec.probes)
+				cal = "step" in (run.get("calibrates") or ())
+				pre = {"step_s": None if cal else _est(pred.get("time.step")),
+					**({"step_why": "this run calibrated Preflight's step band, so it isn't a fair test"} if cal else {}),
+					**({"why": "no probe ran: no answer, not a miss"} if no_probe else {}),
 					"peak_gib": _est(pred.get("memory.peak"), GIB),
 					"p_oom": _num(pred["risk.oom"].point, 3) if pred.get("risk.oom") and pred["risk.oom"].status != "abstain" else None}  # fmt: skip
 			else:
-				pre = {"step_s": None, "peak_gib": None, "p_oom": None, "why": "no probe ran"}
+				pre = {
+					"step_s": None,
+					"peak_gib": None,
+					"p_oom": None,
+					"why": "no probe ran: no answer, not a miss",
+				}
 			a = (answers.get(sid) or {}).get("answer") or {}
 			muse = {"step_s": a.get("step_time_s") if a.get("step_applies") else None,
-				"peak_gib": a.get("peak_memory_gib"), "p_oom": a.get("p_oom")}  # fmt: skip
+				"peak_gib": a.get("peak_memory_gib"), "p_oom": a.get("p_oom"),
+				**({} if a.get("step_applies") else {"step_why": "it said the job has no training step (eval only)"})}  # fmt: skip
 			ps = (pre.get("step_s") or {}).get("point")
 			pp = (pre.get("peak_gib") or {}).get("point")
 			rows.append({
 				"script": "beir" if sid == "unseen-7" else sid,
 				"label": label, "gpu": gt.get("gpu") or run.get("values", {}).get("gpu_type"),
+				"device": bare.get("device"),  # the card the full run got (an A10G for two of them)
 				"full_run": {"step_s": _num(step), "peak_gib": _num(peak, 2), "ran_out_of_memory": ran_out,
 					"reserved_when_it_ran_out_gib": _num((bare.get("peak_reserved_bytes") or 0) / GIB, 2) if ran_out else None,
-					"run": run.get("$ground_truth", "")[:160]},
+					"run": run.get("$ground_truth", "")[:160]},  # internal provenance: not for display
 				"preflight": pre, "muse_spark": muse,
 				"ratio": {"preflight_step": _ratio(ps, step), "muse_step": _ratio((muse["step_s"] or {}).get("point"), step),
 					"preflight_peak": _ratio(pp, peak), "muse_peak": _ratio((muse["peak_gib"] or {}).get("point"), peak)},
@@ -117,11 +128,39 @@ def main() -> int:
 		min(abs(r["preflight_step"] - 1) for r in step_r),
 		max(abs(r["preflight_step"] - 1) for r in step_r),
 	]
+	within = {side: sum(1 for r in rows if r["ratio"][f"{side}_peak"] and abs(r["ratio"][f"{side}_peak"] - 1) <= 0.10)
+		for side in ("preflight", "muse")}  # fmt: skip
+	scored_peak = sum(1 for r in rows if r["ratio"]["preflight_peak"] and r["ratio"]["muse_peak"])
+
+	def covers(side, key, actual_key):
+		n = k = 0
+		for r in rows:
+			e, act = (r[side].get(key) or {}), r["full_run"][actual_key]
+			if act is None or e.get("lo") is None or r[side].get(key) is None:
+				continue
+			if side == "preflight" and key == "step_s" and r["preflight"].get("step_why"):
+				continue
+			if not r["ratio"]["preflight_step" if key == "step_s" else "preflight_peak"]:
+				continue
+			n += 1
+			k += e["lo"] <= act <= e["hi"]
+		return k, n
+
+	cov = {side: tuple(map(sum, zip(covers(side, "step_s", "step_s"), covers(side, "peak_gib", "peak_gib"), strict=True)))
+		for side in ("preflight", "muse_spark")}  # fmt: skip
+	# what the posted text says, checked against the rows: a re-run on another engine says so instead of going stale
+	assert (len(step_r), scored_peak, within["preflight"], within["muse"]) == (4, 4, 2, 0), (
+		len(step_r),
+		within,
+	)
+	assert cov == {"preflight": (3, 8), "muse_spark": (4, 8)}, cov
+	pre_x = [min(r["preflight_step"] for r in step_r), max(r["preflight_step"] for r in step_r)]
 	summary = (f"Too few to rank formally. On step time, on the {len(step_r)} full runs both sides could be scored on, "
 		f"Muse Spark from the code alone was off by {muse_rng[0]:.1f}x to {muse_rng[1]:.0f}x (every one too slow), "
-		f"Preflight by {round(100 * pre_rng[0])}% to {round(100 * pre_rng[1])}% (two low, two high). On peak memory, Preflight "
-		"was within 10% on 2 of 4 and Muse Spark on 0 of 4; on running out of memory both caught the LoRA eval and both "
-		"missed BEIR.")  # fmt: skip
+		f"Preflight by {round(100 * pre_rng[0])}% to {round(100 * pre_rng[1])}% ({pre_x[0]:.2f}x to {pre_x[1]:.2f}x; two "
+		f"low, two high). On peak memory, Preflight was within 10% on {within['preflight']} of {scored_peak} and Muse Spark "
+		f"on {within['muse']} of {scored_peak}. On running out of memory, both caught the LoRA eval (Preflight because a "
+		"probe ran out of memory there); Muse Spark missed BEIR (15%), and Preflight gave no answer for it (no probe ran).")  # fmt: skip
 	commit = subprocess.run(["git", "log", "-1", "--format=%h", "--", "python/preflight/engine"], cwd=ROOT,
 		capture_output=True, text=True).stdout.strip() or None  # fmt: skip
 	out = {
@@ -137,14 +176,15 @@ def main() -> int:
 		"ratio_means": "prediction over what the full run did: 1 is exact, above 1 too high, below 1 too low",
 		"summary": summary,
 		"caveats": [
-			"Too few to rank: 4 scripts for step time and memory, 6 for running out of memory; the hit counts' "
+			"4 scripts for step time and memory, 6 for running out of memory; the hit counts' "
 			"Wilson 95% intervals overlap (2 of 4: 15% to 85%; 0 of 4: 0% to 49%).",
 			"Muse Spark's 90% intervals covered slightly more often than Preflight's on these four (4 of 8 against "
-			"3 of 8, memory and step together).",
-			"Two of the four full runs (vision, nanoGPT) got an A10G, about 11% slower than the A10 both sides "
-			"predicted for.",
+			"3 of 8, memory and step together), but they are much wider: 1.8 to 6 times from low end to high end, "
+			"against Preflight's 1.1 to 1.5, and two of its four covers are near misses.",
+			"Two of the four full runs (vision, nanoGPT) got an A10G; on the LoRA script an A10G ran about 11% "
+			"slower than the A10 both sides predicted for.",
 			"The memory comparison is of unlike quantities on Preflight's side: its point includes the CUDA "
-			"context and the full run's reserved peak doesn't, so each Preflight memory error reads about 0.3 GB high.",
+			"context and the full run's reserved peak doesn't, so each Preflight memory error reads about 0.3 GB (0.25 GiB) high.",
 			"The zoo LoRA run calibrated Preflight's step band, so its Preflight step isn't scored; it and BEIR ran "
 			"out of memory, so their full peaks were never seen.",
 			"The GRPO zoo script is left out: its sample folder held that run's own record, which Muse Spark read.",

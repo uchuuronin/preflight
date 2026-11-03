@@ -1,5 +1,5 @@
 {
-	"generated_at": "2026-11-03T22:27Z",
+	"generated_at": "2026-11-03T22:31Z",
 	"engine_commit": "064f1a6b",
 	"source": "docs/validation/preflight-vs-model.md; scripts/vs_model_from_final.py",
 	"muse_spark": {
@@ -9,12 +9,12 @@
 		"given": "the repo's files (as Preflight's script map gets them), the command and the GPU; nothing measured"
 	},
 	"ratio_means": "prediction over what the full run did: 1 is exact, above 1 too high, below 1 too low",
-	"summary": "Too few to rank formally. On step time, on the 4 full runs both sides could be scored on, Muse Spark from the code alone was off by 1.6x to 18x (every one too slow), Preflight by 8% to 36% (two low, two high). On peak memory, Preflight was within 10% on 2 of 4 and Muse Spark on 0 of 4; on running out of memory both caught the LoRA eval and both missed BEIR.",
+	"summary": "Too few to rank formally. On step time, on the 4 full runs both sides could be scored on, Muse Spark from the code alone was off by 1.6x to 18x (every one too slow), Preflight by 8% to 36% (0.83x to 1.36x; two low, two high). On peak memory, Preflight was within 10% on 2 of 4 and Muse Spark on 0 of 4. On running out of memory, both caught the LoRA eval (Preflight because a probe ran out of memory there); Muse Spark missed BEIR (15%), and Preflight gave no answer for it (no probe ran).",
 	"caveats": [
-		"Too few to rank: 4 scripts for step time and memory, 6 for running out of memory; the hit counts' Wilson 95% intervals overlap (2 of 4: 15% to 85%; 0 of 4: 0% to 49%).",
-		"Muse Spark's 90% intervals covered slightly more often than Preflight's on these four (4 of 8 against 3 of 8, memory and step together).",
-		"Two of the four full runs (vision, nanoGPT) got an A10G, about 11% slower than the A10 both sides predicted for.",
-		"The memory comparison is of unlike quantities on Preflight's side: its point includes the CUDA context and the full run's reserved peak doesn't, so each Preflight memory error reads about 0.3 GB high.",
+		"4 scripts for step time and memory, 6 for running out of memory; the hit counts' Wilson 95% intervals overlap (2 of 4: 15% to 85%; 0 of 4: 0% to 49%).",
+		"Muse Spark's 90% intervals covered slightly more often than Preflight's on these four (4 of 8 against 3 of 8, memory and step together), but they are much wider: 1.8 to 6 times from low end to high end, against Preflight's 1.1 to 1.5, and two of its four covers are near misses.",
+		"Two of the four full runs (vision, nanoGPT) got an A10G; on the LoRA script an A10G ran about 11% slower than the A10 both sides predicted for.",
+		"The memory comparison is of unlike quantities on Preflight's side: its point includes the CUDA context and the full run's reserved peak doesn't, so each Preflight memory error reads about 0.3 GB (0.25 GiB) high.",
 		"The zoo LoRA run calibrated Preflight's step band, so its Preflight step isn't scored; it and BEIR ran out of memory, so their full peaks were never seen.",
 		"The GRPO zoo script is left out: its sample folder held that run's own record, which Muse Spark read."
 	],
@@ -23,6 +23,7 @@
 			"script": "finetune_lora_hf",
 			"label": "LoRA fine-tune (zoo)",
 			"gpu": "L4",
+			"device": "NVIDIA L4",
 			"full_run": {
 				"step_s": 1.8691,
 				"peak_gib": null,
@@ -32,6 +33,7 @@
 			},
 			"preflight": {
 				"step_s": null,
+				"step_why": "this run calibrated Preflight's step band, so it isn't a fair test",
 				"peak_gib": {
 					"status": "abstain",
 					"reason": "probe p1-eval ran out of memory at these settings"
@@ -65,6 +67,7 @@
 			"script": "beir",
 			"label": "Retrieval (BEIR)",
 			"gpu": "A10",
+			"device": "NVIDIA A10",
 			"full_run": {
 				"step_s": null,
 				"peak_gib": null,
@@ -77,6 +80,7 @@
 					"status": "abstain",
 					"reason": "no probe timed a step yet"
 				},
+				"why": "no probe ran: no answer, not a miss",
 				"peak_gib": {
 					"status": "abstain",
 					"reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through"
@@ -90,7 +94,8 @@
 					"lo": 10.0,
 					"hi": 19.0
 				},
-				"p_oom": 0.15
+				"p_oom": 0.15,
+				"step_why": "it said the job has no training step (eval only)"
 			},
 			"ratio": {
 				"preflight_step": null,
@@ -106,6 +111,7 @@
 			"script": "gnn_pyg",
 			"label": "GNN (PyG GraphSAGE)",
 			"gpu": "A10",
+			"device": "NVIDIA A10",
 			"full_run": {
 				"step_s": 0.0612,
 				"peak_gib": 7.95,
@@ -153,6 +159,7 @@
 			"script": "retrieval_st",
 			"label": "Retrieval (sentence-transformers)",
 			"gpu": "A10",
+			"device": "NVIDIA A10",
 			"full_run": {
 				"step_s": 0.0312,
 				"peak_gib": 2.26,
@@ -200,6 +207,7 @@
 			"script": "vision_timm",
 			"label": "Vision (timm ResNet-50)",
 			"gpu": "A10",
+			"device": "NVIDIA A10G",
 			"full_run": {
 				"step_s": 0.1504,
 				"peak_gib": 3.35,
@@ -242,13 +250,14 @@
 				"muse_peak": 1.1358
 			},
 			"notes": [
-				"the full run got an A10G, about 11% slower than the A10 both sides predicted for"
+				"the full run got an A10G, which ran the LoRA script about 11% slower than the A10 both sides predicted for"
 			]
 		},
 		{
 			"script": "pretrain_nanogpt",
 			"label": "Pretrain (nanoGPT)",
 			"gpu": "A10",
+			"device": "NVIDIA A10G",
 			"full_run": {
 				"step_s": 0.7047,
 				"peak_gib": 18.86,
@@ -291,7 +300,7 @@
 				"muse_peak": 0.6097
 			},
 			"notes": [
-				"the full run got an A10G, about 11% slower than the A10 both sides predicted for"
+				"the full run got an A10G, which ran the LoRA script about 11% slower than the A10 both sides predicted for"
 			]
 		}
 	]
