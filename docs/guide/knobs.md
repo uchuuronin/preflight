@@ -42,8 +42,8 @@ Pick **Lowest cost**. In **Your limits**, write "only A100, done within 72 hours
 memory first if the run would run out, then suggests moves that cut cost, one at a time. For each,
 press **Apply**, **Not this**, **Keep** (your value) or **Pin** (its value). Probes on the public
 site run on cards up to an L40S, so A100 time and cost are estimates from another card: they read
-**Extrapolated**, and the true value can be about 1.6 to 1.9 times higher or lower. Memory on the
-A100 still comes from your probes.
+**Extrapolated**, and the true value can be about 1.6 to 1.9 times higher or lower. A100 memory is
+recalculated from your probes for the bigger card, and also reads **Extrapolated**.
 
 **No training loop yet.**
 
@@ -52,9 +52,10 @@ A100 still comes from your probes.
 
 Preflight measures code, so there's nothing to probe yet. Open the closest sample instead (**Pretrain
 a GPT-2 (124M) on TinyStories, measured on an A10 (2 Nov)**) and move its knobs. Batch size,
-sequence length, training steps and precision change memory, time and cost. Layers and model width
-change memory only; time stays at the probes' value and is marked "isn't modelled for time yet".
-Check in your loop once it exists.
+sequence length and precision change memory, time and cost (precision reads **Extrapolated**);
+training steps change time and cost. Layers and model width change memory only; time stays at the
+probes' value and is marked "isn't modelled for time yet". This sample offers only the A10, so it
+can't compare GPUs: check in your loop once it exists, then use the **GPU** knob.
 
 **No GPU chosen yet.**
 
@@ -92,8 +93,8 @@ can't be priced until you sample it.
 
 Use the **Run a command** tab:
 `lm_eval --model hf --model_args pretrained=EleutherAI/pythia-160m --tasks arc_easy --limit 100`.
-Pick **Finish soonest**. The probes measure memory and time. Preflight's model of evaluation passes
-is off on the public site, so treat the finish time as rough and check its status word.
+Pick **Finish soonest**. The probes measure memory and step time. Preflight's model of evaluation
+passes is off on the public site, so the finish time may show **Not measured here**.
 
 **Something the boxes don't cover.** Write it anyway ("must reuse our cluster's checkpoints"). If
 you type it into **Your limits** and Preflight has no knob for it, it says "Not turned into a limit"
@@ -110,15 +111,16 @@ Pick one tab:
 - **Upload:** `.py` files plus requirements, configs and small text data. Up to 5 MB and 2,000
   files. Weights and large datasets come from Hugging Face. Choose which file to run.
 - **Notebook:** one notebook on its own. Its `pip` lines become its requirements.
-- **Run a command:** a tool Preflight knows by name (today, `lm_eval`), up to 64 words. There's no
+- **Run a command:** a tool Preflight knows by name (today, `lm_eval`), up to 64 words and 8,192
+  characters. There's no
   shell, so no pipes (`|`), redirects (`>`), variables or chained commands. The box names any word
   it can't take.
 
 ### Extra packages
 
 PyPI names your code imports that may not be installed, separated by commas (`einops, timm`), up to
-10. Names only, no versions. Preflight installs ready-built wheels for names on its list before the
-run. A name it can't install stops the check-in before any GPU time, so a typo costs nothing.
+10. Names only, no versions. Before the run, Preflight installs the names on its list from ready-built wheels.
+Any other name stops the check-in before GPU time is spent, so a typo costs nothing.
 
 ### What matters most
 
@@ -158,9 +160,9 @@ Free, no account. Limits:
   open until midnight.
 - If a check-in stops at a missing import before measuring anything, one resend a day is free.
 
-A check-in takes about 5 to 11 minutes (the LoRA sample's two production check-ins took 4 min 59 s
-and 10 min 21 s), plus any wait for a free GPU. The boarding screen shows the wait, which is capped
-at 20 minutes.
+A check-in of the LoRA sample on an L4 takes about 5 to 11 minutes (its two production check-ins
+took 4 min 59 s and 10 min 21 s); other jobs vary. Add any wait for a free GPU: the boarding screen
+shows it. If no GPU frees up within 20 minutes, the probe stops with "no GPU could be scheduled".
 
 ## Reading the cockpit
 
@@ -179,8 +181,8 @@ Each readout has a range the true value should fall inside 9 times in 10, and a 
   a measured setting, or run a probe there.
 
 Out-of-memory chance: **Fits** is under 1%, **Tight** 1% to 80%, **Fails** 80% or more. These
-cut-offs haven't been checked against real runs yet, so a chance between 5% and 95% shows as a
-range. **Tight: measure first** means run a probe before you trust it.
+cut-offs haven't been checked against real runs yet. A chance between 5% and 95% shows as a range,
+because chances in that band haven't been verified either. **Tight: measure first** means run a probe before you trust it.
 
 How much to trust the ranges: against real full runs, the 90% ranges held 10 times out of 18 (Nov
 3). Treat a **Predicted** range as narrower than it should be.
@@ -190,8 +192,7 @@ How much to trust the ranges: against real full runs, the 90% ranges held 10 tim
 ### Moving a knob
 
 Drag it or pick a value. The map, readouts and timeline update at once. Each knob's hint says what
-it affects first: memory, speed and cost, batches, the model, where it runs, the RL loop or the
-agent's calls.
+it affects first, for example memory, speed and cost, or where it runs.
 
 ### Knobs that only change what the model learns
 
@@ -209,11 +210,12 @@ measured here** instead.
 
 ### Off the probed values
 
-A knob at a value no probe ran turns memory and time from **Predicted** to **Extrapolated**. The
-exceptions: size knobs (batch, sequence length, image size, fan-outs), run length, GPU and GPU
-count, save and eval intervals, gradient accumulation (for time), and the knobs that only change
-learning. Past twice the largest probe on the job's size axis (batch times sequence length, say),
-memory and time show **Not measured here**.
+A knob at a value no probe ran turns memory and time from **Predicted** to **Extrapolated**. Not
+covered by this rule: size knobs (batch, sequence length, image size, fan-outs), run length, save
+and eval intervals, gradient accumulation (for time), the knobs that only change learning, and GPU
+and GPU count (those read **Extrapolated** for their own reasons; see **GPU** and **GPUs**). The job's size axis is the
+product of its size knobs (for a language model, batch × sequence length). Past twice the largest
+probe on it, memory and time show **Not measured here**.
 
 ### Pinned
 
@@ -257,15 +259,17 @@ product.
 #### Gradient accumulation
 
 Runs several small batches before each update, so batch 8 with accumulation 4 learns like batch 32
-at about batch 8's memory. Slightly slower. *In Preflight:* adds a little memory on its own (one
-copy of the gradients); the saving comes from lowering batch size with it. Time per update rises and
+at about batch 8's memory. Slightly slower. *In Preflight:* on its own it adds up to one copy of the
+trainable gradients (small for LoRA, large for full fine-tuning); the saving comes from lowering
+batch size with it. Time per update rises and
 updates per epoch fall by the same factor.
 
 #### Eval batch
 
 Batch size for evaluation, separate from training. A common trap: training fits, then the first
 eval runs out of memory. Lower it if memory spikes at eval. *In Preflight:* moves memory when eval
-sets the peak; time isn't modelled.
+sets the peak; time and its range don't change (each eval pass is counted at the probes' eval
+batch).
 
 #### Eval without gradients
 
@@ -288,7 +292,7 @@ off when the probes ran with it on keeps the recompute in the time, marked **Ext
 
 #### Precision
 
-The number format. 32-bit is exact and large; `bf16` and `fp16` are half the size and much faster on
+The number format. 32-bit is precise and large; `bf16` and `fp16` are half the size and much faster on
 modern GPUs. Use `bf16` on cards that support it (A10, L4, A100, H100). `fp16` needs loss scaling or
 small gradients round to zero. *In Preflight:* moves memory and time, **Extrapolated** when it
 differs from the probes; a format the card can't run fast (bf16 on a T4) shows **Not measured
@@ -308,8 +312,8 @@ is a lot for a big model. Lion keeps one, plain SGD none, and 8-bit versions sto
 
 #### Attention kernel
 
-How attention is computed. Fused kernels (FlashAttention, PyTorch SDPA) are faster and lighter than
-plain "eager" attention, whose memory grows with the square of sequence length. *In Preflight:*
+How attention is computed. Fused kernels (FlashAttention, PyTorch SDPA), on cards that support them, are
+faster and lighter than plain "eager" attention, whose memory grows with the square of sequence length. *In Preflight:*
 moves memory; time isn't modelled yet.
 
 #### Channels-last layout
@@ -438,8 +442,8 @@ range of about 1.6 to 1.9 times either way. Cost is that time at the card's hour
 #### GPUs
 
 How many cards the run uses. More finish sooner if the job splits well, and cost more per hour. *In
-Preflight:* moves memory per card (down if the script shards the model, up slightly under plain data
-parallel, unchanged with no strategy), step time (up, for communication) and step count (down).
+Preflight:* moves memory per card (down if the script shards the model, up by as much as one copy of the
+trainable gradients under plain data parallel, unchanged with no strategy), step time (up, for communication) and step count (down).
 Always **Extrapolated**: the probes ran on one card.
 
 #### FSDP mode
@@ -522,13 +526,13 @@ reason says so.
 #### Context limit
 
 Most tokens the agent keeps in its conversation. Longer remembers more and pays for every token on
-every turn. *In Preflight:* moves the **Context window filled** readout and says what share of
-tasks would overflow. Cost and runaway chance aren't modelled.
+every turn. *In Preflight:* moves the **Context window filled** readout. If any sampled task would
+overflow, it shows no number and says what share would. Cost and runaway chance aren't modelled.
 
 #### Prompt caching
 
 Reuses the unchanged start of a prompt between calls, billed at a lower rate. Usually saves money
-when an agent resends a long system prompt. *In Preflight:* off the sampled setting, cost shows
+when an agent resends a long system prompt (some APIs charge a little extra to write the cache). *In Preflight:* off the sampled setting, cost shows
 **Not measured here** until you sample with caching on.
 
 #### Tool retry cap
