@@ -158,7 +158,7 @@ function useWakeSource(specs: DialSpec[], knobs: object): void {
 
 /** The dial's size class for a value's text (its length): applied by React and by the tween per frame. */
 export function sizeClass(text: string): string | undefined {
-	return text.length > 9 ? "is-longer" : text.length > 6 ? "is-long" : undefined;
+	return text.length > 11 ? "is-longest" : text.length > 9 ? "is-longer" : text.length > 6 ? "is-long" : undefined;
 }
 
 function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => void; goalOn: boolean; wake?: Wake | undefined }) {
@@ -218,7 +218,8 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 				<b ref={valueRef} className={ok ? sizeClass(value) : "is-abstain"}>
 					{value}
 				</b>
-				<small>{spec.unit}</small>
+				{/* The unit reads as part of the number ("1 h 34 min / to finish"); under "Not measured here" it dangled. */}
+				{ok ? <small>{spec.unit}</small> : null}
 			</span>
 			{wake ? (
 				<span key={wake.key} className={`pf-dial__wake${wake.better === true ? " is-better" : wake.better === false ? " is-worse" : ""}`} aria-hidden="true">
