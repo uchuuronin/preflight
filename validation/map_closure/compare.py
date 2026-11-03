@@ -97,6 +97,8 @@ def summary(sm):
 		if isinstance(loop, dict)
 		else loop,
 		"knobs": {k["id"]: k["current"] for k in d.get("knobs") or []},
+		"model_full": d.get("model"),
+		"rl": d.get("rl"),
 		"_where": {k["id"]: (k.get("location") or {}).get("file") for k in d.get("knobs") or []},
 	}
 
