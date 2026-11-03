@@ -1,0 +1,11 @@
+{
+	"name": "20261103-151859-41662534946-c-handoff-shot6b",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41662534946",
+	"ref": "ws-c",
+	"sha": "1be378532135882076a85e8681428709698cd927",
+	"cmd": "modal run --env main api/checkin_help_app.py::handoff --which packages",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T15:19:26Z"
+}

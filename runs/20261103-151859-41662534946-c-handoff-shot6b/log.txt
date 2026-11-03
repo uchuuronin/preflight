@@ -1,0 +1,7 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-GjG5bzLd3E4dAUAdGCCMck
+✓ Created objects.
+{"which": "packages", "stored": "preflight-handoff[d.shot6b.packages]"}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-GjG5bzLd3E4dAUAdGCCMck
