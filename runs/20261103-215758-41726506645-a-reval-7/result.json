@@ -1,0 +1,11 @@
+{
+	"name": "20261103-215758-41726506645-a-reval-7",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41726506645",
+	"ref": "515400f412f527a122f7e3a84ba0c46d12af3e77",
+	"sha": "515400f412f527a122f7e3a84ba0c46d12af3e77",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor reval-7 --max-minutes 35 --repo https://github.com/beir-cellar/beir --commit ef83d29307061c65d04b035b4f4e7c18bd8374af --entrypoint examples/retrieval/evaluation/dense/evaluate_sbert.py ",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T22:10:03Z"
+}
