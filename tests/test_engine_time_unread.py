@@ -112,3 +112,14 @@ def test_a_held_knob_keeps_the_probe_s_own_number():
 			if base[tid].status != "abstain" and moved[tid].status != "abstain":
 				assert moved[tid].point == pytest.approx(base[tid].point, rel=1e-9), (kv, tid)
 				assert moved[tid].hi - moved[tid].lo >= base[tid].hi - base[tid].lo
+
+
+def test_a_held_move_s_anchor_falls_back_to_the_fit_when_probes_disagree():
+	rec = _rec("pretrain_nanogpt.record.json")
+	p0 = next(p for p in rec.probes if p.status in api.OK_PROBE)
+	cur = api._current(rec)
+	other = p0.model_copy(update={"id": "p-deep", "knobs": {**p0.knobs, "n_layer": cur["n_layer"] * 2}})
+	two = rec.model_copy(update={"probes": [*rec.probes, other]})
+	vals = api._values(two, {"n_layer": cur["n_layer"] + 1})
+	assert api._held_anchor(two, vals, ["n_layer"]) is None
+	assert api._held_anchor(rec, api._values(rec, {"n_layer": cur["n_layer"] * 2}), ["n_layer"]) is not None

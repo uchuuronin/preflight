@@ -1578,6 +1578,24 @@ def _checkpointing_on(v) -> bool:
 	return bool(v)
 
 
+def _held_anchor(record: FlightRecord, values: dict, moved: list[str]):
+	"""The probe matching every knob but the held ones, when the probes that do agree on the held knobs' values;
+	else None, so the fit gives the step (review, Nov 3: two probes at different layer counts would make the anchor
+	depend on their order)."""
+	if not moved:
+		return _matching_probe(record, values)
+	rest = {k: v for k, v in values.items() if k not in moved}
+	ignored = _ignored()
+	found = [p for p in record.probes if p.status in OK_PROBE
+		and all(_same(_probe_values(record, p).get(k), v) for k, v in rest.items() if k not in ignored)]  # fmt: skip
+	if not found:
+		return None
+	first = _probe_values(record, found[0])
+	if any(not _same(_probe_values(record, p).get(k), first.get(k)) for p in found[1:] for k in moved):
+		return None
+	return found[0]
+
+
 def _step(record: FlightRecord, values: dict) -> _StepResult:
 	lens = record.job.lens
 	sprobes, current_probe = [], None
@@ -1615,7 +1633,7 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	# measured anchor, so the move keeps the probe's own number (D's walkthrough, Nov 3: doubling nanoGPT's layers read
 	# 15 min 48 s faster, the fit's value at the base against the probe's measured one)
 	unmodelled_moves = _unmodelled_moves(record, values, "time")
-	match = _matching_probe(record, {k: v for k, v in values.items() if k not in unmodelled_moves})
+	match = _held_anchor(record, values, unmodelled_moves)
 	src_gpu, tgt_gpu = _env_gpu(record), _target_gpu(record, values)
 	requested = _gpu_move(record, values)
 	if requested and tgt_gpu is None:
@@ -1635,6 +1653,10 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	if est.status == "abstain":
 		return _StepResult(_abstain("s", mid, est.reason), est.sigma_log)
 	point, sigma, status, reasons = est.point, est.sigma_log, est.status, [est.reason] if est.reason else []
+	if unmodelled_moves and est.status == "measured":
+		sigma = (
+			model.sigma
+		)  # the probe's number, but the fit's band: a held move isn't a measurement (review)
 	lt = _length_term(record, values, match, _total_steps(record, values)[0], est.breakdown, bool(factors))
 	if lt is not None:
 		sigma = math.hypot(sigma, lt.step_sigma)
