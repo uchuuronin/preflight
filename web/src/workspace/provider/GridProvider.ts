@@ -94,11 +94,21 @@ function same(a: KnobValue | undefined, b: KnobValue | undefined): boolean {
  * holds it: at its `fixed` value, or, for a knob the grid never mentions, at the record's
  * current value. A knob moved away from either means this grid can't answer.
  */
+/**
+ * The knobs a grid's target doesn't depend on (contract 0.6.4 `Grid.independent_of`: the learning rate,
+ * warm-up, weight decay, clipping, LoRA alpha, PPO clip ranges, seed), so the grid answers at any value
+ * of them. B emits it only with `engine.carry_free_knobs` on; absent, every knob off the axes must match.
+ */
+export function freeKnobs(grid: Pick<Grid, "independent_of">): ReadonlySet<string> {
+	return new Set(grid.independent_of ?? []);
+}
+
 function applies(grid: Grid, record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {
 	const onAxis = new Set(grid.axes.map((a) => a.knob_id));
+	const free = freeKnobs(grid);
 	const fixed = grid.fixed ?? {};
 	for (const k of record.knobs) {
-		if (onAxis.has(k.id)) continue;
+		if (onAxis.has(k.id) || free.has(k.id)) continue;
 		const held = k.id in fixed ? fixed[k.id] : k.current;
 		if (!same(knobs[k.id], held)) return false;
 	}

@@ -13,6 +13,7 @@ import { isFixture } from "../record/model";
 import type { KnobValue } from "../record/types";
 import { useWorkspace } from "../state";
 import type { Fit } from "../status";
+import { isRangeTest } from "./rangeTest";
 
 const PROBE_FIT: Record<string, Fit> = {
 	ok: "fits",
@@ -112,7 +113,11 @@ export function Measured() {
 								>
 									<FitMark fit={fit} label={t(`probes.status.${p.status}`)} />
 									<span className="pf-chip__where">
-										{cols.length ? cols.map((k) => valueText(k, (p.knobs?.[k.id] as KnobValue | undefined) ?? k.current)).join(" · ") : t("measured.as_written")}
+										{isRangeTest(p)
+											? t("probes.range_test")
+											: cols.length
+												? cols.map((k) => valueText(k, (p.knobs?.[k.id] as KnobValue | undefined) ?? k.current)).join(" · ")
+												: t("measured.as_written")}
 									</span>
 									<span className="pf-chip__nums">
 										{[peak ? fmt(peak, "bytes") : null, p.cost?.usd && !illustrative ? fmt(p.cost.usd, "usd") : null].filter(Boolean).join(" · ")}

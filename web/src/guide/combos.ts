@@ -8,6 +8,7 @@
  */
 import { fmt, fmtDelta } from "../lib/fmt";
 import { hasKey, t } from "../lib/i18n";
+import { freeKnobs } from "../workspace/provider/GridProvider";
 import type { PredictionProvider, SensitivityOptions } from "../workspace/provider/PredictionProvider";
 import { failureTarget, objectiveTarget, target, targetFor } from "../workspace/record/model";
 import { FITS_BELOW } from "../workspace/record/terms";
@@ -156,7 +157,10 @@ export function bestCombo(
 		// Only B's pair grids (`.clears`: "no single move clears; this pair does somewhere"), not a
 		// record's own multi-axis grids over its gridded knobs, which say nothing about clearing.
 		if (grid.target_id !== fail || grid.axes.length < 2 || !grid.id.endsWith(CLEARING_GRID_SUFFIX)) continue;
-		const fixed = (grid.fixed ?? {}) as Record<string, KnobValue>;
+		// The knobs the target doesn't depend on (0.6.4 independent_of) are neither held nor set by the
+		// move: the visitor's learning rate stays theirs.
+		const free = freeKnobs(grid);
+		const fixed = Object.fromEntries(Object.entries((grid.fixed ?? {}) as Record<string, KnobValue>).filter(([k]) => !free.has(k)));
 		// B holds every other knob where it was when the record was filled; once the visitor has
 		// moved one, the grid no longer answers for this setting (and its move would undo theirs).
 		if (Object.entries(fixed).some(([k, v]) => !grid.axes.some((a) => a.knob_id === k) && k in knobs && !same(knobs[k], v))) continue;

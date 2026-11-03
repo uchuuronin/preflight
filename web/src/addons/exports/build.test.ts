@@ -424,4 +424,11 @@ describe("helpers", () => {
 		const withArgs = { ...gold, job: { ...gold.job, source: { ...gold.job.source, args: ["--name", "my run"] } } };
 		expect(commandText(input(withArgs))).toBe("python train.py --name 'my run'");
 	});
+
+	it("gives a check-in by command its own words, and no re-check (0.6.3, A, Nov 2)", () => {
+		const words = ["lm_eval", "--model", "hf", "--model_args", "pretrained=gpt2", "--tasks", "gsm8k"];
+		const cmd = { ...gold, job: { ...gold.job, source: { kind: "command", uri: "command://lm_eval", args: words, entrypoint: "preflight_command.py" } } } as unknown as LoadedRecord;
+		expect(commandText(input(cmd))).toBe("lm_eval --model hf --model_args pretrained=gpt2 --tasks gsm8k");
+		expect(recheckText(input(cmd))).toBeNull();
+	});
 });
