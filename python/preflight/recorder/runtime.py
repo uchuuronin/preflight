@@ -1998,6 +1998,13 @@ class Recorder:
 				"bytes_mean": int(statistics.fmean(s["io_bytes"] for s in saves)),
 			}
 		if not steps:
+			if self.eval_units and self.cuda and (self._fwd or self._gen_calls_done):
+				# probes.eval_units: an eval probe's peak, which no optimizer step carries (B reads memory.peak)
+				with suppress(Exception):
+					out["memory"] = {
+						"peak": torch.cuda.max_memory_allocated(),
+						"reserved": torch.cuda.max_memory_reserved(),
+					}
 			return out
 		if timed:
 			walls = sorted(s["wall"] for s in timed)
