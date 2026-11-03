@@ -6,17 +6,18 @@
  *   #/cockpit/<ref>  a record by sample id or share token
  *   #/logbook        flights this browser opened
  *   #/checks         held-out checks of the engine on real runs (documentation, not in the nav)
+ *   #/help           how to fill in a check-in: every input and knob (linked from New flight only)
  */
 import { useSyncExternalStore } from "react";
 
-export type Screen = "home" | "new" | "boarding" | "cockpit" | "logbook" | "checks";
+export type Screen = "home" | "new" | "boarding" | "cockpit" | "logbook" | "checks" | "help";
 
 export interface Route {
 	screen: Screen;
 	param: string | null;
 }
 
-export const SCREEN_ORDER: Screen[] = ["home", "new", "boarding", "cockpit", "logbook", "checks"];
+export const SCREEN_ORDER: Screen[] = ["home", "new", "boarding", "cockpit", "logbook", "checks", "help"];
 
 export function parseRoute(hash: string): Route {
 	const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
@@ -32,6 +33,8 @@ export function parseRoute(hash: string): Route {
 			return { screen: "logbook", param: null };
 		case "checks":
 			return { screen: "checks", param: null };
+		case "help":
+			return { screen: "help", param: null };
 		default:
 			return { screen: "home", param: null };
 	}

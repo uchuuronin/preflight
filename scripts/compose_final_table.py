@@ -97,6 +97,20 @@ FOOTER = (
 )
 
 
+FOOTER_NO_UNSEEN = (
+	"Composed by `scripts/compose_final_table.py --no-unseen`: every row is the frozen scorer's (56c2141's "
+	"`validate.py` and `score_validation.py`, today's engine and production flags) on `docs/validation/final/main.json`; "
+	"the cross-GPU row's AMD text and the memory and step-time notes are written by the script. **Don't re-run "
+	"`score_validation.py --readme` (`into_readme`) over this block**: it would put back a different table. "
+	"**Relabelled copies:** the frozen scorer reads records up to contract 0.6.2, so a later record is scored as a "
+	"copy with `schema_version` 0.6.2 (contracts 0.6.3 to 0.6.5 are additive and the frozen schema ignores what it "
+	"doesn't know); the copies are committed in `docs/validation/final/files/` and listed in "
+	"`docs/validation/final/RELABELLED.md`. **Memory compares unlike quantities:** the engine's point includes the "
+	"CUDA context, the full run's reserved peak doesn't, so each memory error reads about 0.3 GB high, and "
+	"vision_timm's hit sits at 9.96%. The scorer's own note: {stamp}"
+)
+
+
 def count(manifest: Path) -> tuple[int, int]:
 	runs = [r for r in json.loads(manifest.read_text())["runs"] if r.get("set") == "unseen"]
 	return sum(bool(r.get("harnessed_without_edits")) for r in runs), len(runs)
@@ -110,6 +124,11 @@ def main(argv: list[str] | None = None) -> int:
 	ap.add_argument("--fresh", type=Path, help="fresh.json, when A's fresh runs have landed")
 	ap.add_argument("--out", type=Path, required=True)
 	ap.add_argument("--readme", type=Path, nargs="*", default=[])
+	# Chiya, Nov 3: the README's block leaves out the unseen-scripts row and its after-freeze and fresh lines; every
+	# other row as scored. The full table stays in docs/validation/table-final-nov3.md, written without this flag
+	ap.add_argument(
+		"--no-unseen", action="store_true", help="leave the unseen-scripts lines out (the README's block)"
+	)
 	a = ap.parse_args(argv)
 	main_md = a.main_md.read_text()
 	k1, n1 = count(a.first)
@@ -154,8 +173,8 @@ def main(argv: list[str] | None = None) -> int:
 				"no memory, time or out-of-memory to score",
 			)
 		)
-	body = compose(main_md, [u for u in unseen if u[2]])
-	if not a.fresh:
+	body = compose(main_md, [] if a.no_unseen else [u for u in unseen if u[2]])
+	if not a.fresh and not a.no_unseen:
 		body = body.replace(
 			"| Knob response |",
 			"| Unseen scripts harnessed: fresh scripts, run once | 8 of 9 without hand edits | One per job type | not measured |  |  | not yet run | A's runs land this afternoon |\n| Knob response |",
@@ -167,7 +186,8 @@ def main(argv: list[str] | None = None) -> int:
 		for line in body.splitlines()
 		if not line.startswith("| Metric |") and not line.startswith("|---")
 	)
-	foot = FOOTER.format(fresh=" and `fresh.json`" if a.fresh else "", stamp=stamp(main_md))
+	foot = (FOOTER_NO_UNSEEN if a.no_unseen else FOOTER).format(fresh=" and `fresh.json`" if a.fresh else "",
+		stamp=stamp(main_md))  # fmt: skip
 	table = f"{head}\n{body}\n\n{foot}\n"
 	a.out.write_text(table)
 	for p in a.readme:

@@ -11,7 +11,9 @@ import { statusLine } from "../../workspace/cockpit/statusLine";
 import { fitMapKnobs } from "../../workspace/record/fitmap";
 import { GuidePanel } from "../../guide/GuidePanel";
 import { fmt } from "../../lib/fmt";
+import { errorCopy } from "../../lib/errors";
 import { t } from "../../lib/i18n";
+import { nothingMeasured, type ProbeSeen } from "../checkinTrouble";
 import { usePanels } from "../../registry";
 import { ExportsSection } from "../../workspace/export/ExportsSection";
 import { CampaignCalendar } from "../../workspace/campaign/Calendar";
@@ -94,6 +96,10 @@ export function CockpitScreen({ recordRef }: { recordRef: string }) {
 
 function Cockpit() {
 	const { record, state, estimates } = useWorkspace();
+	// Every probe stopped before measuring (A's records keep each probe's status and code): nothing to read here.
+	const nothingStop = isFixture(record) ? null : nothingMeasured(record.probes as ProbeSeen[] | undefined);
+	const nothing = nothingStop?.step === "measure";
+	const nothingWhy = errorCopy(nothingStop?.step === "measure" ? nothingStop.code : null);
 	const headPanels = usePanels("cockpit-head", record.job.lens);
 	const below = usePanels("below", record.job.lens);
 	const layout = useOrbitLayout();
@@ -161,6 +167,16 @@ function Cockpit() {
 						<FindingsChip />
 						<ProbeHere />
 					</header>
+					{nothing ? (
+						// A check-in whose probes never ran (PM, Nov 3): say so above the dials, not empty readouts under "done".
+						<div className="pf-sample-banner pf-nothing-banner" role="status">
+							<b>{t("cockpit.nothing_measured")}</b> {nothingWhy.code ? nothingWhy.message : t("checkin.measure.unknown")}
+							{nothingWhy.code && nothingWhy.hint ? <> {nothingWhy.hint}</> : null}{" "}
+							<button type="button" className="pf-link" onClick={() => go("new")}>
+								{t("cockpit.nothing_again")}
+							</button>
+						</div>
+					) : null}
 					{isFixture(record) ? (
 						<p className="pf-sample-banner" role="note">
 							<b>{t("cockpit.illustrative")}</b>{" "}

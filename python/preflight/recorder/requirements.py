@@ -595,11 +595,18 @@ MAX_BUILD_REPORT = 4 * 2**20  # guess: bytes of pip's report read back; one proj
 
 # a build that tries to compile gets a compiler that fails (the PM, Nov 3: never compile an extension); pip's
 # metadata step needs none, so only a setup.py that compiles as it's read is stopped
-_NO_COMPILER = {"CC": "false", "CXX": "false", "LDSHARED": "false", "NVCC": "false", "CUDA_HOME": "/nonexistent",
-	"CUDA_PATH": "/nonexistent", "MAX_JOBS": "1"}  # fmt: skip
-# and on PATH, ahead of the real ones, tools that fail: a setup.py or Makefile that calls gcc, nvcc, make or cmake
-# by name gets an error, not a build (B's review, Nov 3); one that calls a compiler by its full path still can
-_SHIMS = ("gcc", "g++", "cc", "c++", "clang", "clang++", "nvcc", "ld", "make", "cmake", "ninja", "gfortran")
+_NO_COMPILER = {"CC": "false", "CXX": "false", "LDSHARED": "false", "MAX_JOBS": "1"}
+# CUDA_HOME and CUDA_PATH are taken out, never pointed at a fake path: torch's _find_cuda_home returns either as is,
+# so flash-attn's and apex's setup.py (CUDA_HOME is not None, then CUDA_HOME/bin/nvcc -V) failed where an unset
+# variable skips their CUDA parts (A's review, Nov 3). nvcc isn't shimmed for the same reason: torch finds CUDA_HOME
+# from `which nvcc`, and a shim would make it a folder with no bin/nvcc; a CUDA compile still needs the host
+# compiler, which fails. Known (review, Nov 3): pip's isolated build env doesn't see the image's torch, so a setup.py
+# that imports torch at its top (flash-attn's, apex's) fails at that import either way, as it did before these
+# changes; this matters only to a build that can see torch. A retry with --no-build-isolation is left past the freeze
+_NO_CUDA = ("CUDA_HOME", "CUDA_PATH")
+# and on PATH, ahead of the real ones, tools that fail: a setup.py or Makefile that calls gcc, make or cmake by name
+# gets an error, not a build (B's review, Nov 3); one that calls a compiler by its full path still can
+_SHIMS = ("gcc", "g++", "cc", "c++", "clang", "clang++", "ld", "make", "cmake", "ninja", "gfortran")
 
 
 MAX_COPY_BYTES = (
@@ -698,7 +705,7 @@ def _build_metadata(workdir: Path, *, log, timeout_s: float) -> dict | None:
 			str(copy),
 		]  # fmt: skip  (--only-binary: the build's own build dependencies come as wheels, never built)
 		env = {
-			**{k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
+			**{k: v for k, v in os.environ.items() if k != "PYTHONPATH" and k not in _NO_CUDA},
 			**_NO_COMPILER,
 			"PATH": _shim_path(Path(tmp)),
 		}

@@ -3,6 +3,7 @@
  * capsule, and five stacked screens that rise and un-blur into place (D's design). Only the
  * active screen is interactive; the others are hidden from assistive tech.
  */
+import { flag } from "../lib/flags";
 import { currentRef, DEFAULT_SAMPLE } from "../workspace/record/load";
 import { flushSync } from "react-dom";
 import { useEffect, useState } from "react";
@@ -14,13 +15,14 @@ import { Boarding } from "./screens/Boarding";
 import { CockpitScreen } from "./screens/CockpitScreen";
 import { Home } from "./screens/Home";
 import { Checks } from "./screens/Checks";
+import { Help } from "./screens/Help";
 import { Logbook } from "./screens/Logbook";
 import { NewFlight } from "./screens/NewFlight";
 import { go, href, SCREEN_ORDER, type Screen, useRoute } from "./route";
 import { AddonBoundary } from "../components/AddonBoundary";
 
 // Home at -43, not -47: at 720 px tall, -47 put the scroll hint on the pink band (review, Nov 1).
-const SKY_Y: Record<Screen, number> = { home: -43, new: -38, boarding: -26, cockpit: -12, logbook: 0, checks: 0 };
+const SKY_Y: Record<Screen, number> = { home: -43, new: -38, boarding: -26, cockpit: -12, logbook: 0, checks: 0, help: 0 };
 const THEME_KEY = "pf.theme";
 
 function savedTheme(): string {
@@ -141,6 +143,9 @@ export function Shell() {
 			</main>
 			<main className="pf-screen" data-pos={pos("checks")} aria-hidden={pos("checks") !== "active"} inert={pos("checks") !== "active"}>
 				{route.screen === "checks" ? <Checks /> : null}
+			</main>
+			<main className="pf-screen" data-pos={pos("help")} aria-hidden={pos("help") !== "active"} inert={pos("help") !== "active"}>
+				{route.screen === "help" && flag("c.help") ? <Help /> : null}
 			</main>
 		</div>
 	);
