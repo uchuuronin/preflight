@@ -1234,5 +1234,8 @@
 	"gpu.derived": "Specs partly derived: some of Preflight's figures for this card are computed from vendor specs, not quoted from its datasheet.",
 	"gpu.secondary": "Specs from a spec database, not the vendor's datasheet: predictions on this card have wider bands.",
 	"newflight.help_card": "Help",
-	"newflight.help_link": "How to fill this in: every input and knob, explained"
+	"newflight.help_link": "How to fill this in: every input and knob, explained",
+	"help.contents": "Contents",
+	"help.missing": "This page isn't written yet.",
+	"title.help": "Help · Preflight"
 }
