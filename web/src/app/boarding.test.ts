@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boardingState, type BoardingEvent, eventFromStatus, metaModelName, modelsRan, STAGES } from "./boarding";
+import { boardingState, type BoardingEvent, eventFromStatus, metaModelName, metaModelsOnRecord, modelsRan, STAGES } from "./boarding";
 
 const ev = (seq: number, stage: BoardingEvent["stage"], more: Partial<BoardingEvent> = {}): BoardingEvent => ({
 	job_id: "01JOB",
@@ -129,5 +129,26 @@ describe("the runner's words on the leg, and the job's end without the stream (N
 		expect(boardingState([{ stage: "probing" } as BoardingEvent, done])).toMatchObject({ done: true, open: "tok" });
 		const failed = eventFromStatus({ status: "failed", error_code: "gpu.unavailable", error: "no GPU" })!;
 		expect(boardingState([failed]).failed).toBe(true);
+	});
+});
+
+describe("metaModelsOnRecord (PM, Nov 3: the record's header line)", () => {
+	it("names each Meta model with what it did and adds up their calls' cost", () => {
+		const m = metaModelsOnRecord([
+			{ provider: "meta", model: "muse-spark-1.3", purpose: "script_map", cost_usd: 0.02 },
+			{ provider: "baseten", model: "meta-models/muse-spark-open-1026", purpose: "triage", cost_usd: 0.005 },
+			{ provider: "baseten", model: "meta-models/muse-spark-open-1026", purpose: "triage", cost_usd: 0.004 },
+			{ provider: "meta", model: "muse-spark-1.3", purpose: "diagnosis", cost_usd: 0.01, ok: false },
+			{ provider: "fireworks", model: "someone-else", purpose: "triage", cost_usd: 1 },
+		]);
+		expect(m!.models).toEqual([
+			{ name: "Muse Spark", did: ["models.did.script_map"] },
+			{ name: "Muse Spark Open", did: ["models.did.triage"] },
+		]);
+		expect(m!.usd).toBeCloseTo(0.029, 6);
+	});
+	it("is nothing when no Meta model was called", () => {
+		expect(metaModelsOnRecord([])).toBeNull();
+		expect(metaModelsOnRecord(undefined)).toBeNull();
 	});
 });

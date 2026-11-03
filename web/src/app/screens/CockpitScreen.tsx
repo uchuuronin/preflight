@@ -13,6 +13,8 @@ import { GuidePanel } from "../../guide/GuidePanel";
 import { fmt } from "../../lib/fmt";
 import { errorCopy } from "../../lib/errors";
 import { t } from "../../lib/i18n";
+import { metaModelsOnRecord } from "../boarding";
+import { listOf } from "../CheckinHelp";
 import { nothingMeasured, type ProbeSeen } from "../checkinTrouble";
 import { usePanels } from "../../registry";
 import { ExportsSection } from "../../workspace/export/ExportsSection";
@@ -104,6 +106,7 @@ function Cockpit() {
 	const below = usePanels("below", record.job.lens);
 	const layout = useOrbitLayout();
 	const spent = (record.costs?.gpu_usd ?? 0) + (record.costs?.llm_usd ?? 0);
+	const meta = metaModelsOnRecord(record.provenance as Parameters<typeof metaModelsOnRecord>[0]);
 	const source = layout.shareSource;
 	const memUnit = targetFor(record, "memory")?.unit;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
@@ -153,6 +156,15 @@ function Cockpit() {
 
 						{/* A sample's own cost is part of its fixture, not money anyone spent. */}
 						{spent > 0 && !isFixture(record) ? <span className="pf-tag">{t("cockpit.made_for", { cost: fmt(spent, "usd") })}</span> : null}
+						{meta ? (
+							// From the record's own model calls (provenance): which Meta model did what, and their cost.
+							<p className="pf-cockpit__models">
+								{t("models.line", {
+									models: meta.models.map((m) => t("models.one", { name: m.name, did: m.did.length ? listOf(m.did.map((k) => t(k))) : t("models.called") })).join("; "),
+									usd: fmt(meta.usd, "usd"),
+								})}
+							</p>
+						) : null}
 						<Measured />
 						{headPanels.map((p) => (
 							<AddonBoundary key={p.id} id={p.id}>

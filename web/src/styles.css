@@ -2029,6 +2029,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 
 /* ---------- The cockpit as a dashboard: status line, info buttons, Map/Fit stage, drawer ---------- */
 
+/* The Meta models a record's calls show, under the title: a plain line in the header's small text. */
+.pf-cockpit__models { flex-basis: 100%; margin: 0; font-size: var(--pf-text-sm); color: var(--pf-fg-dim); }
 .pf-statusline {
 	flex-basis: 100%;
 	order: 6;

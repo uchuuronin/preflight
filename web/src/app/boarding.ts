@@ -43,7 +43,41 @@ export function metaModelName(model: string | undefined): string | null {
 	const m = (model ?? "").toLowerCase();
 	if (m.includes("muse-spark-open")) return "Muse Spark Open";
 	if (m.includes("muse-spark")) return "Muse Spark";
+	if (m.includes("muse-glimmer")) return "Muse Glimmer";
 	return null;
+}
+
+/** What a model call did, by its purpose (A's and B's `ModelCall.purpose` values), as words for the record's header. */
+const DID: Readonly<Record<string, string>> = {
+	script_map: "models.did.script_map",
+	triage: "models.did.triage",
+	diagnosis: "models.did.diagnosis",
+	diagnosis_check: "models.did.diagnosis_check",
+	claim_check: "models.did.claim_check",
+	search: "models.did.search",
+	guide: "models.did.guide",
+	patch: "models.did.patch",
+	command: "models.did.command",
+};
+
+/**
+ * The Meta models a record's own model calls show (its provenance, successful calls only): each with
+ * what it did, in the order first called, and what those calls cost in all (PM, Nov 3: "Meta models on
+ * this record"). Null when no Meta model was called.
+ */
+export function metaModelsOnRecord(provenance: ReadonlyArray<ModelCallSeen & { cost_usd?: number }> | undefined): { models: Array<{ name: string; did: string[] }>; usd: number } | null {
+	const by = new Map<string, Set<string>>();
+	let usd = 0;
+	for (const c of provenance ?? []) {
+		const name = metaModelName(c.model);
+		if (!name || c.ok === false) continue;
+		if (!by.has(name)) by.set(name, new Set());
+		const key = c.purpose ? DID[c.purpose] : undefined;
+		if (key) by.get(name)!.add(key);
+		usd += typeof c.cost_usd === "number" && Number.isFinite(c.cost_usd) ? c.cost_usd : 0;
+	}
+	if (!by.size) return null;
+	return { models: [...by].map(([name, did]) => ({ name, did: [...did] })), usd };
 }
 
 /** Per leg, the Meta models the record shows were actually called for it (successful calls only). */
