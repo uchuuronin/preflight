@@ -1,0 +1,11 @@
+{
+	"name": "20261103-170734-41681107764-a-fresh-F1-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41681107764",
+	"ref": "eaffabd747eb2b2076be1c639602c6b308780af0",
+	"sha": "eaffabd747eb2b2076be1c639602c6b308780af0",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor fresh-f1 --gpus L4,A10 --max-minutes 45 --repo https://github.com/pytorch/examples --commit acc295dc7b90714f1bf47f06004fc19a7fe235c4 --entrypoint word_language_model/main.py --args=--cuda,--epochs,6",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T17:11:03Z"
+}
