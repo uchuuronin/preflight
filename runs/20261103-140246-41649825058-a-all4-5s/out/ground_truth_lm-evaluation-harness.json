@@ -1,0 +1,99 @@
+{
+  "script": "lm-evaluation-harness",
+  "entrypoint": "lm_eval/__main__.py",
+  "args": [
+    "--model",
+    "hf",
+    "--model_args",
+    "pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,dtype=bfloat16",
+    "--tasks",
+    "arc_easy,hellaswag,piqa",
+    "--batch_size",
+    "auto"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "PackageNotFoundError",
+    "error": "importlib.metadata.PackageNotFoundError: No package metadata was found for lm_eval\n",
+    "seconds": 0.16242533800000203,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 27.5
+  },
+  "recorder": {
+    "status": "error",
+    "error": "The script imports a package, which is not installed in the probe image. PackageNotFoundError: No package metadata was found for lm_eval at lm_eval/__init__.py:7, before the first optimizer step (stage: running script)",
+    "error_code": "missing_package",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 23.748,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {},
+    "step_log": [],
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n[preflight] requirements: the repo declares 14 dependencies (pyproject.toml, setup.cfg or setup.py)\n[preflight] requirements: the script imports promptsource, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports pytest, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports trackio, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports wandb: installing wandb\n[preflight] requirements: kept the image's datasets 3.1.0 (asked for 'datasets>=2.16.0')\n[preflight] requirements: kept the image's numpy 2.1.3 (asked for 'numpy')\n[preflight] requirements: kept the image's jinja2 3.1.6 (asked for 'jinja2')\n[preflight] requirements: kept the image's dill 0.3.8 (asked for 'dill')\n[preflight] requirements: kept the image's typing_extensions 4.16.0 (asked for 'typing_extensions')\n[preflight] requirements: kept the image's tqdm 4.70.1 (asked for 'tqdm>=4.59.0')\n[preflight] requirements: installing evaluate>=0.4.0, pytablewriter, rouge-score>=0.0.4, sacrebleu>=1.5.0, scikit-learn>=0.24.1, sqlitedict, word2number, more_itertools, wandb\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T14:03:45Z",
+      "duration_s": 23.748,
+      "error": "The script imports a package, which is not installed in the probe image. PackageNotFoundError: No package metadata was found for lm_eval at lm_eval/__init__.py:7, before the first optimizer step (stage: running script)",
+      "error_code": "missing_package",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": null,
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {},
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 23.748,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "eval",
+  "image": "probe"
+}
