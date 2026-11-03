@@ -77,7 +77,9 @@ export function GuidePanel() {
 	// started the rule-based tour (it's started once, not again on a later failure).
 	const liveAnswered = useRef(false);
 	const autoStarted = useRef(false);
-	const live = flag("c.guide.live") && !fallback;
+	// The visitor took the rule-based tour's quick read while Muse Spark was still reading the record.
+	const [tookQuick, setTookQuick] = useState(false);
+	const live = flag("c.guide.live") && !fallback && !tookQuick;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 	// The campaign plan the cockpit draws (same flag, same record), so the tour walks what's on screen.
 	// B's plan at the table's rates it was made at: the budget cut is judged there, whatever rate the visitor types.
@@ -290,6 +292,28 @@ export function GuidePanel() {
 
 	const vars = stepVars(active);
 
+	// While Muse Spark reads the record (two model turns, about 30 s on the live site, Nov 3), the
+	// rule-based tour's first step shows at once as the quick read (PM, Nov 3: a visitor shouldn't stare
+	// at nothing). Worked out, never applied: nothing moves until the visitor takes it, and the live
+	// guide's first answer replaces it. A failed answer starts the rule-based tour on this same step.
+	const quickOn = live && liveStatus === "thinking" && !liveAnswered.current;
+	const quick = useMemo<{ active: Active; text: string } | null>(() => {
+		if (!quickOn) return null;
+		const step = nextStep({ record, provider, knobs: state.knobs, pinned: state.pinned, objective: state.objective, visited: new Set<string>(), limits: state.limits, campaign });
+		if (step.kind === "done") return null;
+		// The rule-based tour puts a single move on the map as it shows it: its words describe that setting.
+		const knobs = step.kind === "move" && step.move ? { ...state.knobs, [step.move.knobId]: step.move.to } : state.knobs;
+		const at = { knobs, estimates: knobs === state.knobs ? estimates : provider.predict(record, knobs) };
+		const a: Active = { step, ...(step.move && state.knobs[step.move.knobId] !== undefined ? { from: state.knobs[step.move.knobId] } : {}), n: 1, of: 1 };
+		return { active: a, text: t(step.textKey, stepVars(a, at)) };
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [quickOn]);
+	const takeQuick = () => {
+		setTookQuick(true); // closes the live guide, which stops its tour: a late answer moves nothing
+		autoStarted.current = true;
+		restart();
+	};
+
 	/** The RL steps' numbers: the probe's measurements (A's) and B's estimates, as the RL view shows them. */
 	function rlVars(): Record<string, string> {
 		const p = rlProbe(record);
@@ -352,7 +376,10 @@ export function GuidePanel() {
 		};
 	}
 
-	function stepVars(a: Active | null): Record<string, string> {
+	/** `at`: the setting the words describe (the quick read's, worked out before anything moves). */
+	function stepVars(a: Active | null, at?: { knobs: Record<string, KnobValue>; estimates: typeof estimates }): Record<string, string> {
+		const knobsNow = at?.knobs ?? state.knobs;
+		const estimates = at?.estimates ?? ws.estimates;
 		const step = a?.step;
 		const knobId = step?.move?.knobId ?? step?.pinnedKnob;
 		const knob = knobId ? knobs.get(knobId) : undefined;
@@ -360,7 +387,7 @@ export function GuidePanel() {
 		const goalTarget = step?.move ? target(record, step.move.targetId) : goal ? target(record, goal.id) : undefined;
 		const peakT = targetFor(record, "memory");
 		const peak = peakT ? estimates[peakT.id] : undefined;
-		const cap = capacityBytes(record, state.knobs);
+		const cap = capacityBytes(record, knobsNow);
 		const fail = failureTarget(record);
 		const risk = fail ? estimates[fail] : undefined;
 		return {
@@ -369,13 +396,13 @@ export function GuidePanel() {
 			to: valueText(knob, step?.move?.to),
 			delta: step?.move && goalTarget ? fmtDelta(step.move.delta, goalTarget.unit) : "",
 			target: goalTarget ? t(goalTarget.label_key).toLowerCase() : "",
-			...changeWords({ record, provider, knobs: state.knobs, estimates }, step?.move, a?.from, goalTarget),
+			...changeWords({ record, provider, knobs: knobsNow, estimates }, step?.move, a?.from, goalTarget),
 			peak: trusted(peak) ? fmt(peak.point, "bytes") : t("value.none"),
 			peakTrusted: trusted(peak) ? "1" : "",
 			cap: cap ? fmt(cap, "bytes") : "",
 			risk: trusted(risk) ? fmt(risk.point, "probability") : "",
 			chance: step?.move?.risk !== null && step?.move?.risk !== undefined ? fmt(step.move.risk, "probability") : "",
-			...(step?.combo ? comboWords(record, state.knobs, step.combo) : {}),
+			...(step?.combo ? comboWords(record, knobsNow, step.combo) : {}),
 			title: step?.finding?.title ?? "",
 			// A's detail can end without a full stop; the line reads it as a sentence
 			detail: sentence(step?.finding?.detail ?? ""),
@@ -560,6 +587,26 @@ export function GuidePanel() {
 					{active?.step.kind === "finding" && active.step.finding && fixing === active.step.finding.id ? <FixRace finding={active.step.finding} /> : null}
 				</>
 			)}
+
+			{quickOn ? (
+				<div className="pf-guide__quick">
+					<p className="pf-guide__progress" role="status">
+						<span className="pf-guide__dot" aria-hidden="true" />
+						{t("guide.live.reading")}
+					</p>
+					{quick ? (
+						<>
+							<span className="pf-model pf-model--quiet">{t("guide.quick.label")}</span>
+							<p className="pf-guide__say pf-guide__say--quick">{quick.text}</p>
+							<div className="pf-guide__actions">
+								<button type="button" className="pf-btn pf-btn--small" onClick={takeQuick}>
+									{t("guide.quick.take")}
+								</button>
+							</div>
+						</>
+					) : null}
+				</div>
+			) : null}
 
 			{approvals.map((a) => (
 				<div key={a.id} className="pf-guide__approval">

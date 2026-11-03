@@ -1389,6 +1389,14 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-guide__step { font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
 .pf-guide__say { margin: 0; font-size: var(--pf-text-md); line-height: 1.55; }
 .pf-guide__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* While Muse Spark reads the record: a progress line, then the rule-based tour's first step as the quick read. */
+.pf-guide__quick { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--pf-stroke); }
+.pf-guide__progress { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--pf-fg-dim); }
+.pf-guide__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--pf-accent); animation: pf-guide-pulse 1.4s ease-in-out infinite; }
+@keyframes pf-guide-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pf-guide__dot { animation: none; } }
+.pf-guide__quick > .pf-model { align-self: flex-start; }
+.pf-guide__say--quick { font-size: var(--pf-text-sm, 14px); }
 .pf-guide__why { margin: 0; padding-left: 12px; border-left: 2px solid var(--pf-stroke-strong); font-size: 13px; line-height: 1.55; color: var(--pf-fg-dim); animation: pf-rise 0.3s var(--pf-ease); }
 .pf-guide__code { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--pf-fg-dim); }
 .pf-guide__code::before { content: "‹/› "; font-family: var(--pf-font-mono); color: var(--pf-accent); }

@@ -48,7 +48,9 @@ const GOALS: Array<{ kind: ObjectiveKind; key: string }> = [
 // minutes (A's GPU_FALLBACK, runner/pipeline.py), and an out-of-memory can move it to a bigger card:
 // "L4 or A10" (PM, Nov 3) with a line saying the rest. Bigger cards are a choice, never a default.
 const DEFAULT_GPU = "L4";
-const GPUS = ["L40S", "A100-SXM-80GB", "H100-SXM-80GB", "MI300X"];
+// The GPUs the runner rents (Modal's): an MI300X check-in would be refused (B, Nov 3). The cockpit's GPU
+// knob still predicts it.
+const GPUS = ["L40S", "A100-SXM-80GB", "H100-SXM-80GB"];
 
 type Intake = "repo" | "upload" | "command" | string;
 
@@ -549,9 +551,8 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 				<DataUseNotice onChange={onDataUse} />
 				<div className="pf-desk__foot">
 					{accepted ? (
-						// Source: measured, A's run a-smoke-l4-main-4 (Oct 28): the LoRA zoo script from
-						// upload to record in 6 min 45 s on an L4 (docs/status/a.md). No dollar figure until
-						// the sandbox's CPU and memory cost is read off the bill.
+						// Source: measured, production check-ins of the LoRA sample on an L4: 4 min 59 s and
+						// 10 min 21 s (B, from-b.md, Nov 3; the first smoke run, Oct 28, took 6 min 45 s).
 						<span className="pf-hint">{t("newflight.cost_hint")}</span>
 					) : (
 						// The box sits above, in the same panel: the hint takes the visitor there.

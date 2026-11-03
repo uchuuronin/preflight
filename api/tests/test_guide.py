@@ -466,3 +466,19 @@ def test_sensitivity_carries_a_combined_move():
 				"combined": {"knobs": {"seq_len": 512}, "risk": 0.0},
 			}
 		)
+
+
+def test_objective_accepts_the_visitors_description():
+	"""New flight saves "What are you trying to do?" as objective.description (the record's schema has
+	it); the guide's own Objective took it as an unknown field (D's walkthrough, Nov 3)."""
+	from preflight_api.guide.types import Objective, Setting
+
+	o = Objective.model_validate({"kind": "min_cost", "description": "Fine-tune Qwen on my support tickets"})
+	assert o.description == "Fine-tune Qwen on my support tickets"
+	s = Setting.model_validate({"knobs": {}, "objective": {"kind": "min_time", "description": None}})
+	assert s.objective.description is None
+	import pytest
+	from pydantic import ValidationError
+
+	with pytest.raises(ValidationError):
+		Objective.model_validate({"kind": "min_time", "description": "x" * 2001})

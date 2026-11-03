@@ -50,6 +50,10 @@ class Objective(Strict):
 		"min_cost", "min_time", "fit_memory", "min_risk", "max_throughput", "max_quality_per_usd", "custom"
 	]
 	target_id: Id | None = None
+	# The visitor's own words from New flight's "What are you trying to do?" (the record's
+	# job.objective.description): accepted with the rest of the objective, as the record's schema
+	# allows (D's walkthrough, Nov 3: this model refused it). The cockpit puts it in the guide's box.
+	description: str | None = Field(default=None, max_length=2000)
 
 
 Positive = Annotated[float, Field(gt=0, le=1e12)]
