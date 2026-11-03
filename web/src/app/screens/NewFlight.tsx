@@ -10,7 +10,7 @@ import { t } from "../../lib/i18n";
 import { useAppPanels } from "../../registry";
 import { SAMPLES } from "../../workspace/record/load";
 import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
-import { go } from "../route";
+import { go, href } from "../route";
 import { MAX_EXTRA_PACKAGES, parsePackages, rememberRequest } from "../checkinTrouble";
 import { COMMANDS, commandWords } from "../command";
 import { AddonBoundary } from "../../components/AddonBoundary";
@@ -532,7 +532,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 					{/* The documentation link's own card, under the samples (Chiya's mockup, Nov 3); with the Help page. */}
 					{flag("c.help") ? (
 						<section className="glass pf-checkin__doc" aria-label={t("newflight.help_card")}>
-							<a className="pf-link" href="#/help">
+							<a className="pf-link" href={href("help")}>
 								{t("newflight.help_link")}
 							</a>
 						</section>

@@ -2478,3 +2478,39 @@ button.pf-prov:hover { color: var(--pf-fg); }
 @media (max-width: 560px) {
 	.pf-cockpit__head .pf-tag { white-space: normal; max-width: 100%; flex-wrap: wrap; height: auto; min-height: 30px; text-align: left; }
 }
+
+/* ---------- Help: a plain technical document (Chiya, Nov 3): the site's colours and fonts, a contents list
+   on the left (a menu at the top on a phone), no cards, gradients or animation. ---------- */
+.pf-inner.pf-doc { max-width: 1180px; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 48px; align-items: start; padding-top: 104px; padding-bottom: 96px; }
+.pf-doc__toc { position: sticky; top: 104px; max-height: calc(100dvh - 128px); overflow: auto; font-size: var(--pf-text-sm); }
+.pf-doc__toc > b { display: block; margin-bottom: 8px; font-size: 12px; color: var(--pf-fg-dim); }
+.pf-doc__toc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.pf-doc__toc-list li.is-sub { padding-left: 14px; }
+.pf-doc__toc-list a { display: block; padding: 4px 0; color: var(--pf-fg-dim); text-decoration: none; line-height: 1.35; }
+.pf-doc__toc-list a:hover, .pf-doc__toc-list a:focus-visible { color: var(--pf-fg); text-decoration: underline; }
+.pf-doc__menu { display: none; }
+.pf-doc__body { max-width: 74ch; color: var(--pf-fg); font-size: 15px; line-height: 1.6; }
+.pf-doc__body h1 { font-family: var(--pf-font-serif); font-weight: 400; font-size: clamp(32px, 5vw, 44px); line-height: 1.1; margin: 0 0 20px; }
+.pf-doc__body h2 { font-size: 22px; font-weight: 600; margin: 40px 0 10px; padding-top: 12px; border-top: 1px solid var(--pf-stroke); scroll-margin-top: 96px; }
+.pf-doc__body h3 { font-size: 17px; font-weight: 600; margin: 28px 0 8px; scroll-margin-top: 96px; }
+.pf-doc__body h4, .pf-doc__body h5, .pf-doc__body h6 { font-size: 15px; font-weight: 600; margin: 20px 0 6px; scroll-margin-top: 96px; }
+.pf-doc__body p, .pf-doc__body ul, .pf-doc__body ol, .pf-doc__body blockquote, .pf-doc__body pre, .pf-doc__table { margin: 0 0 14px; }
+.pf-doc__body ul, .pf-doc__body ol { padding-left: 22px; }
+.pf-doc__body li { margin: 4px 0; }
+.pf-doc__body a { color: var(--pf-fg); text-decoration: underline; text-underline-offset: 2px; }
+.pf-doc__body code { font-family: var(--pf-font-mono); font-size: 0.88em; padding: 1px 5px; border-radius: 4px; background: var(--pf-track); overflow-wrap: anywhere; }
+.pf-doc__body pre { font-family: var(--pf-font-mono); font-size: 13px; line-height: 1.5; padding: 12px 14px; border: 1px solid var(--pf-stroke); border-radius: var(--pf-radius-sm); overflow-x: auto; }
+.pf-doc__body pre code { padding: 0; background: none; font-size: inherit; overflow-wrap: normal; }
+.pf-doc__body blockquote { padding-left: 14px; border-left: 2px solid var(--pf-stroke-strong); color: var(--pf-fg-dim); }
+.pf-doc__table { overflow-x: auto; }
+.pf-doc__table table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.pf-doc__table th, .pf-doc__table td { text-align: left; vertical-align: top; padding: 7px 10px; border-bottom: 1px solid var(--pf-stroke); }
+.pf-doc__table th { font-weight: 600; color: var(--pf-fg-dim); font-size: 12.5px; }
+@media (max-width: 860px) {
+	.pf-inner.pf-doc { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-top: 88px; padding-left: 16px; padding-right: 16px; }
+	.pf-doc__toc { display: none; }
+	.pf-doc__menu { display: block; position: sticky; top: 76px; z-index: 5; padding: 8px 12px; border: 1px solid var(--pf-stroke-strong); border-radius: var(--pf-radius-sm); background: var(--pf-glass-solid); font-size: var(--pf-text-sm); }
+	.pf-doc__menu summary { cursor: pointer; font-weight: 600; }
+	.pf-doc__menu nav { margin-top: 8px; max-height: 60dvh; overflow: auto; }
+	.pf-doc__body { font-size: 15px; }
+}
