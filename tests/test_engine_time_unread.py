@@ -3,6 +3,8 @@ isn't modelled for them and holds the probed effect, wider; memory still follows
 
 from pathlib import Path
 
+import pytest
+
 from preflight.engine import api
 
 ZOO = Path(__file__).resolve().parent / "fixtures" / "validation" / "zoo_gt"
@@ -98,3 +100,15 @@ def test_a_trainer_s_step_cap_is_never_rescaled_and_epochs_zero_abstains():
 	sm = rec.job.script_map.model_copy(update={"framework": "hf_trainer"})
 	capped = rec.model_copy(update={"job": rec.job.model_copy(update={"script_map": sm})})
 	assert api._total_steps(capped, {**cur, "epochs": 6})[0] == 471
+
+
+def test_a_held_knob_keeps_the_probe_s_own_number():
+	rec = _rec("pretrain_nanogpt.record.json")
+	cur = api._current(rec)
+	base = api.predict(rec).root
+	for kv in ({"n_layer": cur["n_layer"] * 2}, {"d_model": cur["d_model"] * 2}):
+		moved = api.predict(rec, kv).root
+		for tid in ("time.step", "time.total", "cost.total"):
+			if base[tid].status != "abstain" and moved[tid].status != "abstain":
+				assert moved[tid].point == pytest.approx(base[tid].point, rel=1e-9), (kv, tid)
+				assert moved[tid].hi - moved[tid].lo >= base[tid].hi - base[tid].lo

@@ -1611,7 +1611,11 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		for p in record.probes
 	}
 	recompute = _checkpointing_on(values.get("gradient_checkpointing")) and probe_gc == {False}
-	match = _matching_probe(record, values)
+	# a knob the step doesn't model is held at its probed effect: the probe that matches on every other knob stays the
+	# measured anchor, so the move keeps the probe's own number (D's walkthrough, Nov 3: doubling nanoGPT's layers read
+	# 15 min 48 s faster, the fit's value at the base against the probe's measured one)
+	unmodelled_moves = _unmodelled_moves(record, values, "time")
+	match = _matching_probe(record, {k: v for k, v in values.items() if k not in unmodelled_moves})
 	src_gpu, tgt_gpu = _env_gpu(record), _target_gpu(record, values)
 	requested = _gpu_move(record, values)
 	if requested and tgt_gpu is None:
@@ -1773,7 +1777,6 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			multi.reason if nodes > 1 else f"{world} GPUs: the gradient all-reduce is estimated, not measured"
 		)
 
-	unmodelled_moves = _unmodelled_moves(record, values, "time")
 	unmodelled = set(unmodelled_moves)
 	off = [
 		k
