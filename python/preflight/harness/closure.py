@@ -85,8 +85,9 @@ MAX_STRINGS = 500  # guess: string literals a file is read for paths it may open
 
 def _path_strings(path: str, text: str) -> list[str]:
 	"""String literals in a file that could name a file it opens (a slash or a dot, no NUL, under 300 characters),
-	capped; [] when the file doesn't parse."""
-	if any(len(line) > MAX_LINE for line in text.splitlines()):
+	capped; [] when the file doesn't parse, or has a line over MAX_LINE once continuations are joined (the same
+	guard as _imports: a long dotted name hidden across short lines takes CPython's parser seconds)."""
+	if any(len(line) > MAX_LINE for line in text.replace("\\\r\n", "").replace("\\\n", "").splitlines()):
 		return []
 	try:
 		tree = ast.parse(text, filename=path)
