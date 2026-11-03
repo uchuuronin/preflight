@@ -23,6 +23,8 @@ import type { Finding } from "../record/types";
 export function findingSourceKey(f: Pick<Finding, "source" | "title" | "code" | "evidence"> & Partial<Pick<Finding, "detail">>): string {
 	if (f.source === "spark_open_triage" && f.title.startsWith("Muse Glimmer ")) return "finding.source.glimmer_triage";
 	if (f.source === "model" && f.code.startsWith("search.")) return "finding.source.spark_search";
+	// A's probes.skip_login_cells (Nov 3): Preflight changed the notebook itself, so it says that, not "a rule check".
+	if (f.code === "source.login_skipped") return "finding.source.login_skipped";
 	if (f.source === "spark_diagnosis") {
 		if (f.code === "diagnosis.abstain") return "finding.source.spark_diagnosis_abstain";
 		if ((f.evidence ?? []).some((e) => e.metric === "spark_open_check")) return "finding.source.spark_diagnosis_checked";

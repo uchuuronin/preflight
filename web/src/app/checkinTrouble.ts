@@ -19,6 +19,7 @@ export interface ProbeSeen {
 	error?: string | null;
 	missing_module?: string | null;
 	missing_package?: string | null;
+	steps?: number | null;
 }
 
 export type Trouble =
@@ -27,7 +28,38 @@ export type Trouble =
 	/** The Python is over what the script map reads (2 MB). */
 	| { step: "read"; limit: "map" }
 	/** The script imports packages the probe doesn't have. `pkg` is the name Preflight installs it by, when it's on its list. */
-	| { step: "install"; missing: Array<{ module: string; pkg: string | null; noWheels?: boolean }> };
+	| { step: "install"; missing: Array<{ module: string; pkg: string | null; noWheels?: boolean }> }
+	/**
+	 * The job finished but no probe measured anything (no GPU in time, the repo's own module, a
+	 * notebook-only call, a too-old torch, ...): `code` is the stop they share, when they share one
+	 * (PM, Nov 3: a check-in whose probes never ran must not look finished).
+	 */
+	| { step: "measure"; code: string | null };
+
+/**
+ * A probe that measured something: it ran (ok), its numbers came from an earlier identical run (cached),
+ * or it ran out of memory, which is the answer at that setting (B's engine reads it as "fails here").
+ * Any probe that took steps measured them too (review, Nov 3).
+ */
+const MEASURED = new Set(["ok", "cached", "oom"]);
+/** Still going (a live, watched run): not finished, so not "nothing measured". */
+const GOING = new Set(["queued", "running"]);
+
+/**
+ * A finished job's record where no probe measured anything, and why (the stop they share). Null when
+ * any probe measured, or there are no probes. The import stop with its own way past is
+ * `troubleFromProbes`; this is every other way a check-in ends with nothing measured.
+ */
+/** Stops an identical resend can get past: a GPU that may be free now, a run that was cut short. */
+export const TRANSIENT_STOPS = new Set(["gpu.unavailable", "timeout", "killed"]);
+
+export function nothingMeasured(probes: readonly ProbeSeen[] | undefined, doneCode?: string | null): Trouble | null {
+	const all = probes ?? [];
+	if (!all.length || all.some((p) => MEASURED.has(p.status ?? "") || GOING.has(p.status ?? "") || (p.steps ?? 0) > 0)) return null;
+	const codes = new Set(all.map((p) => p.error_code ?? null));
+	const shared = codes.size === 1 ? [...codes][0]! : null;
+	return { step: "measure", code: doneCode ?? shared };
+}
 
 /** A failed job's stop, from its error code and message. */
 export function troubleFromFailure(code: string | null | undefined, message: string | null | undefined): Trouble | null {

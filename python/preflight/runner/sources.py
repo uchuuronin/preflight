@@ -51,6 +51,7 @@ class Fetched:
 	lens: str | None = None  # a check-in by command: its tool's lens (COMMANDS), over the map's reading
 	# runner.probe_without_map: why the whole source wasn't mapped (the map is the entry point's alone)
 	map_skipped: str | None = None
+	login_skipped: int = 0  # probes.skip_login_cells: the notebook's cells whose login call was left out
 
 
 def content_hash(files: dict[str, str]) -> str:
@@ -118,8 +119,65 @@ def _read_tree(root: Path) -> dict[str, str]:
 	return files
 
 
-def _notebook_to_script(text: str) -> str:
-	"""Code cells in order; shell and magic lines (!pip, %time) become comments."""
+LOGIN_CALLS = {"notebook_login", "login", "interpreter_login"}  # huggingface_hub's own
+
+
+def _drop_login_calls(code: str, names: set, mods: set) -> tuple[str, int]:
+	"""probes.skip_login_cells (F2, Nov 3): the cell's top-level calls to Hugging Face's interactive login, with no
+	arguments (`notebook_login()`, `huggingface_hub.login()`), each replaced by `pass`: it only runs inside a notebook
+	or waits for a token. Only huggingface_hub's own: a name imported from it (`names`, kept across cells) or an
+	attribute of the module (`mods`); never wandb.login(), and never login(token=...), which is what a gated model
+	needs. The imports stay (review, Nov 3: a cell that also imported hf_hub_download lost it)."""
+	import ast
+
+	try:
+		tree = ast.parse(code)
+	except (SyntaxError, ValueError, RecursionError, MemoryError):
+		return code, 0
+	drop = []
+	for st in tree.body:
+		if isinstance(st, ast.ImportFrom) and (st.module or "").split(".")[0] == "huggingface_hub":
+			names.update(a.asname or a.name for a in st.names if a.name in LOGIN_CALLS)
+			names.difference_update(a.asname or a.name for a in st.names if a.name not in LOGIN_CALLS)
+		elif isinstance(st, ast.ImportFrom):  # another library's name shadows huggingface_hub's
+			names.difference_update(a.asname or a.name for a in st.names)
+		elif isinstance(st, ast.Import):
+			bound = {a.asname or a.name.split(".")[0] for a in st.names}
+			names.difference_update(bound)
+			mods.difference_update(bound)
+			mods.update(a.asname or a.name for a in st.names if a.name == "huggingface_hub")
+		elif isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+			names.discard(st.name)
+			mods.discard(st.name)
+		elif (
+			isinstance(st, ast.Expr)
+			and isinstance(st.value, ast.Call)
+			and not (st.value.args or st.value.keywords)
+		):
+			f = st.value.func
+			if (isinstance(f, ast.Name) and f.id in names) or (
+				isinstance(f, ast.Attribute) and f.attr in LOGIN_CALLS and isinstance(f.value, ast.Name)
+				and f.value.id in mods
+			):  # fmt: skip
+				drop.append(st)
+	lines = code.splitlines(keepends=True)
+	taken = {}
+	others = {r for s in tree.body if s not in drop for r in range(s.lineno - 1, s.end_lineno)}
+	for st in drop:
+		rows = range(st.lineno - 1, st.end_lineno)
+		if any(r in taken or r in others for r in rows) or st.col_offset != 0:
+			continue  # shares a line with another statement (`a = 1; notebook_login()`): left as it is
+		taken.update(dict.fromkeys(rows))
+		lines[st.lineno - 1] = "pass  # Preflight skipped this login call; public models need no login\n"
+		for r in rows[1:]:
+			lines[r] = "\n"
+	return "".join(lines), len({st.lineno for st in drop if st.lineno - 1 in taken})
+
+
+def _notebook_to_script(text: str, *, skip_login: bool = False, skipped: list | None = None) -> str:
+	"""Code cells in order; shell and magic lines (!pip, %time) become comments. skip_login (probes.skip_login_cells):
+	the cells' Hugging Face login calls become `pass` (_drop_login_calls), and each such cell's number is appended to
+	`skipped`."""
 	if not isinstance(text, str):
 		raise InvalidSubmission("the notebook is not text")
 	try:
@@ -129,7 +187,7 @@ def _notebook_to_script(text: str) -> str:
 	cells = nb.get("cells") if isinstance(nb, dict) else None
 	if not isinstance(cells, list):
 		raise InvalidSubmission("the notebook has no list of cells")
-	out = []
+	out, names, mods = [], set(), set()
 	for cell in cells:
 		if not isinstance(cell, dict) or cell.get("cell_type") != "code":
 			continue
@@ -140,7 +198,12 @@ def _notebook_to_script(text: str) -> str:
 			lines = src
 		else:
 			raise InvalidSubmission("a notebook cell's source is not text")
-		out.append("".join(("# " + ln) if ln.lstrip().startswith(("!", "%")) else ln for ln in lines))
+		code = "".join(("# " + ln) if ln.lstrip().startswith(("!", "%")) else ln for ln in lines)
+		if skip_login:
+			code, n = _drop_login_calls(code, names, mods)
+			if n and skipped is not None:
+				skipped.append(len(out) + 1)
+		out.append(code)
 	return "\n\n".join(out) + "\n"
 
 
@@ -436,6 +499,7 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 	extra = _extra_packages(source.get("extra_packages"))
 	partial = None
 	command_lens = None
+	login_skipped = 0  # probes.skip_login_cells: a notebook's login cells left out
 	if kind in ("sample", "template"):
 		files = _without_outputs(_read_tree(_sample(uri)))
 	elif kind in ("upload", "cli", "inflight"):
@@ -454,7 +518,11 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		stem = Path(name).with_suffix(".py").name
 		if stem in (".py", "..py") or not re.fullmatch(r"[^/\\\0]{1,200}", stem):
 			raise InvalidSubmission("the notebook's file name is not usable")
-		script = _notebook_to_script(text)
+		from .flags import flag
+
+		skipped: list = []
+		script = _notebook_to_script(text, skip_login=flag("probes.skip_login_cells"), skipped=skipped)
+		login_skipped = len(skipped)
 		files = {stem: script}
 		reqs = notebook_requirements(script)
 		if reqs:  # the notebook's !pip install lines, installed like any upload's requirements.txt
@@ -489,7 +557,15 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		scope="entrypoint" if only_entry else None,
 		extra_packages=extra or None,
 	)
-	return Fetched(files=files, entrypoint=entry, args=args, source=src, partial=partial, lens=command_lens)
+	return Fetched(
+		files=files,
+		entrypoint=entry,
+		args=args,
+		source=src,
+		partial=partial,
+		lens=command_lens,
+		login_skipped=login_skipped,
+	)
 
 
 # ---------------------------------------------------------------- check in by command (runner.command_checkin, off)

@@ -292,3 +292,68 @@ describe("private triage on the check-in desk", () => {
 		expect(hint?.contains(fold ?? null)).toBe(false);
 	});
 });
+
+describe("the repo link's entry point and arguments (PM, Nov 3)", () => {
+	const send = async (entry: string, args: string) => {
+		const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ job_id: "01JOB" }), { status: 202 }));
+		vi.stubGlobal("fetch", fetch);
+		render(<NewFlight onSample={() => {}} />);
+		fireEvent.click(screen.getByRole("checkbox", { name: en["datause.accept"] }));
+		fireEvent.change(screen.getByLabelText(en["newflight.repo.label"]), { target: { value: "github.com/pytorch/examples" } });
+		const e = screen.getByLabelText(new RegExp(`^${en["newflight.entry.label"]}`));
+		const a = screen.getByLabelText(new RegExp(`^${en["newflight.args.label"]}`));
+		fireEvent.change(e, { target: { value: entry } });
+		fireEvent.change(a, { target: { value: args } });
+		fireEvent.blur(a);
+		const go = screen.getByRole("button", { name: "Check in" }) as HTMLButtonElement;
+		if (go.disabled) return null;
+		await act(async () => {
+			fireEvent.click(go);
+		});
+		return JSON.parse(fetch.mock.calls[0][1].body as string);
+	};
+
+	it("sends the script and its flags as words", async () => {
+		const body = await send("word_language_model/main.py", `--accel --epochs 6 --save "model a.pt"`);
+		expect(body.source).toEqual({
+			kind: "repo",
+			uri: "https://github.com/pytorch/examples",
+			entrypoint: "word_language_model/main.py",
+			args: ["--accel", "--epochs", "6", "--save", "model a.pt"],
+		});
+	});
+
+	it("leaves both out when empty, so Preflight picks the script", async () => {
+		const body = await send("", "  ");
+		expect(body.source).toEqual({ kind: "repo", uri: "https://github.com/pytorch/examples" });
+	});
+
+	it("takes a path with a space, as the runner does", async () => {
+		const body = await send("Chapter 3/train.py", "");
+		expect(body.source.entrypoint).toBe("Chapter 3/train.py");
+	});
+
+	it("won't send a hidden or dotted path the repo reader never keeps", async () => {
+		expect(await send("src/.cfg/x.py", "")).toBeNull();
+		cleanup();
+		expect(await send("a/./b.py", "")).toBeNull();
+	});
+
+	it("takes ./ off the front of the path", async () => {
+		const body = await send("./mnist/main.py", "");
+		expect(body.source.entrypoint).toBe("mnist/main.py");
+	});
+
+	it("won't send a path outside the repo or a non-Python file, and says why", async () => {
+		expect(await send("../secrets.py", "")).toBeNull();
+		expect(screen.getByText(en["newflight.entry.path"])).toBeTruthy();
+		cleanup();
+		expect(await send("README.md", "")).toBeNull();
+		expect(screen.getByText(en["newflight.entry.not_py"])).toBeTruthy();
+	});
+
+	it("won't send arguments that need a shell", async () => {
+		expect(await send("main.py", "--epochs 6 | tee log")).toBeNull();
+		expect(screen.getByText(/“\|” needs a shell/)).toBeTruthy();
+	});
+});

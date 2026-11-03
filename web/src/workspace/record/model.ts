@@ -119,6 +119,9 @@ function num(v: KnobValue | undefined): number | null {
  * the current samples per step (batch x gradient accumulation x GPUs; packing folds examples
  * together by their mean length).
  */
+/** Source: derived, B's `engine.api._HARD_STEP_CAPS`: trainers whose max_steps is enforced whatever the epochs. */
+const HARD_STEP_CAPS = new Set(["hf_trainer", "trl", "lightning", "torchtitan", "sentence_transformers"]);
+
 export function runPlan(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>> = currentKnobs(record)): RunPlan {
 	const tr = record.job.script_map?.training;
 	const data = record.job.script_map?.data;
@@ -126,7 +129,23 @@ export function runPlan(record: LoadedRecord, knobs: Readonly<Record<string, Kno
 	const checkpointEvery = num(knobs.checkpoint_every) ?? tr?.checkpoint_every ?? null;
 	const fromKnob = num(knobs.max_steps);
 	if (fromKnob) return { totalSteps: fromKnob, evalEvery, checkpointEvery, source: "knob" };
-	if (tr?.max_steps) return { totalSteps: tr.max_steps, evalEvery, checkpointEvery, source: "script" };
+	if (tr?.max_steps) {
+		// B's engine (api._total_steps, ws-b 43ac89fa and 80d28faa): a map's step count beside an epochs knob,
+		// with no max_steps knob, counts the epochs (the GNN sample's 471 = 3 epochs of 157), so it scales with
+		// epochs and the examples a step takes; not for a trainer that enforces its step cap, and only when
+		// the knob and the map agree on the record's own epochs (its own values stay unchanged).
+		const base = currentKnobs(record);
+		const curEpochs = num(base.epochs);
+		// Epochs 0 is no steps (B: ratio 0); num() drops it, so it's read raw here.
+		const e = typeof knobs.epochs === "number" && Number.isFinite(knobs.epochs) && knobs.epochs >= 0 ? knobs.epochs : null;
+		if (e !== null && !("max_steps" in knobs) && tr.epochs && curEpochs !== null && curEpochs === tr.epochs && !HARD_STEP_CAPS.has(record.job.script_map?.framework ?? "")) {
+			// B's _n_gpus: max(1, the count), so a count of 0 reads as one card.
+			const per = (v: Readonly<Record<string, KnobValue>>) => (num(v.batch_size) ?? 1) * (num(v.grad_accum) ?? 1) * Math.max(1, num(v.gpus) ?? record.env?.gpu?.count ?? 1);
+			const totalSteps = Math.max(0, Math.ceil(tr.max_steps * (e / tr.epochs) * (per(base) / per(knobs)) - 1e-9));
+			return { totalSteps, evalEvery, checkpointEvery, source: "script" };
+		}
+		return { totalSteps: tr.max_steps, evalEvery, checkpointEvery, source: "script" };
+	}
 	const epochs = num(knobs.epochs) ?? tr?.epochs ?? null;
 	const examples = data?.n_examples ?? null;
 	const batch = num(knobs.batch_size) ?? data?.batch_size ?? null;

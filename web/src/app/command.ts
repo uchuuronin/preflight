@@ -20,11 +20,28 @@ export type CommandCheck =
 	| { ok: true; words: string[] }
 	| { ok: false; reason: "empty" | "quote" | "shell" | "unknown" | "too_long"; word?: string };
 
-/**
- * The command as its words, split as a POSIX shell would (spaces separate; single quotes keep text as
- * is; double quotes and a backslash escape), refusing what only a shell could run.
- */
+/** The command as its words; only a command on A's list runs. */
 export function commandWords(text: string): CommandCheck {
+	const split = splitWords(text);
+	if (!split.ok) return split;
+	if (!split.words.length) return { ok: false, reason: "empty" };
+	if (!(COMMANDS as readonly string[]).includes(split.words[0]!)) return { ok: false, reason: "unknown", word: split.words[0] };
+	return split;
+}
+
+/**
+ * A repo script's arguments (contract `source.args`; PM, Nov 3: the repo link's Arguments field), by
+ * the same rules as a command: words, no shell. Empty is fine: the script runs with none.
+ */
+export function argWords(text: string): CommandCheck {
+	return splitWords(text);
+}
+
+/**
+ * Text as its words, split as a POSIX shell would (spaces separate; single quotes keep text as is;
+ * double quotes and a backslash escape), refusing what only a shell could run. No words is ok here.
+ */
+function splitWords(text: string): CommandCheck {
 	if (text.length > MAX_COMMAND_CHARS) return { ok: false, reason: "too_long" };
 	const words: string[] = [];
 	let cur = "";
@@ -84,8 +101,27 @@ export function commandWords(text: string): CommandCheck {
 		const err = e as { reason: "shell"; word: string };
 		return { ok: false, reason: err.reason, word: err.word };
 	}
-	if (!words.length) return { ok: false, reason: "empty" };
 	if (words.length > MAX_WORDS || words.some((w) => w.length > MAX_WORD_CHARS || w.includes("\0"))) return { ok: false, reason: "too_long" };
-	if (!(COMMANDS as readonly string[]).includes(words[0]!)) return { ok: false, reason: "unknown", word: words[0] };
 	return { ok: true, words };
+}
+
+/** Source: derived, A's runner (`sources._pick_entrypoint`): a file path among the repository's files. */
+export const MAX_ENTRY_CHARS = 512;
+
+export type EntryCheck = { ok: true; path: string | null } | { ok: false; reason: "path" | "not_py" | "too_long" };
+
+/**
+ * The repo link's Entry point (contract `source.entrypoint`): empty lets Preflight pick (train.py,
+ * main.py, run.py, ... or the only .py file); otherwise a relative path to a .py file in the repo,
+ * with no "..", no leading "/" and no hidden folders. The runner checks the file exists.
+ */
+export function entryPath(text: string): EntryCheck {
+	const p = text.trim().replace(/^\.\//, "");
+	if (!p) return { ok: true, path: null };
+	if (p.length > MAX_ENTRY_CHARS) return { ok: false, reason: "too_long" };
+	// A's `probes.local._PATH_OK` (letters, digits, . _ - / and spaces), and only a path the repo reader keeps:
+	// no hidden folder or file (sources._wanted), no "." or ".." step, no empty step (review, Nov 3).
+	if (!/^[A-Za-z0-9._\-/ ]+$/.test(p) || p.split("/").some((s) => s === "" || s === "." || s === ".." || s.startsWith(".") || s !== s.trim())) return { ok: false, reason: "path" };
+	if (!p.endsWith(".py")) return { ok: false, reason: "not_py" };
+	return { ok: true, path: p };
 }

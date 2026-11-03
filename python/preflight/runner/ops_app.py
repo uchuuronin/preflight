@@ -734,6 +734,9 @@ def ground_truth(
 	dataset_cache: bool = False,
 	flags: str = "",
 	notebook: str = "",
+	entry_path: bool = False,
+	tty: bool = False,
+	torch_hint: bool = False,
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -842,6 +845,11 @@ def ground_truth(
 	}  # build: probes.repo_install_exec
 	if dataset_cache:  # probes.dataset_cache: torchvision's datasets from the volume, in both runs
 		opts["dataset_cache"] = True
+	# the recorder probe's own flags (probes.tty, probes.torch_hint, runner.entrypoint_path) in this run only;
+	# --tty gives the bare run the same terminal, or it stops where the probe would have
+	opts.update(
+		{k: True for k, v in (("entry_path", entry_path), ("tty", tty), ("torch_hint", torch_hint)) if v}
+	)
 	if sdists:  # names of source-only packages allowed to build (commas, as the workflow allows)
 		opts["sdists"] = tuple(n for n in sdists.split(",") if n)
 	if eval_units:  # probes.eval_units in this process only: the recorder probe's scoring batches
