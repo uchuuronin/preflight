@@ -27,10 +27,9 @@ def test_a_command_becomes_a_wrapper_its_package_and_its_lens(on):
 	# the whole command as the source's args validates as a Source (C's API checks it so)
 	as_args = fetch({"kind": "command", "args": got.args})
 	assert as_args.source.content_hash == got.source.content_hash and as_args.args == got.args
-	with pytest.raises(
-		InvalidSubmission, match="these commands by name: lm_eval"
-	):  # the image's vLLM has no bench
+	with pytest.raises(InvalidSubmission, match="no `vllm bench`") as exc:  # named unsupported, not unknown
 		fetch({"kind": "command", "command": "vllm bench throughput --num-prompts 500"})
+	assert exc.value.code == "unsupported"
 
 
 def test_the_wrapper_runs_the_named_console_entry_point(on, tmp_path):

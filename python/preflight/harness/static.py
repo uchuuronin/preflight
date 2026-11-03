@@ -1253,7 +1253,9 @@ def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:
 			f"{data.batch_size - 1} negatives"
 		)
 	if lens == "vision":
-		if "channels_last" not in all_text:
+		# B, Nov 2: the zoo script's header names the finding ("vision.no_channels_last"), and any comment would do
+		# the same, so only a real use of the format counts as using it
+		if not re.search(r"\btorch\.channels_last\b|memory_format\s*=\s*(?:\w+\.)*channels_last", all_text):
 			risks.append(
 				"No channels_last memory format; convolutions usually run faster with it on tensor cores"
 			)

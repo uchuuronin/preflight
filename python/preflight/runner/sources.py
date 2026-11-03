@@ -500,6 +500,11 @@ COMMANDS = {
 	"lm_eval": {"package": "lm-eval", "module": "lm_eval", "lens": "eval",
 		"sdists": ("sqlitedict", "rouge-score", "word2number")},
 }  # fmt: skip
+# named, and refused saying so (Chiya, Nov 2: unsupported, no more work on it)
+UNSUPPORTED_COMMANDS = {
+	"vllm": "vLLM's bench commands aren't supported: Preflight's serving image has vLLM 0.6.4, which has no "
+	"`vllm bench`. Check in a script that calls vllm.LLM and generate() instead"
+}
 MAX_COMMAND_CHARS = 8_192  # before splitting: shlex is slow on a long unterminated quote
 COMMAND_ENTRY = "preflight_command.py"
 _COMMAND_SCRIPT = '''"""Runs the console command {name!r} as a script: Preflight's check in by command."""
@@ -512,7 +517,9 @@ found = [e for e in entry_points(group="console_scripts") if e.name == {name!r}]
 if not found:
     raise SystemExit("the command {name} isn't installed")
 sys.argv = [{name!r}, *sys.argv[2:]]
-sys.exit(found[0].load()())
+code = found[0].load()()
+if code:  # a console script's return is its exit code; none is success, so no SystemExit on the way out
+    sys.exit(code)
 '''
 
 
@@ -539,6 +546,8 @@ def _command(source: dict, *, on: bool | None = None) -> tuple[dict[str, str], l
 		raise InvalidSubmission(f"the command doesn't parse ({exc})", code="submission.invalid") from None
 	if not isinstance(words, list) or not words or not all(isinstance(w, str) for w in words):
 		raise InvalidSubmission("the command is text, or a list of words", code="submission.invalid")
+	if words[0] in UNSUPPORTED_COMMANDS:
+		raise InvalidSubmission(UNSUPPORTED_COMMANDS[words[0]], code="unsupported")
 	tool = COMMANDS.get(words[0])
 	if tool is None:
 		raise InvalidSubmission(f"Preflight runs these commands by name: {', '.join(sorted(COMMANDS))}; "
