@@ -1,6 +1,7 @@
 # D's check of shot 9b's laptop steps on Windows (docs/demo/shot-9b-laptop.md), on a GitHub
 # Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts.
-# Runs only when this file changes on ws-d. Step 5 also runs `preflight run` with every Linux-only call D found stubbed (and tzdata
+# Runs only when this file changes on ws-d. Step 5 also runs `preflight run` with every Linux-only call D found stubbed, Windows'
+# own variables kept in the probe's environment (and tzdata
 # installed, a sandbox folder set), to check nothing else stops it on Windows. Everything lives on D:, as the laptop's steps keep
 # everything on E:. No secrets are used. The job fails if any checked step failed, after every
 # step has reported and the logs are uploaded.
@@ -69,7 +70,7 @@ jobs:
           # every Linux-only call D found on the path, stubbed, to see whether anything else stops a real
           # measurement: a do-nothing `resource` module for the probe process, and in this one
           Set-Content D:\pf9b\venv\Lib\site-packages\resource.py '# stand-in: no rlimits on Windows'
-          D:\pf9b\venv\Scripts\python.exe -c "import os, sys, signal; os.geteuid = lambda: 1000; signal.SIGKILL = signal.SIGTERM; import subprocess; os.killpg = lambda pid, sig: subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], capture_output=True); os.O_NOFOLLOW = 0; os.O_NONBLOCK = 0; from preflight.cli.main import main; sys.exit(main(['run', 'film\\tiny_train.py']))" *> D:\pf9b\run-stubbed.log
+          D:\pf9b\venv\Scripts\python.exe -c "import os, sys, signal; os.geteuid = lambda: 1000; signal.SIGKILL = signal.SIGTERM; import subprocess; os.killpg = lambda pid, sig: subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], capture_output=True); os.O_NOFOLLOW = 0; os.O_NONBLOCK = 0; import preflight.probes.local as L; L.SAFE_ENV = L.SAFE_ENV + ('SYSTEMROOT', 'WINDIR', 'USERPROFILE', 'USERNAME', 'APPDATA', 'LOCALAPPDATA', 'PATHEXT', 'COMSPEC', 'TEMP', 'TMP'); from preflight.cli.main import main; sys.exit(main(['run', 'film\\tiny_train.py']))" *> D:\pf9b\run-stubbed.log
           $code = $LASTEXITCODE
           "--- with every Linux-only call stubbed:"
           Get-Content D:\pf9b\run-stubbed.log -Tail 120
