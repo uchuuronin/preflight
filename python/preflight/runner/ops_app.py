@@ -136,9 +136,11 @@ def fill_datasets(only: str = ""):
 	Path("out/fill_datasets.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(res, indent=2), flush=True)
 	# a file is in when one of its mirrors gave it (a row per mirror tried, the file named by its URL's last part)
-	files = {(r["dataset"], r["url"].rsplit("/", 1)[-1]) for r in res}
+	files = {(r["dataset"], r.get("url", "").rsplit("/", 1)[-1]) for r in res}
 	got = {
-		(r["dataset"], r["url"].rsplit("/", 1)[-1]) for r in res if r["status"] in ("kept", "already there")
+		(r["dataset"], r.get("url", "").rsplit("/", 1)[-1])
+		for r in res
+		if r["status"] in ("kept", "already there")
 	}
 	if not res or files - got:
 		sys.exit(1)
