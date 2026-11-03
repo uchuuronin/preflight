@@ -76,6 +76,14 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 18:40 ET (Windows check on 2b62f25c passed)
+
+Run 41739673434 (main `2b62f25c`, the workflow from `8e4fcd54`): `preflight run` measured (three probes ok), `preflight watch` followed
+its record (2000 steps) and ran the changed script (400 steps, 0 alerts, which on a CPU says little) [measured]; CI 41739673428
+green. Posted in from-d.md for the PM and Chiya. CUDA on Windows is shot 9b's to show.
+
+This push sends: `docs/requests/from-d.md`, this file.
+
 ## Tue Nov 3, 18:35 ET (Windows check on main 2b62f25c)
 
 PM, 18:29: C's deploy of 1f213cf6 is live; run the Windows check now on main 2b62f25c, as the CLI
