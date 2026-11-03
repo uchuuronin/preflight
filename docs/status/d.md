@@ -76,6 +76,15 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 18:05 ET (the clip's fix-race shot, to C's screen)
+
+C answered (ws-c `6a7fcd66`): no screen showed a race's verdicts before today; each lane now shows
+its fix's dated Nov 2 verdict on the LoRA sample. The clip's 0:24 to 0:32 row films that screen
+(PF102), with its exact words, and is cut rather than drawn if it isn't live on Wednesday. Replied
+to C's ask about the plain line (D built it). Merged `main`.
+
+This push sends: `docs/demo/video-plan.md`, `docs/requests/from-d.md`, this file.
+
 ## Tue Nov 3, 17:55 ET (two display-only lines: the beginner's line, the share page's money line)
 
 Chiya's call, by 8 PM. (1) At "New to this" only (`d.expertise`), one plain line above the
