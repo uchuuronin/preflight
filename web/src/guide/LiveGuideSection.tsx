@@ -70,7 +70,8 @@ export function LiveGuideSection({
 	}, [tour]);
 
 	useEffect(() => {
-		onStatus?.(busy ? "thinking" : view ? view.awaiting : "ready");
+		// "working": busy after a round came back (Muse Spark has spoken or moved a knob and goes on).
+		onStatus?.(busy ? (view ? "working" : "thinking") : view ? view.awaiting : "ready");
 	}, [busy, view, onStatus]);
 
 	const run = async (step: (tour: LiveTour) => Promise<LiveView>) => {

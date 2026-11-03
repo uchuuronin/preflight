@@ -95,7 +95,6 @@ describe("the quick read while Muse Spark reads the record", () => {
 		for (let i = 0; i < 4; i++) await frame();
 		expect(document.querySelector(".pf-guide__quick")).toBeNull();
 		const step = [...document.querySelectorAll(".pf-guide__say")].map((e) => e.textContent);
-		console.log("QQ", JSON.stringify({ said, step }));
 		expect(step).toContain(said);
 		expect(screen.getAllByRole("button", { name: /^Apply / }).length).toBeGreaterThan(0);
 	});
@@ -108,7 +107,6 @@ describe("the quick read while Muse Spark reads the record", () => {
 		fireEvent.click(screen.getByRole("button", { name: en["guide.quick.take"] }));
 		for (let i = 0; i < 3; i++) await frame();
 		const step = [...document.querySelectorAll(".pf-guide__say")].map((e) => e.textContent);
-		console.log("QQ", JSON.stringify({ said, step }));
 		expect(step).toContain(said);
 		const knobs = { ...r.ws!.state.knobs };
 		await release(
@@ -123,6 +121,41 @@ describe("the quick read while Muse Spark reads the record", () => {
 		for (let i = 0; i < 3; i++) await frame();
 		expect(screen.queryByText("Late answer.")).toBeNull();
 		expect(r.ws!.state.knobs).toEqual(knobs);
+	});
+});
+
+describe("the quick read goes once Muse Spark has done anything", () => {
+	it("a first round that moves a knob hides it, so it can't be taken from the guide's setting", async () => {
+		let second: (r: Response) => void = () => {};
+		let n = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string) => {
+				if (!url.startsWith("/v1/guide/turns")) return ok({ limits: null, saved: true });
+				n++;
+				if (n === 1) return ok(answer({ text: "", awaiting: "results", calls: [{ call_id: "c1", name: "set_knob", arguments: { knob_id: "eval_batch_size", value: 8 }, runs_in: "browser" }] }));
+				return new Promise<Response>((r) => {
+					second = r;
+				});
+			}),
+		);
+		mount();
+		await start();
+		for (let i = 0; i < 4; i++) await frame();
+		expect(n).toBe(2);
+		expect(document.querySelector(".pf-guide__quick")).toBeNull();
+		await act(async () => second(ok(answer())));
+	});
+
+	it("follows the visitor's own move while it shows", async () => {
+		slowGuide();
+		const r = mount();
+		await start();
+		const first = quickText();
+		act(() => r.ws!.actions.setKnob("eval_batch_size", 8, "user"));
+		await frame();
+		expect(quickText()).not.toBe("");
+		expect(quickText()).not.toBe(first);
 	});
 });
 
@@ -141,5 +174,10 @@ describe("what the visitor wrote on New flight", () => {
 		await frame();
 		const box = screen.getByLabelText(en["guide.ask.label"]) as HTMLTextAreaElement;
 		expect(box.value).toBe(said);
+		await act(async () => {
+			fireEvent.click(screen.getByRole("button", { name: en["guide.ask.send"] }));
+		});
+		const calls = (fetch as unknown as { mock: { calls: Array<[string, RequestInit]> } }).mock.calls.filter((c) => c[0].startsWith("/v1/guide/turns"));
+		expect(JSON.parse(calls.at(-1)![1].body as string).message).toBe(said);
 	});
 });

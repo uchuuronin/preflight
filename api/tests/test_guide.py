@@ -482,3 +482,15 @@ def test_objective_accepts_the_visitors_description():
 
 	with pytest.raises(ValidationError):
 		Objective.model_validate({"kind": "min_time", "description": "x" * 2001})
+
+
+def test_the_description_stays_out_of_the_models_notes():
+	"""The visitor's words reach the model only as their own bounded message, never inside the
+	"[event]" notes the prompt says come from Preflight (review, Nov 3)."""
+	import inspect
+
+	from preflight_api.routes import guide as route
+
+	src = inspect.getsource(route)
+	assert src.count('objective.model_dump(exclude_none=True, exclude={"description"})') == 2
+	assert "objective.model_dump(exclude_none=True)" not in src

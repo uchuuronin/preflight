@@ -376,6 +376,7 @@ export class LiveTour {
 			if (this.cancelled) throw new TourCancelled();
 			if (!res.ok) {
 				const err = (await res.json().catch(() => null)) as { error?: { message?: string; fallback?: string; reason?: string; code?: string } } | null;
+				if (this.cancelled) throw new TourCancelled();
 				if (res.status === 409) this.state = null;
 				if (err?.error?.fallback === "rule_based") throw new GuideFallback(err.error.message ?? "", err.error.reason ?? "unknown");
 				// No body to show (the API unreachable, a proxy's 503): the panel's own words, not a bare code (D's walkthrough).

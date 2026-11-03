@@ -296,22 +296,28 @@ export function GuidePanel() {
 	// rule-based tour's first step shows at once as the quick read (PM, Nov 3: a visitor shouldn't stare
 	// at nothing). Worked out, never applied: nothing moves until the visitor takes it, and the live
 	// guide's first answer replaces it. A failed answer starts the rule-based tour on this same step.
+	// Only before Muse Spark has said or moved anything: once a round comes back ("working": it may have
+	// moved a knob), the quick read goes, so taking it never starts from the guide's setting (review, Nov 3).
 	const quickOn = live && liveStatus === "thinking" && !liveAnswered.current;
 	const quick = useMemo<{ active: Active; text: string } | null>(() => {
 		if (!quickOn) return null;
-		const step = nextStep({ record, provider, knobs: state.knobs, pinned: state.pinned, objective: state.objective, visited: new Set<string>(), limits: state.limits, campaign });
+		// As restart() will see it: a fresh tour with the knobs set aside cleared.
+		const limits = state.limits.declined.length ? { ...state.limits, declined: [] } : state.limits;
+		const step = nextStep({ record, provider, knobs: state.knobs, pinned: state.pinned, objective: state.objective, visited: new Set<string>(), limits, campaign });
 		if (step.kind === "done") return null;
 		// The rule-based tour puts a single move on the map as it shows it: its words describe that setting.
 		const knobs = step.kind === "move" && step.move ? { ...state.knobs, [step.move.knobId]: step.move.to } : state.knobs;
 		const at = { knobs, estimates: knobs === state.knobs ? estimates : provider.predict(record, knobs) };
 		const a: Active = { step, ...(step.move && state.knobs[step.move.knobId] !== undefined ? { from: state.knobs[step.move.knobId] } : {}), n: 1, of: 1 };
 		return { active: a, text: t(step.textKey, stepVars(a, at)) };
+		// Worked out again whenever the setting, aim, limits or numbers change while it shows (review, Nov 3).
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [quickOn]);
+	}, [quickOn, state.knobs, state.objective, state.limits, state.pinned, estimates, provider]);
 	const takeQuick = () => {
 		setTookQuick(true); // closes the live guide, which stops its tour: a late answer moves nothing
 		autoStarted.current = true;
 		restart();
+		focusFirstMove();
 	};
 
 	/** The RL steps' numbers: the probe's measurements (A's) and B's estimates, as the RL view shows them. */
@@ -525,13 +531,7 @@ export function GuidePanel() {
 						autoStarted.current = true;
 						restart();
 						// The pressed button is gone: focus the tour's first move, so a screen reader hears it.
-						requestAnimationFrame(() =>
-							requestAnimationFrame(() => {
-								const panel = document.querySelector<HTMLElement>(".pf-guide");
-								const next = [...(panel?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find((b) => b.textContent?.startsWith("Apply"));
-								(next ?? panel?.querySelector<HTMLButtonElement>("button"))?.focus();
-							}),
-						);
+						focusFirstMove();
 					}}
 					onStatus={(s) => {
 						if (s !== "ready" && s !== "thinking") liveAnswered.current = true;
@@ -653,6 +653,17 @@ export function GuidePanel() {
 				</AddonBoundary>
 			))}
 		</section>
+	);
+}
+
+/** The pressed button is gone: focus the tour's first move (or its first button), so a screen reader hears it. */
+function focusFirstMove(): void {
+	requestAnimationFrame(() =>
+		requestAnimationFrame(() => {
+			const panel = document.querySelector<HTMLElement>(".pf-guide");
+			const next = [...(panel?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find((b) => b.textContent?.startsWith("Apply"));
+			(next ?? panel?.querySelector<HTMLButtonElement>(".pf-guide__actions button"))?.focus();
+		}),
 	);
 }
 

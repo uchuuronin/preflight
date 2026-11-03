@@ -605,14 +605,16 @@ button.pf-prov:hover { color: var(--pf-fg); }
 /* Chiya's layout (Nov 3): the form on the left, the samples and then the documentation card on the right,
    and one panel across both for where the code goes and Check in. On a phone: the form, the
    documentation card, the samples, then the panel. */
-@media (min-width: 1080px) {
-	.pf-checkin__grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 20px; align-items: start; }
+@media (min-width: 1240px) {
+	.pf-checkin__grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(440px, 1fr); grid-template-rows: auto 1fr; gap: 20px; align-items: start; }
 	.pf-checkin__grid > .pf-desk { grid-column: 1; grid-row: 1 / span 2; }
 	.pf-checkin__grid > .pf-departures { grid-column: 2; grid-row: 1; }
 	.pf-checkin__grid > .pf-checkin__doc { grid-column: 2; grid-row: 2; }
 }
-@media (max-width: 1079.98px) {
-	.pf-checkin__grid > * { flex-basis: 100%; }
+@media (max-width: 1239.98px) {
+	/* One column until the samples' column holds 440 px (its fixed columns take 276): the titles need the rest
+	   (review, Nov 3). As specific as .pf-desk's and .pf-departures' own flex, which came later. */
+	.pf-checkin__grid > *, .pf-checkin__grid > .pf-desk, .pf-checkin__grid > .pf-departures { flex-basis: 100%; }
 	.pf-checkin__grid > .pf-checkin__doc { order: 1; }
 	.pf-checkin__grid > .pf-departures { order: 2; }
 }

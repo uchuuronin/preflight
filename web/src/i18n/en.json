@@ -766,6 +766,7 @@
 	"guide.live.status.ready": "Ready",
 	"guide.live.status.thinking": "Thinking",
 	"guide.live.status.results": "Working",
+	"guide.live.status.working": "Working",
 	"guide.live.status.decision": "Your move",
 	"guide.live.status.approval": "Needs your go-ahead",
 	"guide.live.status.visitor": "Listening",
