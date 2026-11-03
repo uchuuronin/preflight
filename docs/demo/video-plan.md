@@ -6,7 +6,7 @@ the earlier drafts; the 45-second cut in `storyboard.md` is the fallback if shot
 
 ## At the freeze (Tue Nov 3): the plan of record for Wednesday's recording
 
-By D, Tue Nov 3, 10:00 ET (the PM's 08:07 item 6, plan only). This section supersedes the shot
+By D, Tue Nov 3, 08:25 ET (the PM's 08:07 item 6, plan only). This section supersedes the shot
 table under "Shots" below, which stays as Monday's version with each shot's history. The rules
 below still hold. One change since Monday: **the fix loop is on in production**
 (`c.fix_loop`, Nov 2), so Muse Code gets a shot (8b), the agentic beat the plan was missing.

@@ -19,11 +19,24 @@ def probe(status="oom", error=OOM, code="oom.eval") -> Probe:
 	return Probe(id="p1", knobs={}, status=status, steps=0, error=error, error_code=code)
 
 
-def response(text: str, *, cited=(), opened=(), searched=True, open_status="completed") -> dict:
+def response(
+	text: str, *, cited=(), opened=(), searched=True, open_status="completed", returned=None
+) -> dict:
+	"""A Responses API reply. `returned`: the URLs the search's own results list (by default the
+	cited ones, as a real search returns what the model then cites)."""
 	out: list[dict] = [{"type": "reasoning", "summary": []}]
 	if searched:
+		results = [
+			{"type": "text_result", "title": "t", "url": u, "snippet": "s"}
+			for u in (cited if returned is None else returned)
+		]
 		out.append(
-			{"type": "web_search_call", "status": "completed", "action": {"type": "search", "query": "q"}}
+			{
+				"type": "web_search_call",
+				"status": "completed",
+				"action": {"type": "search", "query": "q"},
+				"results": results,
+			}
 		)
 	for url in opened:
 		out.append(
@@ -81,11 +94,11 @@ def test_only_the_exact_annotated_url_matches_and_it_is_what_is_stored():
 		assert f.code == "search.none_found", cited
 		f, _ = ground_failure(client(response(answer("found", cited), cited=[ISSUE])), probe(), {})
 		assert f.code == "search.none_found", cited
-	# only the scheme and host's case are ignored; the annotation's spelling is stored
+	# only the scheme and host's case are ignored; the search result's spelling is stored
 	upper = "HTTPS://GitHub.com" + ISSUE[18:]
 	f, _ = ground_failure(client(response(answer("found", ISSUE), cited=[upper])), probe(), {})
 	assert f.code == "search.known_issue" and [c.url for c in f.citations] == [upper]
-	# opened but never annotated: dropped
+	# opened but no search returned it: dropped
 	f, _ = ground_failure(client(response(answer("found", ISSUE), opened=[ISSUE])), probe(), {})
 	assert f.code == "search.none_found"
 	# annotated, but its open failed: dropped
@@ -444,9 +457,11 @@ def test_the_record_shows_the_searchs_titles_not_the_models_words():
 	f, _ = ground_failure(client(data), probe(), {})
 	assert f.code == "search.known_issue" and said not in f.detail and said not in f.title
 	assert [c.title for c in f.citations] == ["OOM in eval · Issue #12345"] and "github.com" in f.detail
-	# no title from the search: the host stands in
-	f, _ = ground_failure(client(response(text, cited=[ISSUE])), probe(), {})
-	assert said not in f.detail and f.citations[0].title in ("t", "github.com")
+	# no title in the search's result: the host stands in, not the annotation's title
+	data = response(text, cited=[ISSUE], returned=[])
+	data["output"][1]["results"] = [{"type": "text_result", "url": ISSUE, "snippet": "s"}]
+	f, _ = ground_failure(client(data), probe(), {})
+	assert said not in f.detail and f.citations[0].title == "github.com"
 
 
 def test_a_long_error_cant_stall_the_scrub_or_hide_an_address():
@@ -509,3 +524,38 @@ def test_a_secrets_name_cut_off_at_the_window_edge_never_sends_its_value():
 			seen: list = []
 			ground_failure(client(response(answer("none_found")), seen), probe(error=err), {})
 			assert seen and value not in seen[0][1]["input"], (line, cut)
+
+
+def test_a_page_the_model_only_opened_is_never_a_source_however_it_is_cited():
+	# B's re-check (Nov 2): the search returned one page; the model opened another itself and cited it
+	# inline; the error names no address, so nothing else rules it out
+	opened_only = "https://github.com/pytorch/pytorch/issues/777"
+	err = OOM + "\nsee pytorch issue #777"
+	data = response(answer("found", opened_only), cited=[opened_only], opened=[opened_only], returned=[ISSUE])
+	data["output"][2]["results"] = [
+		{"type": "text_result", "title": "Opened page", "url": opened_only, "snippet": "s"}
+	]
+	f, _ = ground_failure(client(data), probe(error=err), {})
+	assert f.code == "search.none_found" and not f.citations
+	assert {e.metric: e.value for e in f.evidence}["search.dropped_unannotated"] == 1.0
+	# the page the search did return still counts, with the search's own title, though an open that
+	# came before the search, and an annotation, give it others
+	data = response(
+		answer("found", ISSUE, opened_only), cited=[ISSUE, opened_only], opened=[ISSUE], returned=[]
+	)
+	data["output"][1]["results"] = [
+		{"type": "text_result", "title": "Search's title", "url": ISSUE, "snippet": "s"}
+	]
+	data["output"][2]["results"] = [
+		{"type": "text_result", "title": "Opened title", "url": ISSUE, "snippet": "s"}
+	]
+	data["output"][1], data["output"][2] = data["output"][2], data["output"][1]
+	data["output"][-1]["content"][0]["annotations"][0]["title"] = "Annotation title"
+	f, _ = ground_failure(client(data), probe(), {})
+	assert f.code == "search.known_issue" and [(c.url, c.title) for c in f.citations] == [
+		(ISSUE, "Search's title")
+	]
+
+
+def test_an_answer_nested_too_deep_to_parse_is_no_answer():
+	assert parse_answer('{"a": ' + "[" * 100_000) is None
