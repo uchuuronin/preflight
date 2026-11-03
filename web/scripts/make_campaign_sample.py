@@ -72,7 +72,9 @@ def main(cells_path: str, base_path: str, out_path: str) -> None:
 	with open(out_path, "w") as f:
 		json.dump(out, f, indent="\t", ensure_ascii=False)
 		f.write("\n")
-	print(f"wrote {out_path}: {len(plan.cells)} runs, {len(plan.cut_list)} cut, finish {plan.finish_s.status}")
+	print(
+		f"wrote {out_path}: {len(plan.cells)} runs, {len(plan.cut_list)} cut, finish {plan.finish_s.status}"
+	)
 
 
 if __name__ == "__main__":
