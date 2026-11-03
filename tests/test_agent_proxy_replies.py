@@ -163,3 +163,19 @@ def test_a_long_selection_leaves_room_for_the_top_up_marker():
 	assert len(s.selection) <= SELECTION_CHARS
 	both = combine_samples(s, AgentSample(tasks=[], population=None, selection="extra"))
 	assert both.selection.endswith("+ top-up of 0")
+
+
+def test_a_providers_error_is_kept_with_the_requests_shape_never_its_values(proxy):
+	from preflight.recorder.agent import request_shape
+
+	prov, px = proxy
+	url = px.open_run("r", max_tasks=1)
+	prov.status = 400
+	body = {"model": "muse-spark-1.3", "max_tokens": 5, "stop": ["<end_code>"],
+		"messages": [{"role": "system", "content": "secret plan"}, {"role": "user", "content": [{"type": "text", "text": "x"}]}]}  # fmt: skip
+	assert _post(url, body) == 400
+	(status, _code, model, shape, n), *_ = px.provider_errors()
+	assert status == 400 and model == "muse-spark-1.3" and n == 1
+	assert shape == "keys max_tokens,messages,model,stop; roles system,user; content list:text,text"
+	assert "secret" not in shape and "end_code" not in shape
+	assert request_shape(b"[1]") == "not an object" and request_shape(b"{") == "not JSON"

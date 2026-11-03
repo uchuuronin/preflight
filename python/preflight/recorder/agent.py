@@ -285,6 +285,35 @@ class _StreamReader:
 					self.found["tool_calls"] = len(self._tool_ids)
 
 
+def request_shape(body: bytes) -> str:
+	"""What a request held, by name only: its top-level keys and its messages' roles and content kinds
+	("keys max_tokens,messages,model,stop; roles system,user; content list:text"). Never a value."""
+	try:
+		req = json.loads(body)
+	except ValueError:
+		return "not JSON"
+	if not isinstance(req, dict):
+		return "not an object"
+	keys = sorted(k for k in req if isinstance(k, str) and re.fullmatch(r"[a-z_]{1,40}", k))[:16]
+	msgs = req.get("messages") if isinstance(req.get("messages"), list) else []
+	roles = sorted({m["role"] for m in msgs[:200] if isinstance(m, dict) and isinstance(m.get("role"), str)
+		and re.fullmatch(r"[a-z_]{1,20}", m["role"])})  # fmt: skip
+	kinds = set()
+	for m in msgs[:200]:
+		c = m.get("content") if isinstance(m, dict) else None
+		if isinstance(c, str):
+			kinds.add("text")
+		elif isinstance(c, list):
+			kinds |= {f"list:{p['type']}" for p in c[:20] if isinstance(p, dict) and isinstance(p.get("type"), str)
+				and re.fullmatch(r"[a-z_]{1,20}", p["type"])}  # fmt: skip
+	parts = [f"keys {','.join(keys)}"]
+	if roles:
+		parts.append(f"roles {','.join(roles)}")
+	if kinds:
+		parts.append(f"content {','.join(sorted(kinds))}")
+	return "; ".join(parts)[:240]
+
+
 def _error_code(data) -> str | None:
 	err = data.get("error") if isinstance(data, dict) else None
 	if isinstance(err, dict):
@@ -332,6 +361,8 @@ class AgentProxy:
 		# the proxy's own answers (a refusal, a bad body): (status, code, model) -> count, so a record
 		# can say what a script heard back when its SDK hides the message (smolagents, Nov 2)
 		self._own: dict[tuple[int, str, str | None], int] = {}
+		# the provider's error answers, with the shape of the request that got each (keys, never values)
+		self._provider: dict[tuple[int, str, str | None, str], int] = {}
 		self.max_calls_per_task = max_calls_per_task
 		self.max_usd_per_task = max_usd_per_task
 		self.max_usd_total = max_usd_total
@@ -804,10 +835,22 @@ class AgentProxy:
 				self._own[(status, "other", None)] = self._own.get((status, "other", None), 0) + 1
 		_reply(h, status, obj, **kw)
 
+	def provider_errors(self) -> list[tuple[int, str, str | None, str, int]]:
+		"""(status, the error's code, model, the request's shape, times) for every error the provider sent back."""
+		with self._lock:
+			return sorted(((*k, n) for k, n in self._provider.items()), key=lambda r: (-r[4], r[0], r[1]))
+
 	def own_replies(self) -> list[tuple[int, str, str | None, int]]:
 		"""(status, code, model, times) for every answer the proxy gave itself, most frequent first."""
 		with self._lock:
 			return sorted(((*k, n) for k, n in self._own.items()), key=lambda r: (-r[3], r[0], r[1]))
+
+	def _note_provider(self, status: int, code: str, model: str | None, body: bytes) -> None:
+		key = (status, re.sub(r"[^a-z0-9_.]", "", str(code).lower())[:40] or "error",
+			model[:128] if isinstance(model, str) else None, request_shape(body))  # fmt: skip
+		with self._lock:
+			if key in self._provider or len(self._provider) < MAX_OWN_REPLIES:
+				self._provider[key] = self._provider.get(key, 0) + 1
 
 	def _note(self, task_id: str, req: dict, error: str) -> None:
 		"""A call refused before it went out, counted as an error."""
@@ -831,6 +874,7 @@ class AgentProxy:
 				call.response_id = data["id"][:128]
 		elif r.status_code >= 400:
 			call.error = _error_code(data) or str(r.status_code)
+			self._note_provider(r.status_code, call.error, call.model, body)
 		sent[0] = True
 		h.send_response(r.status_code)
 		for k, v in r.headers.items():
@@ -869,6 +913,7 @@ class AgentProxy:
 					with contextlib.suppress(ValueError):
 						call.error = _error_code(json.loads(raw)) or str(r.status_code)
 					call.error = call.error or str(r.status_code)
+					self._note_provider(r.status_code, call.error, call.model, body)
 					write(raw)
 				else:
 					for chunk in r.iter_bytes():

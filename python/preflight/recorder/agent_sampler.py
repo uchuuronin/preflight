@@ -212,6 +212,10 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	own = [r for r in own if r[0] != 404]  # a stray request at the tunnel's address, not the script's
 	if own:  # what the script heard from the proxy itself, which its SDK may not say
 		parts.insert(2, "proxy answered " + ", ".join(_own_reply(*r) for r in own[:2]))
+	bad = proxy.provider_errors() if note_replies and hasattr(proxy, "provider_errors") else []
+	if bad:  # what the provider refused, and what the request held (its keys, never their values)
+		status, code, model, shape, n = bad[0]
+		parts.insert(2, f"provider answered {_own_reply(status, code, model, n)} to {shape}")
 	if failed:  # probes.agent_error_line: why a script that made no calls stopped, ahead of the rest
 		parts.insert(2, f"script failed: {failed}")
 	if cut == "stalled" and waiting:
