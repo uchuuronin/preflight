@@ -289,6 +289,13 @@ def _uses_vllm(sm: ScriptMap, files: dict[str, str]) -> bool:
 	return sm.lens == "eval" and any(_VLLM_IMPORT.search(t) for n, t in files.items() if n.endswith(".py"))
 
 
+_TORCHVISION = re.compile(r"^\s*(?:from|import)\s+torchvision\b", re.M)
+
+
+def _uses_torchvision(files: dict[str, str]) -> bool:
+	return any(_TORCHVISION.search(t) for n, t in files.items() if n.endswith(".py"))
+
+
 def _image_pins(image: str) -> str:
 	"""A sandbox image's own pins in its probes' cache key, for the images image_tag doesn't hash: torch27's."""
 	if image != "torch27":
@@ -343,7 +350,8 @@ def _spec(
 		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
 		install_exec=deps.install_requirements and _repo_install_on() and _flag("probes.repo_install_exec"),
 		torch_stop=deps.install_requirements and _flag("probes.torch_new"),
-		dataset_cache=_flag("probes.dataset_cache"),
+		# only code that imports torchvision: the flag re-keys no other job's probes (review, Nov 3)
+		dataset_cache=_flag("probes.dataset_cache") and _uses_torchvision(fetched.files),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
 		image=_image(sm, fetched.files),
@@ -689,7 +697,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	out = _with_dataset_size(out, fetched.files)  # the record's own code: a patch may change the size
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
-	keep = [f for f in keep if not f.id.startswith("source.partial")]
+	keep = [
+		f for f in keep if not f.id.startswith(("source.partial", "source.map_skipped"))
+	]  # said afresh below
 	out = out.model_copy(
 		update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *_reading_findings(fetched)]}
 	)

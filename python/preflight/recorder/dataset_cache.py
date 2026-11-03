@@ -15,6 +15,7 @@ import shutil
 from pathlib import Path
 
 CACHE_DIR = "/datasets"  # the volume's mount in the probe sandbox (runner/modal_app.py)
+DATASETS = ("CIFAR10", "CIFAR100", "MNIST", "FashionMNIST")
 
 
 def resources() -> list[tuple[str, str, str]]:

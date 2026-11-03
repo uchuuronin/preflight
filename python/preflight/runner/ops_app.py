@@ -43,6 +43,9 @@ from preflight.runner.probe_user import probe_user_ok as _probe_user_ok
 ops = modal.App(APP_NAME + "-ops")
 
 
+FILL_DEADLINE_S = 3300.0  # one archive's download, inside the function's hour
+
+
 @ops.function(image=probe_image, volumes={DATASETS_DIR: datasets_vol}, timeout=3600)  # CPU
 def fill_dataset_cache(only: str = "") -> list[dict]:
 	"""probes.dataset_cache: download torchvision's CIFAR-10/100, MNIST and FashionMNIST archives into the
@@ -74,6 +77,12 @@ def fill_dataset_cache(only: str = "") -> list[dict]:
 					f.write(chunk)
 					h.update(chunk)
 					n += len(chunk)
+					if (
+						time.monotonic() - t0 > FILL_DEADLINE_S
+					):  # a slow host: say how slow, before the container ends
+						raise TimeoutError(
+							f"{n / 1024 / (time.monotonic() - t0):.0f} kB/s, {n:,} bytes in {FILL_DEADLINE_S:.0f} s"
+						)
 		except Exception as exc:  # one host down doesn't stop the rest
 			tmp.unlink(missing_ok=True)
 			out.append({"dataset": name, "url": url, "status": f"failed: {type(exc).__name__}: {exc}"[:300]})
@@ -98,7 +107,13 @@ def fill_datasets(only: str = ""):
 	Writes out/fill_datasets.json; exits non-zero unless every archive asked for is in the volume."""
 	import sys
 
-	res = fill_dataset_cache.remote(only)
+	from preflight.recorder.dataset_cache import DATASETS
+
+	names = [n for n in (only.split(",") if only else DATASETS) if n]
+	calls = [
+		fill_dataset_cache.spawn(n) for n in names
+	]  # one container a dataset: a slow host holds up only its own
+	res = [r for c in calls for r in c.get()]
 	Path("out").mkdir(exist_ok=True)
 	Path("out/fill_datasets.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(res, indent=2), flush=True)

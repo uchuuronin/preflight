@@ -45,3 +45,12 @@ def test_the_spec_carries_it_only_when_set():
 	a = ProbeSpec(probe_id="p", files={"t.py": ""}, entrypoint="t.py")
 	b = ProbeSpec(probe_id="p", files={"t.py": ""}, entrypoint="t.py", dataset_cache=True)
 	assert a.dataset_cache is False and cache_key(a, "L4", "i") != cache_key(b, "L4", "i")
+
+
+def test_only_code_that_imports_torchvision_is_keyed_with_it():
+	from preflight.runner.pipeline import _uses_torchvision
+
+	assert _uses_torchvision({"t.py": "import torch\nfrom torchvision import datasets\n"})
+	assert not _uses_torchvision(
+		{"t.py": "import torch\n# torchvision later\n", "notes.md": "import torchvision"}
+	)

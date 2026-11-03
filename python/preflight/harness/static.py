@@ -867,7 +867,7 @@ def _lens_by_entry(lens: str, reach: Facts, f: Facts, entrypoint: str) -> str:
 		return lens
 	# lm-evaluation-harness's own entry point imports its package as local code, which the job's imports leave out
 	evals = ("lm_eval", "lighteval")
-	if entrypoint.split("/", 1)[0] in evals:
+	if entrypoint.removeprefix("src/").split("/", 1)[0] in evals:  # lighteval keeps its package under src/
 		return "eval"
 	words = re.split(r"[^a-z0-9]+", entrypoint.rsplit("/", 1)[-1].lower().removesuffix(".py"))
 	if set(words) & ENTRY_FINETUNE or any(

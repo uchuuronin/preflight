@@ -70,3 +70,7 @@ def test_whole_words_only_and_fine_tuning_wins(on):
 		_lens({"explorations.py": TRAIN}, "explorations.py")
 		== S.map_static({"explorations.py": TRAIN}, entrypoint="explorations.py").lens
 	)
+
+
+def test_lighteval_s_src_layout_reads_as_an_eval(on):
+	assert S._lens_by_entry("pretrain", None, None, "src/lighteval/__main__.py") == "eval"
