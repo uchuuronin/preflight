@@ -1,0 +1,33 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-FlUM9ndZqPkatOaad8q8SM
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+├── ✓ Created Function read_rows.
+├── ✓ Created Function gpu_dirs.
+└── ✓ Created Function read_rows_gz.
+[L4] wave 0: $0.00 of $5.00 spent (container time, worst case for unsettled waves), 0 done, 300 to do, deadline 1500 s, next wave 2 x 3
+[L4] wave 0 took 2758 s on 2 containers: 5576 container-s ($1.36, worst case was $2.63) for 6 configs
+[L4] batch: 51.4 s in the container, reload 0.2 s, commits 1.6 s
+[L4] config ba9b4edbc7ff gpt-small  ok: 18.8 s
+[L4] config 4380f850ed3c gpt-small  ok: 16.2 s
+[L4] config cb4c893a09af gpt-small  ok: 14.5 s
+[L4] batch: 48.7 s in the container, reload 0.2 s, commits 1.7 s
+[L4] config 86248b54b37a gpt-small  ok: 14.1 s
+[L4] config 2f60789bdf7a gpt-small  ok: 18.2 s
+[L4] config 2f01c1d87002 gpt-small  ok: 14.5 s
+[L4] wave 1: $1.36 of $5.00 spent (container time, worst case for unsettled waves), 6 done, 294 to do, deadline 1500 s, next wave 2 x 1
+[L4] wave 1 took 1006 s on 2 containers: 2073 container-s ($0.51, worst case was $1.13) for 0 configs
+[L4] batch: 0.2 s in the container, reload 0.1 s, commits 0.0 s
+[L4] batch: 0.1 s in the container, reload 0.1 s, commits 0.0 s
+[L4] wave 2: $1.87 of $5.00 spent (container time, worst case for unsettled waves), 6 done, 294 to do, deadline 1500 s, next wave 2 x 1
+[L4] no progress in the last wave (rows filed under another GPU?); stopping
+[L4] finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-FlUM9ndZqPkatOaad8q8SM
