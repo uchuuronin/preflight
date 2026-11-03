@@ -115,7 +115,9 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 	const trouble = failed
 		? troubleFromFailure(last?.error_code, last?.message)
 		: done
-			? (troubleFromProbes(probes, known.known, known.noWheels) ?? nothingMeasured(probes, last?.error_code))
+			? (troubleFromProbes(probes, known.known, known.noWheels) ??
+				// A's runner says so on the done event (contract 0.6.6, `nothing_measured`); the record's probes otherwise.
+				(last?.nothing_measured ? ({ step: "measure", code: last.error_code ?? null } as const) : nothingMeasured(probes, last?.error_code)))
 			: null;
 	const installStop = trouble?.step === "install";
 	const measuredNothing = trouble?.step === "measure";
