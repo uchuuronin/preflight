@@ -350,7 +350,9 @@ def declared(workdir: Path) -> list[str]:
 	return []
 
 
-def repo_requirement_sets(workdir: Path, entrypoint: str, *, log=print) -> tuple[list[str], list[str]]:
+def repo_requirement_sets(
+	workdir: Path, entrypoint: str, *, log=print, pyg: bool = False
+) -> tuple[list[str], list[str]]:
 	"""(what the repo declares, what its code imports that the image lacks, by KNOWN_MODULES only) for a
 	repo that ships no requirements.txt (probes.repo_install). Noted, never guessed: a module Preflight
 	doesn't know, and one with no wheels on PyPI."""
@@ -367,7 +369,14 @@ def repo_requirement_sets(workdir: Path, entrypoint: str, *, log=print) -> tuple
 	every = {_norm(m["name"]) for x in declared_lines if (m := _LINE.match(x.strip()))}
 	imported: list[str] = []
 	for mod in sorted(missing_imports(workdir, entrypoint)):
-		if mod in NO_WHEELS:
+		if mod in NO_WHEELS and pyg:  # PyG's own index has its wheels
+			if _norm(mod) not in names:
+				imported.append(_norm(mod))
+				names.add(_norm(mod))
+				log(
+					f"[preflight] requirements: the script imports {mod}: installing {_norm(mod)} from PyG's wheels"
+				)
+		elif mod in NO_WHEELS:
 			log(f"[preflight] requirements: {mod} has no wheels on PyPI (only source); not installed")
 		elif mod in KNOWN_MODULES:
 			dist = _norm(_LINE.match(KNOWN_MODULES[mod])["name"])  # a known line may carry a pin
@@ -399,15 +408,100 @@ def site_dirs(prefix: Path) -> list[Path]:
 	)
 
 
-def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float) -> str | None:
-	"""One pip install of keep into target with the image pinned; pip's error tail, or None."""
+# probes.extra_hosts (off): PyG's own wheel index for the probe image's torch (the packages PyPI has only as
+# source, NO_WHEELS); the image names it (runner/modal_app.py), and the probe's egress then allows data.pyg.org
+PYG_INDEX_ENV = "PREFLIGHT_PYG_INDEX"
+
+
+def _uv() -> list[str] | None:
+	"""How to run uv here, when the image has it (probes.uv_install)."""
+	exe = shutil.which("uv")
+	if exe:
+		return [exe]
+	with contextlib.suppress(Exception):
+		import importlib.util
+
+		if importlib.util.find_spec("uv") is not None:
+			return [sys.executable, "-I", "-m", "uv"]
+	return None
+
+
+UV_SHARE = 0.6  # guess: of the install's time limit, what uv's resolve may use before pip gets the rest
+
+
+def _uv_then_pip(
+	runner, keep, target, constraints, links, cache, resolve_s, deadline, sdists=()
+) -> str | None:
+	"""uv pip compile under the image's pins, then `pip install --no-deps` of the pins the image doesn't have;
+	None when it installed, else why not (and pip resolves as usual after it)."""
+	import time
+
+	env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}  # as pip's -I: the probe's path
+	cmd = [*runner, "pip", "compile", "-", "--python", sys.executable, "--only-binary", ":all:", "-c",
+		str(constraints), "--no-header", "--no-annotate", "--quiet", *links, *(["--cache-dir", cache] if cache else []),
+		*(a for n in sdists for a in ("--no-binary-package", n))]  # fmt: skip
+	try:
+		r = subprocess.run(cmd, input="\n".join(keep) + "\n", capture_output=True, text=True,
+			timeout=max(1.0, resolve_s), cwd=target, env=env)  # fmt: skip
+	except subprocess.TimeoutExpired:
+		return f"uv's resolve took longer than {resolve_s:.0f} s"
+	except OSError as exc:
+		return f"uv didn't start ({type(exc).__name__})"
+	if r.returncode != 0:
+		return ((r.stderr or r.stdout or "").strip().splitlines() or [f"uv exited with {r.returncode}"])[-1]
+	have = installed()
+	pins = [ln.strip() for ln in r.stdout.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+	todo = [p for p in pins if (m := _LINE.match(p)) and _norm(m["name"]) not in have]
+	if any(not re.fullmatch(rf"{_NAME}==[A-Za-z0-9.+!_-]{{1,64}}", p) for p in todo):
+		return "uv's resolve wasn't plain pins"
+	if not todo:
+		return None
+	left = deadline - time.monotonic()
+	cmd = [sys.executable, "-I", "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
+		"--no-warn-script-location", "--only-binary", ":all:", *(a for n in sdists for a in ("--no-binary", n)),
+		"--no-deps", "--prefix", str(target), *links, *todo]  # fmt: skip
+	try:
+		r = subprocess.run(cmd, capture_output=True, text=True, timeout=max(1.0, left), cwd=target)
+	except subprocess.TimeoutExpired:
+		return f"pip took longer than {left:.0f} s installing uv's pins"
+	if r.returncode != 0:
+		return ((r.stderr or r.stdout or "").strip().splitlines() or [f"pip exited with {r.returncode}"])[-1]
+	return None
+
+
+def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, uv: bool = False,
+	find_links: str | None = None, log=None, sdists: tuple[str, ...] = ()) -> str | None:  # fmt: skip
+	"""One install of keep into target with the image pinned; the installer's error tail, or None. uv
+	(probes.uv_install): `uv pip install` first, with the same constraints, wheels only and prefix (its
+	resolver is much faster on a big stack: LitGPT's ran past 420 s in pip, Nov 2); pip after it if it
+	fails, inside the same time limit. find_links: an extra wheel index page (PyG's)."""
+	import time
+
+	deadline = time.monotonic() + timeout_s
+	links = ["--find-links", find_links] if find_links else []
+	cache = os.environ.get("PREFLIGHT_PIP_CACHE")
+	cache = cache if cache and os.access(cache, os.W_OK) else None
+	runner = _uv() if uv else None
+	if runner is not None:
+		# uv resolves (its resolver is the fast part); pip installs exactly what it chose that the image lacks,
+		# without resolving again. Not `uv pip install --prefix`: uv doesn't see the image's packages there and
+		# would put a second torch in the prefix (review, Nov 2)
+		why = _uv_then_pip(
+			runner, keep, target, constraints, links, cache, timeout_s * UV_SHARE, deadline, sdists
+		)
+		if why is None:
+			return None
+		if log is not None:
+			log(f"[preflight] requirements: uv's route didn't install them ({why[:200]}); trying pip")
+		timeout_s = deadline - time.monotonic()
+		if timeout_s < 5:
+			return f"no time was left for pip after uv's route: {why[:500]}"
 	# -I: pip walks every sys.path entry, and the probe's PYTHONPATH can name a directory its
 	# unprivileged uid can't list (Modal's /root, Nov 1: PermissionError, nothing installed)
 	cmd = [sys.executable, "-I", "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
 		"--no-warn-script-location", "--only-binary", ":all:", "--prefix", str(target),
-		"-c", str(constraints), *keep]  # fmt: skip
-	cache = os.environ.get("PREFLIGHT_PIP_CACHE")
-	if cache and os.access(cache, os.W_OK):  # shared across a run's probes
+		"-c", str(constraints), *(a for n in sdists for a in ("--no-binary", n)), *links, *keep]  # fmt: skip
+	if cache:  # shared across a run's probes
 		cmd[5:5] = ["--cache-dir", cache]
 	try:
 		r = subprocess.run(cmd, capture_output=True, text=True, timeout=max(1.0, timeout_s), cwd=target)
@@ -420,7 +514,8 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float) -> 
 
 
 def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None,
-	extra: list[str] | None = None) -> tuple[str | None, list[Path]]:  # fmt: skip
+	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = ()
+) -> tuple[str | None, list[Path]]:  # fmt: skip
 	"""Install workdir/requirements.txt. Returns (pip's error tail or None, the dirs to import from).
 
 	target: this probe's own prefix; a shared one under PREFLIGHT_DEPS_DIR is used instead when set.
@@ -429,7 +524,9 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	The imported ones are optional: if everything together won't install, the declared ones go alone,
 	then each imported package on its own, all inside the one time limit.
 	extra: the job's extra packages (extra_requirements' lines), installed with the rest under the same
-	rules (the image's stack wins, wheels only), with or without a requirements.txt."""
+	rules (the image's stack wins, wheels only), with or without a requirements.txt.
+	uv (probes.uv_install): uv before pip. pyg (probes.extra_hosts): PyG's wheel index too, so torch-sparse
+	and the other NO_WHEELS packages install, and a repo's imports of them count as known."""
 	import time
 
 	req = workdir / "requirements.txt"
@@ -439,7 +536,7 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		text = req.read_text(encoding="utf-8", errors="replace")
 	elif repo and entrypoint:
 		try:
-			decl, optional = repo_requirement_sets(workdir, entrypoint, log=log)
+			decl, optional = repo_requirement_sets(workdir, entrypoint, log=log, pyg=pyg)
 		except Exception as exc:  # a repo that can't be read for requirements runs as it would without them
 			log(
 				f"[preflight] requirements: couldn't read the repo's requirements ({type(exc).__name__}); none installed"
@@ -461,7 +558,9 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	pins = "".join(f"{n}=={v.split('+', 1)[0]}\n" for n, v in sorted(have.items()))
 	shared = os.environ.get("PREFLIGHT_DEPS_DIR")
 	if shared and os.access(shared, os.W_OK):
-		key = hashlib.sha256(("\n".join(keep) + "\0" + pins).encode()).hexdigest()[:24]
+		extra_key = f"\0{os.environ.get(PYG_INDEX_ENV)}" if pyg else ""  # what PyG's index adds
+		extra_key += f"\0{','.join(sdists)}" if sdists else ""  # what building from source allows
+		key = hashlib.sha256(("\n".join(keep) + "\0" + pins + extra_key).encode()).hexdigest()[:24]
 		target = Path(shared) / key
 		if (target / ".ok").is_file():
 			log("[preflight] requirements: already installed for this job")
@@ -473,7 +572,11 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	limit = REPO_INSTALL_TIMEOUT_S if repo and not req.is_file() else INSTALL_TIMEOUT_S
 	deadline = time.monotonic() + limit
 	log(f"[preflight] requirements: installing {', '.join(keep)}")
-	err = _pip(keep, target, constraints, limit)
+	links = os.environ.get(PYG_INDEX_ENV) if pyg else None
+	# a check-in by command's own pure-Python dependencies PyPI has only as source (sources.COMMANDS)
+	src_ok = tuple(n for n in sdists if re.fullmatch(_NAME, n))
+	how = {"uv": uv, "find_links": links, "log": log, "sdists": src_ok}
+	err = _pip(keep, target, constraints, limit, **how)
 	opt = [k for k in keep if k in optional]
 	if err and opt:  # one optional package can't sink the ones the repo declares
 		log(
@@ -483,14 +586,14 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		left = deadline - time.monotonic()
 		if left < 5:  # the first try used the time: its error stands
 			return err, []
-		err = _pip(base, target, constraints, left) if base else None
+		err = _pip(base, target, constraints, left, **how) if base else None
 		if err is None:
 			for k in opt:
 				left = deadline - time.monotonic()
 				if left < 5:
 					log(f"[preflight] requirements: out of install time; {k} not installed")
 					continue
-				e = _pip([k], target, constraints, left)
+				e = _pip([k], target, constraints, left, **how)
 				log(
 					f"[preflight] requirements: {k} "
 					+ ("installed" if e is None else f"didn't install: {e.splitlines()[-1][:200]}")

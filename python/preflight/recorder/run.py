@@ -171,7 +171,9 @@ def main(spec_path: str) -> int:
 		if rank == 0:
 			extra = [x for x in spec.get("extra_packages") or [] if isinstance(x, str)]
 			err, dirs = install(Path(workdir), Path(spec["deps"]), repo=bool(spec.get("install_repo")),
-				entrypoint=spec.get("entrypoint"), extra=extra)  # fmt: skip
+				entrypoint=spec.get("entrypoint"), extra=extra, uv=bool(spec.get("install_uv")),
+				pyg=bool(spec.get("install_pyg")),
+				sdists=tuple(x for x in spec.get("install_sdists") or () if isinstance(x, str)))  # fmt: skip
 			_write(str(done), {"error": err, "dirs": [str(d) for d in dirs]})
 		else:
 			# torchrun: rank 0 installs once into the shared prefix; the other ranks wait for it and

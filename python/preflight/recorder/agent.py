@@ -98,6 +98,8 @@ class _Run:
 	system: dict[str, str | None] = field(default_factory=dict)  # task -> its last system prompt hash
 	last_call_at: float | None = None  # monotonic: any call through the run, refused ones too
 	budget_hit: bool = False  # a task was refused because the proxy's dollar cap was reached
+	# probes.agent_single_task (off): a script with no task list is one task, so its every call is task 1
+	single: bool = False
 	peak_concurrent: int = 0  # the most tasks with a call in flight at once: the script's workers
 	opened_at: dict[str, float] = field(default_factory=dict)  # task -> monotonic time its first call came
 
@@ -327,6 +329,9 @@ class AgentProxy:
 		self.model_override = model_override
 		self._key = api_key
 		self._rate = rate
+		# the proxy's own answers (a refusal, a bad body): (status, code, model) -> count, so a record
+		# can say what a script heard back when its SDK hides the message (smolagents, Nov 2)
+		self._own: dict[tuple[int, str, str | None], int] = {}
 		self.max_calls_per_task = max_calls_per_task
 		self.max_usd_per_task = max_usd_per_task
 		self.max_usd_total = max_usd_total
@@ -400,7 +405,7 @@ class AgentProxy:
 			self._tasks.setdefault(task_id, _Task())
 		return self._url(token)
 
-	def open_run(self, run_id: str, *, max_tasks: int, skip_keys=()) -> str:
+	def open_run(self, run_id: str, *, max_tasks: int, skip_keys=(), single: bool = False) -> str:
 		"""The base URL for a script that runs many tasks in one process (the usual agent eval
 		loop): its calls are split into tasks by conversation (a call whose messages extend a
 		task's last messages, or name its last response, belongs to that task; anything else
@@ -410,7 +415,8 @@ class AgentProxy:
 		tasks whose opening key is here are refused at their first call (a top-up after a first
 		sample: a script that can't be told where to start runs its first tasks again, and they
 		cost nothing this way, in whatever order they start; a key given twice skips two tasks
-		opened that way)."""
+		opened that way). single: the script runs one task (not a benchmark), so every call after the
+		first is that task's, however its messages change between calls; its own caps still stop it."""
 		if not _TASK_ID.fullmatch(run_id):
 			raise ValueError(f"run id {run_id!r}: letters, digits, '_', '.', '-', up to 64")
 		if self._server is None:
@@ -422,7 +428,7 @@ class AgentProxy:
 			counts: dict = {}
 			for k in skip_keys:  # a key twice: two sampled tasks opened the same way, both skipped
 				counts[k] = counts.get(k, 0) + 1
-			self._tokens[token] = _Run(run_id, max_tasks, skip_keys=counts)
+			self._tokens[token] = _Run(run_id, max_tasks, skip_keys=counts, single=single)
 		return self._url(token)
 
 	def _run(self, run_id: str):
@@ -499,6 +505,13 @@ class AgentProxy:
 				run.last[best] = msgs
 				run.system[best] = sys_h
 				return best
+			if run.single and run.order:
+				# one task (no task list): a call whose messages don't extend the last ones (an agent that
+				# rewrites its memory, a side call) is still task 1, never a second task or a 429
+				tid = run.order[0]
+				run.last[tid] = msgs
+				run.system[tid] = sys_h
+				return tid
 			for k_sys, k in run.skipped:
 				if not k or len(k) > len(msgs) or msgs[: len(k)] != k:
 					continue
@@ -643,7 +656,7 @@ class AgentProxy:
 			task_id = self._tokens.get(m["token"]) if m else None
 		run = task_id if isinstance(task_id, _Run) else None
 		if m is None or m["rest"] not in FORWARDED or task_id is None:
-			_reply(h, 404, {"error": {"type": "not_found", "message": "preflight: not a generation endpoint"}},
+			self._refuse(h, 404, {"error": {"type": "not_found", "message": "preflight: not a generation endpoint"}},
 				close=True)  # fmt: skip
 			return
 		rest = m["rest"]
@@ -652,7 +665,7 @@ class AgentProxy:
 		except ValueError:
 			n = -1
 		if not 0 < n <= MAX_BODY_BYTES or h.headers.get("Transfer-Encoding"):
-			_reply(h, 413, {"error": {"type": "invalid_request", "message": "preflight: body missing or too large"}},
+			self._refuse(h, 413, {"error": {"type": "invalid_request", "message": "preflight: body missing or too large"}},
 				close=True)  # fmt: skip
 			return
 		body = h.rfile.read(n)
@@ -661,7 +674,7 @@ class AgentProxy:
 		except ValueError:
 			req = None
 		if not isinstance(req, dict):
-			_reply(
+			self._refuse(
 				h,
 				400,
 				{"error": {"type": "invalid_request", "message": "preflight: body is not a JSON object"}},
@@ -674,25 +687,25 @@ class AgentProxy:
 		if run is not None:
 			task_id = self._task_for(run, req)
 			if task_id == "":
-				_reply(h, 429, {"error": {"type": "preflight_task_skipped", "code": "already_sampled",
+				self._refuse(h, 429, {"error": {"type": "preflight_task_skipped", "code": "already_sampled",
 					"message": "preflight: this task was in the first sample; skipped in the top-up"}},
-					headers=NO_RETRY)  # fmt: skip
+					model=req.get("model"), headers=NO_RETRY)  # fmt: skip
 				return
 			if task_id is None:
-				_reply(h, 429, {"error": {"type": "preflight_sample_complete", "code": "sample_complete",
+				self._refuse(h, 429, {"error": {"type": "preflight_sample_complete", "code": "sample_complete",
 					"message": f"preflight: the sample's {run.max_tasks} tasks are running; this task isn't one"}},
-					headers=NO_RETRY)  # fmt: skip
+					model=req.get("model"), headers=NO_RETRY)  # fmt: skip
 				return
 		why, reserved = self._admit(task_id, req, body)
 		if why == "unpriced_model":
 			self._note(task_id, req, why)  # counted before the script hears back
-			_reply(h, 400, {"error": {"type": "preflight_unpriced_model", "code": why,
-				"message": "preflight: this model has no price, so the sample can't be costed"}})  # fmt: skip
+			self._refuse(h, 400, {"error": {"type": "preflight_unpriced_model", "code": why,
+				"message": "preflight: this model has no price, so the sample can't be costed"}}, model=req.get("model"))  # fmt: skip
 			return
 		if why:
-			_reply(h, 429, {"error": {"type": "preflight_task_stopped", "code": why,
+			self._refuse(h, 429, {"error": {"type": "preflight_task_stopped", "code": why,
 				"message": f"preflight: this task was stopped ({why}); it counts as a runaway in the sample"}},
-				headers=NO_RETRY)  # fmt: skip
+				model=req.get("model"), headers=NO_RETRY)  # fmt: skip
 			return
 		started, t0 = time.time(), time.monotonic()
 		model = req.get("model") if isinstance(req.get("model"), str) else None
@@ -765,8 +778,8 @@ class AgentProxy:
 			self._log(task_id, call, reserved, uncosted=uncosted)
 		if fail_reply:
 			with contextlib.suppress(OSError):
-				_reply(h, 502, {"error": {"type": "upstream_unreachable",
-					"message": "preflight: the provider didn't answer"}}, close=True)  # fmt: skip
+				self._refuse(h, 502, {"error": {"type": "upstream_unreachable",
+					"message": "preflight: the provider didn't answer"}}, model=model, close=True)  # fmt: skip
 		if last:
 			with contextlib.suppress(OSError):
 				for part in last:
@@ -775,6 +788,26 @@ class AgentProxy:
 					else:
 						h.wfile.write(part)
 				h.wfile.flush()
+
+	def _refuse(self, h, status: int, obj: dict, *, model=None, **kw) -> None:
+		"""A reply of the proxy's own, counted by status, code and model (own_replies)."""
+		err = obj.get("error") if isinstance(obj.get("error"), dict) else {}
+		code = str(err.get("code") or err.get("type") or "")[:64]
+		key = (status, code, model[:128] if isinstance(model, str) else None)
+		if status == 404:  # anyone can reach the tunnel's address; not the script's calls
+			_reply(h, status, obj, **kw)
+			return
+		with self._lock:
+			if key in self._own or len(self._own) < MAX_OWN_REPLIES:
+				self._own[key] = self._own.get(key, 0) + 1
+			else:
+				self._own[(status, "other", None)] = self._own.get((status, "other", None), 0) + 1
+		_reply(h, status, obj, **kw)
+
+	def own_replies(self) -> list[tuple[int, str, str | None, int]]:
+		"""(status, code, model, times) for every answer the proxy gave itself, most frequent first."""
+		with self._lock:
+			return sorted(((*k, n) for k, n in self._own.items()), key=lambda r: (-r[3], r[0], r[1]))
 
 	def _note(self, task_id: str, req: dict, error: str) -> None:
 		"""A call refused before it went out, counted as an error."""
@@ -967,6 +1000,9 @@ class _Server(ThreadingHTTPServer):
 
 	request_queue_size = 128
 	daemon_threads = True
+
+
+MAX_OWN_REPLIES = 64  # distinct (status, code, model) kept; a count past it is still kept as "other"
 
 
 def _reply(h: BaseHTTPRequestHandler, status: int, obj: dict, *, close: bool = False, headers=None) -> None:

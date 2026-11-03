@@ -92,7 +92,10 @@ export interface Job {
  * via the `definition` "Source".
  */
 export interface Source {
-	kind: "sample" | "repo" | "upload" | "notebook" | "template" | "cli" | "inflight" | "record";
+	/**
+	 * 0.6.3 adds command: a console tool run by name (args holds the whole command; uri is command://<tool>), with runner.command_checkin on
+	 */
+	kind: "sample" | "repo" | "upload" | "notebook" | "template" | "cli" | "inflight" | "record" | "command";
 	/**
 	 * sample://name, https://github.com/..., upload://<hash>
 	 */

@@ -128,6 +128,7 @@ def _stream(cmd: list[str], *, env: dict, cwd: Path, timeout_s: float) -> tuple[
 def _bare(
 	work: Path, bare_steps: int, *, install_requirements: bool, caches: Path, env: dict, timeout_s: float,
 	entrypoint: str = "train.py", args: tuple[str, ...] = (), install_repo: bool = False,
+	install_opts: dict | None = None,
 ) -> dict:  # fmt: skip
 	env = {**os.environ, **env}
 	if install_requirements:
@@ -140,7 +141,8 @@ def _bare(
 		}
 		try:
 			repo_kw = {"repo": True, "entrypoint": entrypoint} if install_repo else {}
-			err, dirs = install(work, caches / "deps", log=lambda m: print(m, flush=True), **repo_kw)
+			err, dirs = install(work, caches / "deps", log=lambda m: print(m, flush=True), **repo_kw,
+				**(install_opts or {}))  # fmt: skip
 		finally:
 			os.environ.update(saved)
 		if err:
@@ -201,6 +203,7 @@ def measure(
 	generate_sample: int = 0,
 	generate_calls: int = 0,
 	install_repo: bool = False,
+	install_opts: dict | None = None,
 ) -> dict:
 	"""Both runs and the paired overhead, as one dict (what out/ground_truth_<script>.json holds).
 	bare_env: environment overrides for the bare run only (its own caches on a root box).
@@ -225,7 +228,7 @@ def measure(
 		)
 		bare = _bare(work, bare_steps, install_requirements=install_requirements, caches=caches,
 			env={**_bare_hf_home(caches), **(bare_env or {})}, timeout_s=budget_s * BARE_SHARE,
-			entrypoint=entrypoint, args=args, install_repo=install_repo)  # fmt: skip
+			entrypoint=entrypoint, args=args, install_repo=install_repo, install_opts=install_opts)  # fmt: skip
 		bare_wall = time.monotonic() - t0
 		_say(
 			f"bare run ended ({bare.get('ended') or 'failed'}) after {bare_wall:.0f} s, {bare.get('steps')} steps"
@@ -236,6 +239,8 @@ def measure(
 		r = run_probe(ProbeSpec(probe_id="gt", files=files, entrypoint=entrypoint, args=list(args), warmup=warmup,
 			timed=recorder_steps, timeout_s=left, alternate_sync=not (generate_sample or generate_calls),
 			install_requirements=install_requirements, install_repo=install_repo, generate_sample=generate_sample,
+			install_uv=bool((install_opts or {}).get("uv")), install_pyg=bool((install_opts or {}).get("pyg")),
+			install_sdists=tuple((install_opts or {}).get("sdists", ())),
 			generate_calls=generate_calls))  # fmt: skip
 		_say(f"recorder run ended ({r.probe.status}) after {r.probe.steps} steps")
 	finally:

@@ -79,6 +79,12 @@ def refetch(src: Source, blobs) -> dict:
 		return {"kind": src.kind, "uri": src.uri, **base}
 	if src.kind == "repo":
 		return {"kind": "repo", "uri": src.uri, "commit": src.commit, **base}
+	if src.kind == "command":  # the command again (its args are the whole command line)
+		return {
+			"kind": "command",
+			"args": list(src.args),
+			**{k: v for k, v in base.items() if k == "extra_packages"},
+		}
 	if src.kind in UPLOAD_KINDS:
 		ref = (src.uri or "").removeprefix("upload://")
 		if not ref.startswith("sha256:") or blobs is None:
