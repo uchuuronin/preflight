@@ -117,7 +117,14 @@ def _code_lines(files: dict[str, str]) -> list[str]:
 
 	lines = []
 	if "requirements.txt" in files:
-		lines += files["requirements.txt"].splitlines()
+		for raw in files["requirements.txt"].splitlines():
+			m = re.fullmatch(r"\s*(?:-r|--requirement)[\s=]+(\S+)\s*", raw.split(" #", 1)[0])
+			if (
+				m and m[1] in files and m[1] != "requirements.txt"
+			):  # one level: base.txt beside it (B's review)
+				lines += files[m[1]].splitlines()
+			else:
+				lines.append(raw)
 	with tempfile.TemporaryDirectory() as tmp:
 		for name in ("pyproject.toml", "setup.cfg", "setup.py"):
 			if name in files:
@@ -175,7 +182,9 @@ def overrides_note(overrides: list[tuple[str, str, str]]) -> str:
 
 	def ask(name: str, spec: str) -> str:
 		exact = spec.startswith("==") and "," not in spec and "*" not in spec
-		return f"pins {spec[2:]}" if exact else f"asks for {name}{spec}"
+		if exact or (spec.startswith("===") and "," not in spec):
+			return f"pins {spec.lstrip('=')}"
+		return f"asks for {name}{spec}"
 
 	return "; ".join(f"measured on {n} {v}; your code {ask(n, s)}" for n, v, s in overrides)
 
@@ -494,20 +503,23 @@ def declared(workdir: Path) -> list[str]:
 
 
 def built_in_code(workdir: Path) -> bool:
-	"""Whether the repo declares dependencies that only running its build can list: a setup.py that
-	passes install_requires something other than a literal list (open-r1's `deps_list(...)`, Nov 2), or a
-	pyproject.toml whose dependencies are `dynamic`."""
+	"""Whether the repo declares dependencies that only running its build can list: a pyproject.toml whose
+	[project] dependencies are `dynamic`, or, with no [project] table, a setup.py that passes install_requires
+	something other than a literal (open-r1's `deps_list(...)`, Nov 2). A list or tuple of strings (empty too), None,
+	or a name bound to one is a literal (B's review, Nov 3); with a [project] table, setuptools ignores setup.py's
+	list, so only `dynamic` counts."""
 	import ast
 	import tomllib
 
 	py = workdir / "pyproject.toml"
 	if py.is_file():
+		proj = None
 		with contextlib.suppress(
 			tomllib.TOMLDecodeError, AttributeError, RecursionError, MemoryError, OSError
 		):
-			proj = tomllib.loads(py.read_text(encoding="utf-8", errors="replace")).get("project", {})
-			if isinstance(proj, dict) and "dependencies" in (proj.get("dynamic") or []):
-				return True
+			proj = tomllib.loads(py.read_text(encoding="utf-8", errors="replace")).get("project")
+		if isinstance(proj, dict):
+			return "dependencies" in (proj.get("dynamic") or [])
 	setup = workdir / "setup.py"
 	if not setup.is_file():
 		return False
@@ -515,7 +527,29 @@ def built_in_code(workdir: Path) -> bool:
 		tree = ast.parse(setup.read_text(encoding="utf-8", errors="replace"))
 	except (SyntaxError, ValueError, RecursionError, MemoryError, OSError):
 		return False
-	return any(isinstance(n, ast.keyword) and n.arg == "install_requires" for n in ast.walk(tree))
+
+	def literal(v) -> bool:
+		if isinstance(v, ast.Constant) and v.value is None:
+			return True
+		return isinstance(v, ast.List | ast.Tuple) and all(
+			isinstance(e, ast.Constant) and isinstance(e.value, str) for e in v.elts
+		)
+
+	bound = {}
+	for n in ast.walk(tree):
+		if isinstance(n, ast.Assign):
+			for t in n.targets:
+				if isinstance(t, ast.Name):
+					bound.setdefault(t.id, []).append(n.value)
+	for n in ast.walk(tree):
+		if isinstance(n, ast.keyword) and n.arg == "install_requires":
+			v = n.value
+			if literal(v) or (
+				isinstance(v, ast.Name) and v.id in bound and all(literal(x) for x in bound[v.id])
+			):
+				continue
+			return True
+	return False
 
 
 def needs_build(workdir: Path) -> bool:
@@ -534,9 +568,25 @@ MAX_BUILD_REPORT = 4 * 2**20  # guess: bytes of pip's report read back; one proj
 # metadata step needs none, so only a setup.py that compiles as it's read is stopped
 _NO_COMPILER = {"CC": "false", "CXX": "false", "LDSHARED": "false", "NVCC": "false", "CUDA_HOME": "/nonexistent",
 	"CUDA_PATH": "/nonexistent", "MAX_JOBS": "1"}  # fmt: skip
+# and on PATH, ahead of the real ones, tools that fail: a setup.py or Makefile that calls gcc, nvcc, make or cmake
+# by name gets an error, not a build (B's review, Nov 3); one that calls a compiler by its full path still can
+_SHIMS = ("gcc", "g++", "cc", "c++", "clang", "clang++", "nvcc", "ld", "make", "cmake", "ninja", "gfortran")
+
+
 MAX_COPY_BYTES = (
 	64 * 2**20
 )  # guess: the repo's text a build copy carries; a fetched repo is capped below this
+
+
+def _shim_path(tmp: Path) -> str:
+	shims = tmp / "no-compilers"
+	shims.mkdir()
+	for name in _SHIMS:
+		(shims / name).write_text(
+			"#!/bin/sh\necho 'preflight: no compiling in a metadata build' >&2\nexit 1\n"
+		)
+		(shims / name).chmod(0o755)
+	return f"{shims}{os.pathsep}{os.environ.get('PATH', '')}"
 
 
 def _build_copy(workdir: Path, dest: Path) -> bool:
@@ -600,9 +650,29 @@ def _build_metadata(workdir: Path, *, log, timeout_s: float) -> dict | None:
 			log("[preflight] requirements: the repo is too big to copy for its build; its build wasn't run")
 			return None
 		report = Path(tmp) / "report.json"
-		cmd = [sys.executable, "-I", "-m", "pip", "install", "--dry-run", "--no-deps", "--ignore-installed",
-			"--disable-pip-version-check", "--no-input", "--quiet", "--report", str(report), str(copy)]  # fmt: skip
-		env = {**{k: v for k, v in os.environ.items() if k != "PYTHONPATH"}, **_NO_COMPILER}
+		cmd = [
+			sys.executable,
+			"-I",
+			"-m",
+			"pip",
+			"install",
+			"--dry-run",
+			"--no-deps",
+			"--ignore-installed",
+			"--disable-pip-version-check",
+			"--no-input",
+			"--quiet",
+			"--only-binary",
+			":all:",
+			"--report",
+			str(report),
+			str(copy),
+		]  # fmt: skip  (--only-binary: the build's own build dependencies come as wheels, never built)
+		env = {
+			**{k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
+			**_NO_COMPILER,
+			"PATH": _shim_path(Path(tmp)),
+		}
 		try:
 			r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, cwd=tmp, env=env)
 		except subprocess.TimeoutExpired:
@@ -654,9 +724,44 @@ def requires_from_build(workdir: Path, *, log=print, timeout_s: float = BUILD_TI
 	return out
 
 
+def _version_in(path: Path) -> str | None:
+	"""A file's own `__version__ = "1.2.3"` (or `version = ...`), read by its syntax tree, never run."""
+	import ast
+
+	try:
+		tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+	except (SyntaxError, ValueError, RecursionError, MemoryError, OSError):
+		return None
+	for n in tree.body:
+		if isinstance(n, ast.Assign | ast.AnnAssign):
+			targets = n.targets if isinstance(n, ast.Assign) else [n.target]
+			v = n.value
+			if any(isinstance(t, ast.Name) and t.id in ("__version__", "version") for t in targets) and (
+				isinstance(v, ast.Constant) and isinstance(v.value, str)
+			):
+				return v.value
+	return None
+
+
+def _attr_version(workdir: Path, attr: str) -> str | None:
+	"""setuptools' `attr: pkg.__version__` (setup.cfg, or pyproject's [tool.setuptools.dynamic]), read from the
+	module's file, flat or under src/, without importing it."""
+	mod, _, name = attr.strip().rpartition(".")
+	if not mod or name not in ("__version__", "version") or not re.fullmatch(r"[A-Za-z_][\w.]*", mod):
+		return None
+	rel = Path(*mod.split("."))
+	for base in (workdir, workdir / "src"):
+		for f in (base / rel / "__init__.py", base.joinpath(*rel.parts[:-1], f"{rel.parts[-1]}.py")):
+			if f.is_file() and f.resolve().is_relative_to(workdir.resolve()):
+				return _version_in(f)
+	return None
+
+
 def static_name_version(workdir: Path) -> tuple[str, str] | None:
 	"""The project's name and version as its files state them, read without running anything: pyproject's
-	[project], setup.cfg's [metadata], or literal name= and version= strings in setup.py."""
+	[project] (a dynamic version from [tool.setuptools.dynamic]'s attr or [tool.hatch.version]'s path), setup.cfg's
+	[metadata] (its `attr:` too), or literal name= and version= strings in setup.py (B's review, Nov 3: a version
+	kept in the package's own __version__ is common)."""
 	import ast
 	import configparser
 	import tomllib
@@ -664,23 +769,40 @@ def static_name_version(workdir: Path) -> tuple[str, str] | None:
 	py = workdir / "pyproject.toml"
 	if py.is_file():
 		with contextlib.suppress(
-			tomllib.TOMLDecodeError, AttributeError, RecursionError, MemoryError, OSError
+			tomllib.TOMLDecodeError, AttributeError, RecursionError, MemoryError, OSError, TypeError
 		):
-			proj = tomllib.loads(py.read_text(encoding="utf-8", errors="replace")).get("project", {})
-			if (
-				isinstance(proj, dict)
-				and isinstance(proj.get("name"), str)
-				and isinstance(proj.get("version"), str)
-			):
-				return proj["name"], proj["version"]
+			doc = tomllib.loads(py.read_text(encoding="utf-8", errors="replace"))
+			proj = doc.get("project", {})
+			if isinstance(proj, dict) and isinstance(proj.get("name"), str):
+				v = proj.get("version")
+				if not isinstance(v, str) and "version" in (proj.get("dynamic") or []):
+					tool = doc.get("tool", {})
+					attr = ((tool.get("setuptools") or {}).get("dynamic") or {}).get("version") or {}
+					path = (tool.get("hatch") or {}).get("version") or {}
+					if isinstance(attr, dict) and isinstance(attr.get("attr"), str):
+						v = _attr_version(workdir, attr["attr"])
+					elif isinstance(path, dict) and isinstance(path.get("path"), str):
+						f = workdir / path["path"]
+						v = (
+							_version_in(f)
+							if f.resolve().is_relative_to(workdir.resolve()) and f.is_file()
+							else None
+						)
+				if isinstance(v, str) and v:
+					return proj["name"], v
 	cfg = workdir / "setup.cfg"
 	if cfg.is_file():
 		cp = configparser.ConfigParser(interpolation=None)
 		with contextlib.suppress(configparser.Error, RecursionError, MemoryError, OSError):
 			cp.read_string(cfg.read_text(encoding="utf-8", errors="replace"))
-			n, v = cp.get("metadata", "name", fallback=""), cp.get("metadata", "version", fallback="")
-			if n and v and not v.startswith(("attr:", "file:")):
-				return n.strip(), v.strip()
+			n, v = (
+				cp.get("metadata", "name", fallback="").strip(),
+				cp.get("metadata", "version", fallback="").strip(),
+			)
+			if v.startswith("attr:"):
+				v = _attr_version(workdir, v[len("attr:") :]) or ""
+			if n and v and not v.startswith("file:"):
+				return n, v
 	setup = workdir / "setup.py"
 	if setup.is_file():
 		try:
@@ -708,7 +830,8 @@ def own_metadata(workdir: Path, target: Path, *, log=print, timeout_s: float = B
 			nv = meta["name"], meta["version"]
 	if nv is None:
 		log(
-			"[preflight] requirements: the repo's own name and version aren't stated in its files; no metadata written"
+			"[preflight] requirements: no metadata written for the repo itself: its files don't state its name and "
+			"version, and its build, run only when its list is built in code, didn't give them"
 		)
 		return False
 	name, version = (re.sub(r"[^A-Za-z0-9._+!-]", "", x)[:100] for x in nv)

@@ -101,3 +101,13 @@ def test_the_stored_predictions_carry_it_too(monkeypatch):
 	filled = api.fill_predictions(rec.model_copy(update={"findings": [*rec.findings, f]}))
 	est = filled.predictions.estimates["memory.peak"]
 	assert est.status != "abstain" and "your code pins 4.46.3" in est.reason
+
+
+def test_a_base_file_s_pins_and_a_triple_equals_pin_are_read_review():
+	files = {
+		"requirements.txt": "-r requirements/base.txt\n",
+		"requirements/base.txt": "transformers===4.46.3\n",
+	}
+	over = R.image_overrides(files, PROBE_NEW_PACKAGES)
+	assert over == [("transformers", "4.52.3", "===4.46.3")]
+	assert R.overrides_note(over) == "measured on transformers 4.52.3; your code pins 4.46.3"

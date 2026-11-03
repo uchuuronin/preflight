@@ -316,3 +316,60 @@ def test_the_own_metadata_goes_in_the_probe_s_prefix_never_the_shared_one(tmp_pa
 		assert err is None
 		assert any("p-deps-own" in str(d) for d in dirs)
 	assert not list(shared.rglob("*.dist-info")) and sorted(work.rglob("*")) == before
+
+
+@pytest.mark.parametrize(
+	"setup",
+	[
+		"setup(name='x', version='1', install_requires=[])",
+		"setup(name='x', install_requires=('tqdm',))",
+		"setup(name='x', install_requires=None)",
+		"REQS = []\nsetup(name='x', install_requires=REQS)",
+	],
+)
+def test_a_literal_list_never_builds_review(tmp_path, setup):
+	(tmp_path / "setup.py").write_text("from setuptools import setup\n" + setup + "\n")
+	assert not R.built_in_code(tmp_path) and not R.needs_build(tmp_path)
+
+
+def test_a_static_project_table_wins_over_setup_py_s_code_review(tmp_path):
+	(tmp_path / "setup.py").write_text(BUILT)
+	(tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1"\ndependencies = []\n')
+	assert not R.needs_build(tmp_path)
+	(tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\ndynamic = ["dependencies", "version"]\n')
+	assert R.needs_build(tmp_path)
+
+
+def test_the_build_finds_failing_compilers_on_path_and_takes_wheels_only(tmp_path, monkeypatch):
+	(tmp_path / "setup.py").write_text(BUILT)
+	seen, real = {}, subprocess.run
+
+	def run(cmd, **kw):
+		gcc = Path(kw["env"]["PATH"].split(":")[0]) / "gcc"
+		seen.update(gcc=real([str(gcc)], capture_output=True).returncode, cmd=cmd)
+		return _fake_pip(["tqdm"])(cmd, **kw)
+
+	monkeypatch.setattr(R.subprocess, "run", run)
+	assert R.requires_from_build(tmp_path, log=lambda m: None) == ["tqdm"]
+	assert seen["gcc"] == 1 and seen["cmd"][seen["cmd"].index("--only-binary") + 1] == ":all:"
+
+
+def test_a_version_kept_in_the_package_is_read_without_running_it(tmp_path):
+	(tmp_path / "pkg").mkdir()
+	(tmp_path / "pkg" / "__init__.py").write_text('__version__ = "2.3.4"\nimport os\n')
+	(tmp_path / "setup.cfg").write_text("[metadata]\nname = pkg\nversion = attr: pkg.__version__\n")
+	assert R.static_name_version(tmp_path) == ("pkg", "2.3.4")
+	(tmp_path / "setup.cfg").unlink()
+	(tmp_path / "pyproject.toml").write_text(
+		'[project]\nname = "pkg"\ndynamic = ["version"]\ndependencies = []\n'
+		'[tool.setuptools.dynamic]\nversion = {attr = "pkg.__version__"}\n'
+	)
+	assert R.static_name_version(tmp_path) == ("pkg", "2.3.4")
+	(tmp_path / "pyproject.toml").write_text(
+		'[project]\nname = "pkg"\ndynamic = ["version"]\n[tool.hatch.version]\npath = "pkg/__init__.py"\n'
+	)
+	assert R.static_name_version(tmp_path) == ("pkg", "2.3.4")
+	(tmp_path / "pyproject.toml").write_text(
+		'[project]\nname = "pkg"\ndynamic = ["version"]\n[tool.hatch.version]\npath = "../outside.py"\n'
+	)
+	assert R.static_name_version(tmp_path) is None
