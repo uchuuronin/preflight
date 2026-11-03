@@ -1,6 +1,8 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Nov 3, 4:10 PM ET.
+Updated Tue Nov 3, 6:15 PM ET.
+
+**FINAL (freeze) runner: deployed from main 4671c8b3af32ea44983c5cdb3dd5d31f1d2b28f3** (the PM's freeze merge: `runner.made_by`, `harness.map_closure`, `runner.entry_runs_nothing` on), `a-deploy-main-32` GitHub 41735219144, Nov 3 22:58 UTC / 5:58 PM ET, after three startup checks passed (`a-startup-check-32` 41734520603, `a-startup-check-serving-18` 41734823043, `a-startup-torch-new-6` 41735024703); the limit check passed after it (`a-limit-check-13` 41735320177). **Rollback: `modal deploy --env main` from e8f0516c64af51a1e84eed9b8750313bbdbd2ae8** (the runner live before it, 4:55 PM). No runner changes until after submission.
 
 **Production runner: deployed from ws-a 56e686de** (main b40012bb merged in, plus the PM's 11:23 list; `a-deploy-main-30`, GitHub 41690166435, Nov 3 18:05 UTC / 1:05 PM ET), after three startup checks passed (`a-startup-check-30` 41688982619, `a-startup-check-serving-16` 41689362694, `a-startup-torch-new-4` 41689764723); the limit check passed after it (`a-limit-check-11`, 41690460909). New in production with it: native Windows fixes (D's ten), B's must-fixes 3 to 5 on `runner.read_closure` and `runner.probe_without_map`, OGB's arxiv archive from the dataset volume (sha256-pinned), the retrieval, GNN and vision samples' Fix button, B's request-count logging under `probes.eval_units`, and `harness.spark_search` on (main's flags, Chiya's 11:25 yes). Off: `runner.entrypoint_path` (proposed on, for the PM), `probes.step_clock`, `probes.uv_install`, `probes.agent_single_task`. **Rollback: `modal deploy --env main` from c146cf11** (10:52 AM).
 
