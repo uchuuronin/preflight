@@ -2448,6 +2448,16 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-ratebox__err { margin: 0; font-size: 12px; color: var(--pf-fail); }
 .pf-ratebox__actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pf-costline__note { flex-basis: 100%; font-size: 11.5px; color: var(--pf-fg-dim); }
+/* "Optional flight details" on the check-in desk (Chiya, Nov 3): one quiet fold for the fields most check-ins
+   leave empty; the summary is a full-size target, its marker says open or closed. */
+.pf-desk__more { border-top: 1px solid var(--pf-stroke); border-bottom: 1px solid var(--pf-stroke); }
+.pf-desk__more > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; cursor: pointer; list-style: none; font-size: var(--pf-text-sm); font-weight: 600; }
+.pf-desk__more > summary::-webkit-details-marker { display: none; }
+.pf-desk__more > summary::before { content: "▸"; color: var(--pf-fg-dim); font-weight: 400; }
+.pf-desk__more[open] > summary::before { content: "▾"; }
+.pf-desk__more > summary .pf-dim { font-weight: 400; font-size: 12.5px; }
+.pf-desk__more > summary:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 2px; border-radius: var(--pf-radius-sm); }
+.pf-desk__more-body { display: flex; flex-direction: column; gap: 14px; padding: 4px 0 16px; }
 /* Private triage on the check-in desk (harness.glimmer_private): the box, then what it changes. */
 .pf-private { gap: 6px; }
 .pf-private__hint { display: flex; flex-direction: column; gap: 4px; padding-left: 24px; }
