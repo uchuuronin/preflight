@@ -92,8 +92,8 @@ The flag is on only in each ops run's own process (`ground_truth --install-repo`
 | 19:38 | Redeployed the runner from main a132c0a (`a-deploy-main-26`), gated | the PM's 7:35 note: spark_diagnosis and spark_claim_check on; the new probe image resets the cache, as expected | cents | `modal deploy --env main` from 8ec03bc |
 | 20:25 | Push gate runs lint, the schema check and the Python tests (less 12 known environment-only failures) before gitleaks | fb889fe went out red | about 3.5 min a push | the gate is a scratch script, not in the repo |
 | 20:40 | Smolagents: no `probes.agent_proxy_compat` | Meta refuses `tool_choice: required` and `stop` each on its own; the rule was one field | $0.001 of Meta [estimate] | n/a |
-| 21:10 | `probes.eval_units` (off): scoring batches as units, a finished eval kept, an eval probe's allocated peak; under `probes.repo_install`, the script's folder on the probe's path | lm_eval's scoring tasks measured nothing; OGB's probe couldn't import its own logger.py | the checks' A10 minutes | flags off; revert |
-| 21:15 | `runner.free_resend` (off; contract 0.6.5): one free resend a day of the same code after an import stop | Chiya via the PM, 9:04 PM | none | flag off; revert |
+| 21:10 | `probes.eval_units` (off): scoring batches as units, a finished eval kept, an eval probe's allocated peak; under `probes.repo_install`, the script's folder on the probe's path | lm_eval's scoring tasks measured nothing; OGB's probe couldn't import its own logger.py | the checks' A10 minutes | flags off; revert 8798e43, 690e69d1, 8d9f04f0, f712d587 |
+| 21:15 | `runner.free_resend` (off; contract 0.6.5): one free resend a day of the same code after an import stop | Chiya via the PM, 9:04 PM | none | flag off; revert df0db43f, b0841eba |
 | 21:40 | `MAX_QUEUED_PER_VISITOR` stays 3, now load-tested | lower caps trade queue wait for refusals with the visitor's own wait about the same; the in-flight budget hold binds first | none (CPU) | n/a |
 
 ## Decisions overnight (Chiya's autonomy, Nov 2 12:16 AM ET)
