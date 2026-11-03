@@ -1224,6 +1224,7 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	white-space: normal;
 }
 .pf-onode__chip.is-fails { color: var(--pf-fail); }
+.pf-onode__chip.is-above { top: auto; bottom: calc(100% - 12px); }
 .pf-onode__chip.is-fails::before { content: "✕ "; }
 .pf-onode--diamond .pf-onode__chip { left: auto; right: 0; top: 100%; transform: translate(50%, -50%) rotate(-45deg) scale(1.25) translateY(16px); transform-origin: 50% 0; max-width: 130px; }
 
@@ -2438,3 +2439,9 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	font-size: var(--pf-text-sm);
 }
 .pf-sample-banner b { font-weight: 600; }
+
+/* On a phone the cockpit's header tags may wrap rather than run off the screen (the probes tag
+   names its count, cost and failures). */
+@media (max-width: 560px) {
+	.pf-cockpit__head .pf-tag { white-space: normal; max-width: 100%; flex-wrap: wrap; height: auto; min-height: 30px; text-align: left; }
+}
