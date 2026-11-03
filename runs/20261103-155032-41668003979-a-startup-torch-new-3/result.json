@@ -1,0 +1,11 @@
+{
+	"name": "20261103-155032-41668003979-a-startup-torch-new-3",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41668003979",
+	"ref": "c146cf11b09bda767efc083eecc12a92656d80b2",
+	"sha": "c146cf11b09bda767efc083eecc12a92656d80b2",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::startup_check_torch_new",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T15:51:33Z"
+}
