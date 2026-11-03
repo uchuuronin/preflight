@@ -575,6 +575,7 @@ def ground_truth(
 	pyg: bool = False,
 	eval_units: bool = False,
 	sdists: str = "",
+	build: bool = False,
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -646,7 +647,9 @@ def ground_truth(
 
 		p = {"entrypoint": entrypoint_of(files, entrypoint or None), "lens": None, "image": "probe",
 			"generate_sample": 0, "generate_calls": 0}  # fmt: skip
-	opts = {k: v for k, v in (("uv", uv), ("pyg", pyg)) if v}
+	opts = {
+		k: v for k, v in (("uv", uv), ("pyg", pyg), ("build", build)) if v
+	}  # build: probes.repo_install_exec
 	if sdists:  # names of source-only packages allowed to build (commas, as the workflow allows)
 		opts["sdists"] = tuple(n for n in sdists.split(",") if n)
 	if eval_units:  # probes.eval_units in this process only: the recorder probe's scoring batches

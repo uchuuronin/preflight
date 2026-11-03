@@ -152,6 +152,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"extra_packages": list(spec.extra_packages)} if spec.extra_packages else {}),
 		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
 		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
+		**({"install_exec": True} if spec.install_exec else {}),  # a list read from the build installs more
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
@@ -314,6 +315,7 @@ def _spec(
 		extra_packages=extra_lines(fetched.source) if deps.install_requirements else (),
 		install_uv=deps.install_requirements and _flag("probes.uv_install"),
 		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
+		install_exec=deps.install_requirements and _repo_install_on() and _flag("probes.repo_install_exec"),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image

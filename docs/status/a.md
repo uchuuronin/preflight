@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Nov 3, 8:45 AM ET.
+Updated Tue Nov 3, 8:25 AM ET.
 
 **Production runner: deployed from main ad12da7** (`a-deploy-main-27`, GitHub 41641834293, Nov 3 13:10 UTC / 8:10 AM ET), after both startup checks passed (`a-startup-check-27` 41641282975, `a-startup-check-serving-13` 41641618181); the limit check passed after it (`a-limit-check-8`, 41641950530: 3 jobs taken, the 4th refused `limit.visitor_daily`). New in production with it: `probes.repo_install`, `probes.extra_hosts`, `probes.eval_units`, `runner.command_checkin`, `probes.agent_proxy_replies` and `runner.free_resend` on (the PM's morning merge). The probe image is unchanged from a132c0a. The previous deploy was a132c0a (Nov 3 00:40 UTC); **rollback is `modal deploy --env main` from a132c0a**.
 
@@ -64,6 +64,7 @@ The flag is on only in each ops run's own process (`ground_truth --install-repo`
 | --- | --- | --- | --- | --- |
 | 8:10 | Redeployed the runner from main ad12da7 (`a-deploy-main-27`), gated: both startup checks, then the limit check | the PM's item 1: the morning merge's flags on | cents (CPU) [estimate] | `modal deploy --env main` from a132c0a |
 | 8:09 | `runner.read_closure`: the walk stops on a count of import lookups (200,000, a guess), beside the 600 files and 2 MB it had; the 30 s clock is gone. A cut is reported as `cut: "lookups"`, and the files it leaves out are counted in `skipped` | the PM's item 2: the clock could read different files on a slow day, so the same code could get a different content hash | none | revert ae305a80 |
+| 8:20 | `probes.repo_install_exec` (off): when setup.py passes `install_requires` something other than a literal list (or pyproject.toml's dependencies are `dynamic`), the probe runs pip's metadata-only build (`pip install --dry-run --no-deps --report`) inside its sandbox and installs the list it gives the usual way (the image's stack pinned, wheels only, extras left out). Not `pip install .`: an installed copy of the repo would sit ahead of its working copy on the path and hide a patched file | the PM's item 3 (open-r1, 3 of the nine). Its build lists 18 dependencies, among them transformers==4.52.3 and trl==0.18.0, which the image's own pins (transformers 4.46.3, TRL 0.14.0) win over, so expect 3 to stop on the pin message | none | revert the item 3 commit |
 
 ## Decisions today (Chiya out until about 5 PM ET; her autonomy, Nov 2 11:16 AM ET)
 

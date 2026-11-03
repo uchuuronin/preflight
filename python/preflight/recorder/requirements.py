@@ -373,13 +373,89 @@ def declared(workdir: Path) -> list[str]:
 	return []
 
 
+def built_in_code(workdir: Path) -> bool:
+	"""Whether the repo declares dependencies that only running its build can list: a setup.py that
+	passes install_requires something other than a literal list (open-r1's `deps_list(...)`, Nov 2), or a
+	pyproject.toml whose dependencies are `dynamic`."""
+	import ast
+	import tomllib
+
+	py = workdir / "pyproject.toml"
+	if py.is_file():
+		with contextlib.suppress(
+			tomllib.TOMLDecodeError, AttributeError, RecursionError, MemoryError, OSError
+		):
+			proj = tomllib.loads(py.read_text(encoding="utf-8", errors="replace")).get("project", {})
+			if isinstance(proj, dict) and "dependencies" in (proj.get("dynamic") or []):
+				return True
+	setup = workdir / "setup.py"
+	if not setup.is_file():
+		return False
+	try:
+		tree = ast.parse(setup.read_text(encoding="utf-8", errors="replace"))
+	except (SyntaxError, ValueError, RecursionError, MemoryError, OSError):
+		return False
+	return any(isinstance(n, ast.keyword) and n.arg == "install_requires" for n in ast.walk(tree))
+
+
+BUILD_TIMEOUT_S = (
+	120.0  # guess: pip's metadata build of one project (open-r1's took 6 s with setuptools fetched)
+)
+MAX_BUILD_REPORT = 4 * 2**20  # guess: bytes of pip's report read back; one project's metadata is a few kB
+
+
+def requires_from_build(workdir: Path, *, log=print, timeout_s: float = BUILD_TIMEOUT_S) -> list[str]:
+	"""probes.repo_install_exec (off): the requirements the repo's own build lists, by pip's metadata-only
+	build (`pip install --dry-run --no-deps --report`). That runs the visitor's setup.py, so it is only
+	called inside the probe's sandbox, where their training code runs too. Nothing is installed here, so
+	the repo's own code stays the copy the probe imports (an installed copy would shadow a patched file);
+	the lines go through the usual install (the image's stack pinned, wheels only). Extras are left out.
+	[] when the build fails, saying why."""
+	import json
+	import tempfile
+
+	with tempfile.TemporaryDirectory() as tmp:
+		report = Path(tmp) / "report.json"
+		cmd = [sys.executable, "-I", "-m", "pip", "install", "--dry-run", "--no-deps", "--ignore-installed",
+			"--disable-pip-version-check", "--no-input", "--quiet", "--report", str(report), str(workdir)]  # fmt: skip
+		env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+		try:
+			r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, cwd=tmp, env=env)
+		except subprocess.TimeoutExpired:
+			log(
+				f"[preflight] requirements: the repo's build didn't list its dependencies in {timeout_s:.0f} s"
+			)
+			return []
+		except OSError as exc:
+			log(f"[preflight] requirements: pip didn't start to read the repo's build ({type(exc).__name__})")
+			return []
+		if r.returncode != 0 or not report.is_file() or report.stat().st_size > MAX_BUILD_REPORT:
+			tail = ((r.stderr or r.stdout or "").strip().splitlines() or [f"pip exited with {r.returncode}"])[
+				-1
+			]
+			log(f"[preflight] requirements: the repo's build didn't list its dependencies: {tail[:300]}")
+			return []
+		try:
+			items = json.loads(report.read_text(encoding="utf-8", errors="replace")).get("install") or []
+			reqs = (items[0].get("metadata") or {}).get("requires_dist") or [] if len(items) == 1 else []
+		except (ValueError, AttributeError, IndexError, RecursionError):
+			reqs = []
+	out = [x.strip() for x in reqs if isinstance(x, str) and "extra" not in x.partition(";")[2]]
+	log(f"[preflight] requirements: the repo's setup.py builds its list in code; its build lists {len(out)} "
+		"dependencies (read by running it in this sandbox)")  # fmt: skip
+	return out
+
+
 def repo_requirement_sets(
-	workdir: Path, entrypoint: str, *, log=print, pyg: bool = False
+	workdir: Path, entrypoint: str, *, log=print, pyg: bool = False, build: bool = False
 ) -> tuple[list[str], list[str]]:
 	"""(what the repo declares, what its code imports that the image lacks, by KNOWN_MODULES only) for a
 	repo that ships no requirements.txt (probes.repo_install). Noted, never guessed: a module Preflight
-	doesn't know, and one with no wheels on PyPI."""
+	doesn't know, and one with no wheels on PyPI. build (probes.repo_install_exec): when the declared
+	list is built in code (built_in_code), the list the repo's build gives (requires_from_build)."""
 	declared_lines = list(declared(workdir))
+	if not declared_lines and build and built_in_code(workdir):
+		declared_lines = requires_from_build(workdir, log=log)
 	if declared_lines:
 		log(
 			f"[preflight] requirements: the repo declares {len(declared_lines)} dependencies (pyproject.toml, setup.cfg or setup.py)"
@@ -559,8 +635,8 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 
 
 def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None,
-	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = ()
-) -> tuple[str | None, list[Path]]:  # fmt: skip
+	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = (),
+	build: bool = False) -> tuple[str | None, list[Path]]:  # fmt: skip
 	"""Install workdir/requirements.txt. Returns (pip's error tail or None, the dirs to import from).
 
 	target: this probe's own prefix; a shared one under PREFLIGHT_DEPS_DIR is used instead when set.
@@ -571,7 +647,8 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	extra: the job's extra packages (extra_requirements' lines), installed with the rest under the same
 	rules (the image's stack wins, wheels only), with or without a requirements.txt.
 	uv (probes.uv_install): uv before pip. pyg (probes.extra_hosts): PyG's wheel index too, so torch-sparse
-	and the other NO_WHEELS packages install, and a repo's imports of them count as known."""
+	and the other NO_WHEELS packages install, and a repo's imports of them count as known. build
+	(probes.repo_install_exec): a setup.py that builds its list in code is run to read it (requires_from_build)."""
 	import time
 
 	req = workdir / "requirements.txt"
@@ -581,7 +658,7 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		text = req.read_text(encoding="utf-8", errors="replace")
 	elif repo and entrypoint:
 		try:
-			decl, optional = repo_requirement_sets(workdir, entrypoint, log=log, pyg=pyg)
+			decl, optional = repo_requirement_sets(workdir, entrypoint, log=log, pyg=pyg, build=build)
 		except Exception as exc:  # a repo that can't be read for requirements runs as it would without them
 			log(
 				f"[preflight] requirements: couldn't read the repo's requirements ({type(exc).__name__}); none installed"

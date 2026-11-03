@@ -213,6 +213,8 @@ class ProbeSpec:
 	extra_packages: tuple[str, ...] = ()
 	install_uv: bool = False  # probes.uv_install: uv pip before pip
 	install_pyg: bool = False  # probes.extra_hosts: PyG's wheel index (the sandbox reaches data.pyg.org)
+	# probes.repo_install_exec: a setup.py that builds its list in code is run, in the sandbox, to read it
+	install_exec: bool = False
 	install_sdists: tuple[
 		str, ...
 	] = ()  # a check-in by command's source-only dependencies (sources.COMMANDS)
@@ -987,6 +989,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"extra_packages": list(spec.extra_packages),
 				"install_uv": spec.install_uv,
 				"install_pyg": spec.install_pyg,
+				"install_exec": spec.install_exec,
 				"install_sdists": list(spec.install_sdists),
 				"eval_units": spec.eval_units,
 				"deps": str(box / "deps"),
