@@ -174,5 +174,5 @@ that did. Both are on in the live site.
 ## What's next
 
 A cross-vendor step-time model that holds on the MI300X (its corpus slice, measured Nov 2, shows the roofline
-reading 0.63x); more full runs behind the validation table, whose rows still rest on a few runs
-each; and harnessing more unseen scripts on their first try (0 of 9 so far).
+reading 0.63x); and more full runs behind the validation table, whose rows still rest on a few
+runs each.
