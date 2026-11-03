@@ -85,6 +85,9 @@ SAFE_ENV = (
 	"HF_HOME",
 	"PREFLIGHT_PIP_CACHE",
 	"PREFLIGHT_DEPS_DIR",
+	# probes.extra_hosts: PyG's public wheel index (a URL, no secret). Without it a probe never saw the index, so
+	# torch-sparse didn't install and OGB's probe stopped where its full run finished (a-all4-8, Nov 3)
+	"PREFLIGHT_PYG_INDEX",
 	"HF_HUB_OFFLINE",
 	"HF_DATASETS_OFFLINE",
 	"TRANSFORMERS_OFFLINE",

@@ -379,6 +379,14 @@ def _command_sdists(fetched: Fetched) -> tuple[str, ...]:
 	from .sources import COMMANDS
 
 	src = fetched.source
+	if (
+		_flag("probes.repo_install_exec")
+		and "lm_eval/__init__.py" in fetched.files
+		and fetched.entrypoint.startswith("lm_eval/")
+	):
+		# lm-evaluation-harness checked in as its repo (unseen 5): the same source-only dependencies its command
+		# path builds (sqlitedict has no wheel), behind the flag that already runs a repo's build code
+		return tuple(COMMANDS["lm_eval"].get("sdists", ()))
 	if src is None or src.kind != "command" or not src.args:
 		return ()
 	return tuple((COMMANDS.get(src.args[0]) or {}).get("sdists", ()))

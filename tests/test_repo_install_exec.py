@@ -165,3 +165,22 @@ def test_torch27_s_pins_key_its_cache_and_the_default_key_doesn_t_move():
 	new = ProbeSpec(probe_id="p", files={"train.py": "x"}, entrypoint="train.py", image="torch27")
 	assert P._image_pins("probe") == "" and P._image_pins("torch27").startswith("@")
 	assert P.cache_key(base, "L4", "img") != P.cache_key(new, "L4", "img")
+
+
+def test_the_probe_sees_pyg_s_index_a_public_url():
+	from preflight.probes.local import SAFE_ENV
+
+	assert "PREFLIGHT_PYG_INDEX" in SAFE_ENV
+
+
+def test_lm_eval_s_own_repo_builds_the_same_source_only_packages_as_its_command(monkeypatch):
+	import preflight.runner.pipeline as P
+	from preflight.runner.sources import COMMANDS, Fetched
+
+	f = Fetched(
+		files={"lm_eval/__init__.py": "", "lm_eval/__main__.py": ""}, entrypoint="lm_eval/__main__.py"
+	)
+	monkeypatch.setattr(P, "_flag", lambda name: False)
+	assert P._command_sdists(f) == ()
+	monkeypatch.setattr(P, "_flag", lambda name: name == "probes.repo_install_exec")
+	assert P._command_sdists(f) == tuple(COMMANDS["lm_eval"]["sdists"])
