@@ -1,7 +1,7 @@
 # Knobs and inputs
 
 Every setting a visitor can change in Preflight, what each one moves, and what the engine
-doesn't model yet. Written from the code as of Nov 3 (ws-b aa9b3a48); every number carries a
+doesn't model yet. Written from the code as of Nov 3 (ws-b aac37763); every number carries a
 source tag: measured, derived, cited, simulated or guess.
 
 ## How to read this page
@@ -22,7 +22,8 @@ out of memory; for agent runs, the chance of a runaway task. Each readout is a p
 **interval**: a range the true value should fall inside 9 times in 10 (a 90% interval
 [cited: python/preflight/schema/prediction.py, `level` 0.9]). Each also carries a status word
 (Measured, Predicted, Extrapolated, Not measured here) that says how far it sits from what the
-probes actually ran. Read the status before the number.
+probes actually ran. Read the status before the number. Every technical term on this page has a one-line
+explanation under [Words used here](#words-used-here) at the end.
 
 ## What's on in production
 
@@ -35,7 +36,7 @@ Some engine models sit behind flags. Production uses `flags.json` overridden by
 | `engine.steptime_cross_gpu` | on | Time on a GPU the probes didn't run on, with the held-out cross-GPU band |
 | `engine.rl` | on | RL readouts: groups with no reward spread, rollout time, truncation |
 | `engine.carry_free_knobs` | on | Learning-rate-like knobs keep a Measured or Predicted status when moved |
-| `engine.serving` | off | Serving throughput, time to first token, KV capacity (the serving simulator) |
+| `engine.serving` | off | Serving throughput, time to first token, and how many sequences fit in memory (the serving simulator) |
 | `engine.divergence` | off | The divergence (training blows up) risk readout |
 | `engine.context_same_stack` | off | Keeping the probes' measured CUDA context on a GPU move within one vendor |
 | `engine.memory_reserved` | off | A reserved-pool margin on memory |
@@ -49,20 +50,24 @@ These hold across the page, so the entries below don't repeat them.
 - **Out-of-memory risk follows memory.** Any knob that moves memory moves the chance of running
   out of memory too. When an entry says risk is "not modelled", it means training-stability risk
   (loss blowing up), whose readout is off in production (`engine.divergence`).
-- **Off the probed values.** If you set a knob (other than batch size, sequence length and the
-  other size knobs, run length, the learning rate and the GPU) to a value no probe ran, memory and
-  time turn from Predicted to Extrapolated, with the reason "is off the probed values; the model
-  carries it there" [derived: engine/api.py `_off_probe`].
+- **Off the probed values.** If you set a knob to a value no probe ran, memory and time turn from
+  Predicted to Extrapolated, with the reason "is off the probed values; the model carries it
+  there". This doesn't apply to batch size, sequence length and the other size knobs, run
+  length, the GPU and the GPU count, the save and eval intervals, gradient accumulation (for
+  time), the fan-outs, or the free knobs below [derived: engine/api.py `_off_probe`].
 - **A knob the engine doesn't model for a readout.** Moved off the probed values, it makes
   memory abstain ("Not measured here", "changes memory in a way the engine doesn't model yet")
   and holds time at the probe's value with a band 1.5 times wider, labelled Extrapolated, with
   the reason "{knob} isn't modelled for time yet; held at its probed effect" [guess: engine/api.py
-  `UNMODELLED_WIDEN` 1.5]. Below, "time holds" means this. The step-time model reads only the work
-  per step (batch, sequence length, image size, fan-outs, accumulation), precision,
-  checkpointing, the GPU, the number of GPUs and nodes; every other knob's time effect holds.
+  `UNMODELLED_WIDEN` 1.5]. If that wider band would pass plus or minus 50%, time abstains
+  instead ("Not measured here"). Below, "time holds" means this. The step-time model reads only
+  the work per step (batch, sequence length, image size, fan-outs, accumulation, and for RL the
+  prompt and completion lengths), precision (and `tf32` inside a precision change),
+  checkpointing, the GPU, the number of GPUs, nodes and the bandwidth between them, and the
+  script's own distributed strategy; every other knob's time effect holds.
 - **Free knobs carry.** With `engine.carry_free_knobs` on (production), moving `lr`,
-  `lr_schedule`, `warmup_steps`, `weight_decay`, `grad_clip`, `lora_alpha`, `clip_low` or
-  `clip_high` leaves memory and time, and their status, as they were [derived: engine/api.py
+  `lr_schedule`, `warmup`, `warmup_steps`, `weight_decay`, `grad_clip`, `lora_alpha`, `clip_low`,
+  `clip_high` or `seed` leaves memory and time, and their status, as they were [derived: engine/api.py
   `FREE_KNOBS`]. `kl_beta`, `lora_dropout`, `temperature` and `loss_type` are kept out on
   purpose, so moving them marks memory and time Extrapolated even though the numbers don't change.
 - **Work units.** Memory and step time are fitted against one size axis per job type: batch x
@@ -83,7 +88,7 @@ site shows the id.
 **Batch size** · `batch_size`
 - What: how many examples go through the model in one step.
 - When: raise it to use the GPU better; lower it if memory is tight.
-- Moves: memory up (activations and logits grow with it). Time per step up. Steps per epoch down
+- Moves: memory up (activations and logits grow with it). Time per step up. Steps down
   (steps = examples x epochs / (batch x accumulation x GPUs)). Total time and cost go whichever
   way the product goes; the model computes it, it doesn't assume it falls.
 - Not modelled: training-stability risk.
@@ -92,13 +97,12 @@ site shows the id.
 - What: how many examples go through at once during evaluation.
 - When: lower it when the peak comes during eval (the map shows an "Eval spike").
 - Moves: memory, when the eval pass sets the peak: up with the eval batch.
-- Not modelled: time and cost. Eval time comes from the probes' measured eval pass, not from
-  this knob, so the number holds.
+- Not modelled: time and cost. Eval passes are timed at the probes' eval batch, so time holds.
 
 **Encode batch** · `encode_batch_size`
 - What: how many passages a retrieval job encodes at once.
 - When: same as batch size, for the corpus-encoding phase.
-- Moves: memory and time per step up with it (it is the batch on the work axis); cost follows time.
+- Moves: memory and time per step up with it (it is the batch on the work axis when the script has no batch-size knob); cost follows time.
 - Not modelled: nothing beyond the general rules.
 
 **Sequence length** · `seq_len`
@@ -121,7 +125,7 @@ site shows the id.
 - What: adding up gradients over several small batches before one update, so it acts like a
   bigger batch (effective batch = batch x accumulation x GPUs).
 - When: to keep the effective batch while lowering batch size for memory.
-- Moves: on its own, memory slightly up (above 1, the summed gradients stay in memory through
+- Moves: on its own, memory up, by as much as one copy of the trainable gradients (above 1, the summed gradients stay in memory through
   later forward passes). Time per update up; updates per epoch down by the same factor. Cost
   follows time. The memory saving comes from lowering batch size alongside it.
 - Not modelled: training-stability risk.
@@ -156,7 +160,7 @@ site shows the id.
 - What: how many steps between log lines.
 - When: rarely; it matters only if logging is slow.
 - Moves: time, in principle.
-- Not modelled: time. Logging cost is folded into the measured step time.
+- Not modelled: time holds. Logging cost is folded into the measured step time.
 
 **Warm-up steps** · `warmup_steps`
 - What: steps at the start where the learning rate ramps up from low.
@@ -197,7 +201,7 @@ No label · `pin_memory`
 - What: page-locked host memory for faster copies to the GPU.
 - When: rarely; usually already on.
 - Moves: time, in principle.
-- Not modelled: folded into the measured data phase.
+- Not modelled: time holds; copy speed is folded into the measured data phase.
 
 ### Model shape
 
@@ -271,8 +275,8 @@ No label · `pin_memory`
   set, weights stay fp32 (mixed precision); a model loaded in bf16 trains pure bf16 with bf16
   optimizer state, which saves the most. fp8 keeps bf16 weights and an fp32 master copy, so it
   doesn't save weight memory here. Time: scaled by the GPU's peak for the two formats (70% of the
-  step) and by bytes (the rest) [derived: engine/api.py `_dtype_ratio`; the 0.7 share is
-  unlabelled in code], Extrapolated whenever it differs from what the probes ran. A format with no
+  step) and by bytes (the rest) [guess: engine/api.py `_dtype_ratio` `compute_share`, untagged in
+  code], Extrapolated whenever it differs from what the probes ran. A format with no
   fast path on the GPU (bf16 on a T4) abstains.
 - Not modelled: training-stability risk (fp16 blow-ups).
 
@@ -299,13 +303,14 @@ No label · `pin_memory`
   drops the attention-score terms). Time up: one extra forward pass inside backward, added only
   when the probes ran with it off.
 - Not modelled: turning it off when the probes ran with it on doesn't take the recompute out
-  (time holds, Extrapolated). On a record with only a parameter count, memory abstains.
+  (the number keeps the recompute, labelled Extrapolated, "is off the probed values"; the band
+  isn't widened). On a record with only a parameter count, memory abstains.
 
 **Eval without gradients** · `eval_no_grad`
 - What: running evaluation under no_grad, so no activations are kept for a backward pass.
 - When: it's off and the eval pass sets the peak.
 - Moves: memory: on, the eval pass holds one layer's activations; off, all of them.
-- Not modelled: time (it holds).
+- Not modelled: time (it holds). On a record with only a parameter count, memory abstains.
 
 **Attention kernel** · `attn`
 - What: how attention is computed (eager, SDPA, FlashAttention, ...).
@@ -359,14 +364,14 @@ All four are free knobs except where noted: moving them leaves memory and time a
 ### Hardware
 
 **GPU** · `gpu_type`
-- What: the GPU model the run uses. The dial lists the GPUs Preflight can run (see The GPU
-  options), or only your allowed GPUs if you set any.
+- What: the GPU model the run uses. The dial lists the 11 GPUs Modal offers (not the
+  MI300X), or only your allowed GPUs if you set any.
 - When: to compare cost and time across cards, or to fit a bigger job.
 - Moves: memory: the usable memory per card changes, so the out-of-memory chance changes; the peak
   itself barely does, except that a move replaces the probes' measured CUDA context with a 0.75
   GiB guess [guess: engine/memory.py `DEFAULT_CONTEXT_BYTES`, "typically 0.5-1 GB"], because
   `engine.context_same_stack` is off. Time: carried to the new card by the cross-GPU roofline
-  model, Extrapolated, with a held-out band usually wider than plus or minus 50% and the reason
+  model, Extrapolated, with a held-out band wider than plus or minus 50% on every card in today's table and the reason
   "rough, no probe on this GPU; run a probe here". Across vendors (NVIDIA to AMD) time abstains.
   Cost: time x the card's hourly rate; a card with no price abstains.
 - Not modelled: across vendors, time and cost. See The GPU options for the numbers.
@@ -374,8 +379,8 @@ All four are free knobs except where noted: moving them leaves memory and time a
 **GPUs** · `gpus`
 - What: how many GPUs the run uses in data parallel.
 - When: to finish sooner, or to shard a model that doesn't fit one card.
-- Moves: memory per card: down under FSDP or ZeRO sharding; up slightly under plain DDP (its
-  gradient bucket copy); unchanged when the script sets no distributed strategy. Time per step up by the estimated gradient all-reduce; steps down (the
+- Moves: memory per card: down under FSDP or ZeRO sharding; up under plain DDP, by one copy of the
+  trainable gradients (its bucket copy); unchanged when the script sets no distributed strategy. Time per step up by the estimated gradient all-reduce; steps down (the
   effective batch grows). Cost: time x GPUs x rate. Always Extrapolated: "the gradient
   all-reduce is estimated, not measured".
 - Not modelled: measured multi-GPU communication. Probes run on one GPU; if a record's probes ran
@@ -423,8 +428,8 @@ is on in production.
   sequence being generated). Rollout time up (a batch waits for its longest response, and more
   responses make a longer longest one). Risk: the share of groups that teach nothing, p^G +
   (1 - p)^G for a prompt with pass rate p, falls as the group grows.
-- Not modelled: the zero-spread readout abstains below 8 prompts [measured: engine/rl.py
-  `MIN_PROMPTS`, checked once on Nov 1].
+- Not modelled: the zero-spread readout abstains below 8 prompts [guess: engine/rl.py
+  `MIN_PROMPTS`, checked against one pair of real runs, Nov 1].
 
 **Max completion length** · `max_completion_len`
 - What: the cap on each generated response, in tokens.
@@ -443,8 +448,8 @@ No label · `rl_iterations`
 - What: how many RL iterations the run makes.
 - When: planning run length.
 - Moves: time and cost, in principle.
-- Not modelled: time and cost: Preflight doesn't read it yet; run length comes from `max_steps`
-  or epochs. Quality.
+- Not modelled: time and cost: Preflight doesn't read it yet (time holds); run length comes from
+  `max_steps` or epochs. Quality.
 
 **vLLM rollouts** · `use_vllm`
 - What: generating rollouts with vLLM instead of Hugging Face generate.
@@ -485,8 +490,8 @@ only the simulator reads don't move any number; they only change the status.
 **Max new tokens** · `max_new_tokens`
 - What: the cap on tokens generated per request.
 - When: outputs are cut, or generation takes too long.
-- Moves: memory up (KV cache); the sequence on the work axis becomes prompt plus new tokens when
-  no sequence length is set.
+- Moves: memory up (KV cache): with no sequence length set, the memory model sizes each sequence
+  at prompt plus new tokens. It isn't on the work axis, so time holds.
 - Not modelled: the risk and time effects through serving need `engine.serving` (off).
 
 **Max model length** · `max_model_len`
@@ -500,13 +505,13 @@ only the simulator reads don't move any number; they only change the status.
 - When: tuning serving throughput.
 - Moves: memory and time, through the serving simulator only.
 - Not modelled: in production (simulator off), no number moves; moved off the probed value,
-  memory and time are labelled Extrapolated.
+  memory is labelled Extrapolated and time holds.
 
 No label · `request_rate`
 - What: requests per second arriving at an online server (Poisson arrivals).
 - When: planning online serving.
 - Moves: time and cost, through the serving simulator only.
-- Not modelled: in production, as for sequences in flight.
+- Not modelled: in production, time holds, as for sequences in flight.
 
 No label · `max_batched_tokens`
 - What: the tokens a server processes in one scheduler step.
@@ -540,13 +545,13 @@ No label · `max_batched_tokens`
 - What: how many links each vector keeps in an HNSW index.
 - When: trading recall for index memory and speed.
 - Moves: memory and time, in principle.
-- Not modelled: memory and time: Preflight doesn't read this knob yet. Quality.
+- Not modelled: memory and time: Preflight doesn't read this knob yet (time holds). Quality.
 
 **IVF lists** · `index_nlist`
 - What: how many clusters an IVF index splits vectors into.
 - When: trading recall for search speed.
 - Moves: time, in principle.
-- Not modelled: time: Preflight doesn't read this knob yet. Quality.
+- Not modelled: time holds: Preflight doesn't read this knob yet. Quality.
 
 ### Agents
 
@@ -615,17 +620,19 @@ interval, widened for runaway tasks the sample may have missed.
 - What: how FSDP shards the model: full_shard, shard_grad_op, hybrid_shard, no_shard.
 - When: with more than one GPU, to fit a bigger model.
 - Moves: memory per card down with more sharding (full_shard splits weights, gradients and
-  optimizer state; shard_grad_op splits gradients and state; no_shard is DDP). Time: FSDP's
-  all-reduce traffic counts 1.5 times DDP's [derived: engine/steptime.py]. Only applies with GPUs
-  above 1.
-- Not modelled: as for GPUs (communication is analytical).
+  optimizer state; shard_grad_op splits gradients and state; no_shard is DDP). Only applies with
+  GPUs above 1.
+- Not modelled: time holds. The all-reduce term uses the script's own distributed setting (FSDP
+  or ZeRO-3 traffic counts 1.5 times DDP's [derived: engine/steptime.py]; no setting counts as
+  DDP), not this knob. Communication is analytical, as for GPUs.
 
 No label · `deepspeed_config`
 - What: a DeepSpeed config; the ZeRO stage (0 to 3) is read from it.
 - When: with more than one GPU.
 - Moves: memory per card down with higher stages, as for FSDP. A config with no stage counts as
   ZeRO-2.
-- Not modelled: offload. Optimizer or parameter offload in the config doesn't lower memory here.
+- Not modelled: offload (optimizer or parameter offload in the config doesn't lower memory
+  here); time holds, as for FSDP mode.
 
 No label · `tf32`
 - What: letting fp32 matrix multiplies run on TF32 tensor cores.
@@ -649,7 +656,8 @@ No label · `dump_attentions`
 - Moves: storage, time and memory, in principle up.
 - Not modelled: all three. Memory abstains when it moves off the probed value.
 
-Any knob id not on this list shows "Preflight doesn't model this knob yet."
+Any knob id not on this list moves no number. Moved off the probed value, it marks memory and
+time Extrapolated ("is off the probed values; the model carries it there").
 
 ## Other inputs you set
 
@@ -698,8 +706,8 @@ The public site probes on GPUs no bigger and no dearer than an L40S [derived: ru
 |---|---|---|---|---|
 | T4 | 16 GB | 14.74 GiB [cited: torch total_memory as published, gpus.py `usable_gib`] | $0.59 [cited: Modal list rate, July 2026] | datasheet |
 | L4 | 24 GB | 22.06 GiB [measured: torch total_memory on Modal, Oct 27 smoke run, gpus.py] | $0.80 [cited: Modal list rate, July 2026] | derived |
-| A10 | 24 GB | 22.08 GiB [cited: 92% for ECC GDDR, gpus.py] | $1.10 [cited: Modal list rate, July 2026] | datasheet |
-| L40S | 48 GB | 44.16 GiB [cited: 92% for ECC GDDR, gpus.py] | $1.95 [cited: Modal list rate, July 2026] | datasheet |
+| A10 | 24 GB | 22.08 GiB [derived: 92% of card memory, the ratio cited from the T4 and L4 rows, gpus.py] | $1.10 [cited: Modal list rate, July 2026] | datasheet |
+| L40S | 48 GB | 44.16 GiB [derived: 92% of card memory, the ratio cited from the T4 and L4 rows, gpus.py] | $1.95 [cited: Modal list rate, July 2026] | datasheet |
 
 - **"L4 or A10"** (the default) starts on an L4. If none is free within 2 minutes it tries an A10,
   then an L40S [derived: runner/sandbox_runner.py `SCHEDULE_WAIT_S` 120, runner/pipeline.py
@@ -721,7 +729,7 @@ run on GPUs up to L40S; {GPU} numbers come from the cross-GPU model".
 |---|---|---|---|---|
 | A100-SXM-40GB | 40 GB | 39.39 GiB [cited: torch total_memory as published, gpus.py] | $2.10 [cited: modal.com/pricing, Nov 1] | datasheet |
 | A100-SXM-80GB | 80 GB | 79.15 GiB [cited: torch total_memory as published, gpus.py] | $2.50 [cited: Modal list rate, July 2026] | datasheet |
-| RTX-PRO-6000-96GB | 96 GB | 88.32 GiB [cited: 92% for ECC GDDR, gpus.py] | $3.03 [cited: Modal list rate, July 2026] | secondary |
+| RTX-PRO-6000-96GB | 96 GB | 88.32 GiB [derived: 92% of card memory, the ratio cited from the T4 and L4 rows, gpus.py] | $3.03 [cited: Modal list rate, July 2026] | secondary |
 | H100-SXM-80GB | 80 GB | 79.18 GiB [cited: torch total_memory as published, gpus.py] | $3.95 [cited: Modal list rate, July 2026] | derived |
 | H200-SXM-141GB | 141 GB | 139.59 GiB [cited: 99% of HBM, gpus.py] | $4.54 [cited: Modal list rate, July 2026] | derived |
 | B200-SXM-180GB | 180 GB | 178.2 GiB [cited: 99% of HBM, gpus.py] | $6.25 [cited: Modal list rate, July 2026] | datasheet |
@@ -737,7 +745,7 @@ How far to trust a move to one of these:
   6,694 NVIDIA pairs within 20% (57%) [simulated: docs/validation/table-final-nov3.md], and full
   runs on another GPU 1 of 3 [measured: same table].
 - **MI300X**: cross-vendor step time is within 20% on only 22% of pairs (254 of 1,147, Wilson
-  95% 20% to 25%) [measured: MI300X corpus slice, 295 configs, Nov 2; engine/api.py `AMD_CROSS`].
+  95% 20% to 25%) [simulated: MI300X corpus slice, 295 configs, Nov 2; docs/validation/table-final-nov3.md].
   NVIDIA torch 2.8.0 to MI300X torch 2.5.1+rocm6.2: card and software both differ. So a move
   across vendors abstains: time and cost show "Not measured here". Memory and the
   out-of-memory chance are still computed against the MI300X's memory.
@@ -746,8 +754,9 @@ How far to trust a move to one of these:
 
 - **Spec row** (`confidence` in gpus.py): **datasheet** is the vendor's figure; **derived** is
   worked out from a vendor figure (half a with-sparsity peak, or cores times the per-core rate);
-  **secondary** comes from a spec database. Time moved onto or off a secondary card gets a band
-  1.5 times wider [guess: engine/steptime.py `SIGMA_SECONDARY_SPECS`].
+  **secondary** comes from a spec database. The simulated cross-GPU band is 1.5 times wider for a
+  secondary card [guess: engine/steptime.py `SIGMA_SECONDARY_SPECS`]; in production the held-out
+  cross-GPU band, never narrower, sets the width.
 - **Usable memory** is what PyTorch reports, which is less than the box says. Rows with a
   `torch.cuda` figure carry it (the L4's measured on Modal, the others as published). The others are estimated: 99% of the
   memory for HBM cards [cited: published torch total_memory for the A100 and H100 rows], 92% for
@@ -812,7 +821,7 @@ Muse Spark's map $0.0178 [derived: reported tokens at list prices]. Those totals
 sandbox's CPU and memory.
 
 **Per-job caps.** A job may spend up to $0.60 of GPU [guess: runner/pipeline.py `JOB_BUDGET_USD`]
-and 15 minutes of probing [derived: runner/pipeline.py `JOB_PROBE_WALL_S`]; one probe point is
+and 15 minutes of probing [guess: runner/pipeline.py `JOB_PROBE_WALL_S`]; one probe point is
 stopped at 6 minutes [guess: runner/pipeline.py `PROBE_TIMEOUT_S`]. Past a cap, probing stops and
 what was measured stays. Muse Spark Open's check of model-written findings stops at $0.10 a job and
 falls back to code only [guess: harness/claim_check.py `JOB_CAP_USD`].
@@ -822,7 +831,7 @@ falls back to code only [guess: harness/claim_check.py `JOB_CAP_USD`].
 | Limit | Value | Source |
 |---|---|---|
 | Probe jobs (a check-in, or a probe or check from the cockpit) | 3 a day | [derived: runner/queue.py `VISITOR_DAILY_JOBS`] |
-| Jobs queued or running at once | 3 | [derived: runner/queue.py `MAX_QUEUED_PER_VISITOR`] |
+| Jobs queued or running at once | 3 | [simulated: runner/queue.py `MAX_QUEUED_PER_VISITOR`, a load test on a simulated clock] |
 | Free resend after a check-in stopped at an import (nothing measured) | 1 a day; doesn't count against the 3 jobs, but the site's GPU cap still holds | [derived: runner/queue.py `FREE_RESENDS_PER_DAY`; `runner.free_resend` on in production] |
 | Guide rounds | 64 a day per visitor, 256 per network address | [derived: api/preflight_api/ledger.py, from tours measured Oct 27 / guess for the address limit] |
 | Guide spend | $0.40 a tour | [derived: api/preflight_api/ledger.py] |
@@ -834,11 +843,11 @@ site opens samples and shared records only, until midnight ET ("You've run today
 "Preflight has used today's GPU budget").
 
 **Waiting for a GPU.** The boarding screen shows "Waiting for a GPU" and, after a minute, how long
-so far. The default request moves from an L4 to an A10, then an L40S, after 2 minutes on each
+so far. The default request moves from an L4 to an A10 after 2 minutes, and to an L40S after 2 more; the L40S is waited for up to the cap
 [derived: runner/sandbox_runner.py `SCHEDULE_WAIT_S`]; the whole wait is capped at 20 minutes,
 after which the probe fails as "no GPU could be scheduled" [derived: runner/sandbox_runner.py
 `WAIT_CAP_S`]. L4 waits of 14 to 26 minutes were seen Oct 31 to Nov 1, before the fallback
-[cited: runner/sandbox_runner.py comment]. A busy queue refuses a check-in with "Try again in
+[measured: observed waits, runner/sandbox_runner.py comment]. A busy queue refuses a check-in with "Try again in
 {s} seconds".
 
 **Private triage.** Muse Glimmer naps when nobody is using it. Waking it took 5 to 8 minutes on
@@ -847,17 +856,38 @@ Nov 1; after that a triage takes seconds [measured: en.json `newflight.private.w
 ## Words used here
 
 - **Abstain**: show no number because nothing measured is close enough ("Not measured here").
+- **Activations**: the intermediate values a forward pass keeps so the backward pass can compute gradients.
 - **All-reduce**: the step where GPUs in data parallel add up their gradients over the link
   between them.
 - **Band, interval**: the range a readout should fall inside 9 times in 10.
+- **Baseten**: the hosting service that runs Muse Spark Open for Preflight's failure triage.
+- **Bootstrap interval**: a range found by resampling the sampled tasks many times and seeing how the total varies.
+- **Corpus**: Preflight's collection of measured runs (records of real jobs) that the models are fitted and checked on.
 - **Cross-GPU model**: the roofline model that carries a step measured on one GPU to another, by
   each kernel's compute and memory-bandwidth limits.
 - **CUDA context**: memory the GPU driver and libraries take before your model loads.
+- **DDP, data parallel**: every GPU holds a full copy of the model and works on its own slice of each batch.
 - **Effective batch**: batch size x gradient accumulation x GPUs; what one update sees.
 - **Free knob**: a knob that changes what the run learns but not one step's memory or time.
+- **GRPO**: an RL method that samples a group of answers per prompt and learns from how they score against each other.
+- **HBM, GDDR, ECC**: kinds of GPU memory (HBM on data-centre cards, GDDR on others); ECC is error correction, which reserves a little of it.
+- **Held-out**: checked on runs the model wasn't fitted on, so the check is fair.
 - **KV cache**: the stored attention keys and values for each sequence being generated.
+- **lm_eval**: EleutherAI's lm-evaluation-harness, a common tool for scoring language models on benchmarks.
+- **Log half-width**: a band's half-width on a log scale; 0.44 means a factor of e^0.44, about 1.55, either way.
+- **Logits**: the model's raw score for every word in its vocabulary at each position; large for big vocabularies.
+- **Megatron**: NVIDIA's library for splitting a model's layers across GPUs (tensor parallel).
+- **Micro-batch, 1F1B**: in pipeline parallel, a batch is cut into micro-batches that flow through the stages; 1F1B is the usual schedule (one forward, one backward in turn).
+- **Optimizer state**: what the optimizer keeps per weight between updates (AdamW keeps two running averages).
+- **PEFT, QLoRA**: Hugging Face's library for LoRA-style training; QLoRA is LoRA on a model whose frozen weights are stored in 4 bits.
+- **Poisson arrivals**: requests arriving at random, independent moments at a set average rate.
 - **Probe**: a short, real run of your script on a rented GPU, a few profiled steps at one setting.
+- **PyPI, wheel**: Python's public package index; a wheel is a ready-built package, installed without compiling.
 - **Readout**: one of memory, time, cost and risk.
+- **Reserved pool**: memory PyTorch's allocator holds on to after use, so the GPU shows more in use than the model needs.
+- **TRL**: Hugging Face's library for RL and preference training of language models.
+- **vLLM**: a fast inference server for language models; also used to generate RL rollouts.
+- **Wilson interval**: a 95% range for a success rate, valid for small counts.
 - **Work axis (work units)**: the one size measure memory and step time are fitted against,
   such as batch x sequence length.
 - **ZeRO, FSDP**: ways to split weights, gradients and optimizer state across GPUs so each card
