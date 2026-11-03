@@ -268,3 +268,60 @@ def test_packages_lists_what_the_probes_install_by_import_name():
 	assert body["known"]["torchvision"] == "torchvision"
 	assert body["known"]["torch_geometric"] == "torch-geometric"
 	assert "torch_sparse" in body["no_wheels"]
+
+
+# ---- check in by command (contract 0.6.3, runner.command_checkin; A's ask, Nov 2)
+
+CMD = ["lm_eval", "--model", "hf", "--model_args", "pretrained=gpt2", "--tasks", "gsm8k", "--limit", "16"]
+
+
+def _command_on(monkeypatch, on: bool):
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"runner.queue": True, "runner.command_checkin": on}))
+	flags.reload()
+
+
+def test_a_command_is_refused_while_the_flag_is_off(monkeypatch):
+	_command_on(monkeypatch, False)
+	store = Store()
+	r = client(store).post("/v1/jobs", json={**BODY, "source": {"kind": "command", "args": CMD}}, headers=KEY)
+	assert r.status_code == 422 and "isn't open" in r.json()["error"]["message"]
+	assert not store.jobs
+
+
+def test_a_command_on_the_list_is_queued_as_its_words(monkeypatch):
+	_command_on(monkeypatch, True)
+	store = Store()
+	r = client(store).post("/v1/jobs", json={**BODY, "source": {"kind": "command", "args": CMD}}, headers=KEY)
+	assert r.status_code == 202, r.text
+	((job,),) = [list(store.jobs.values())]
+	assert job["request"]["source"]["kind"] == "command"
+	assert job["request"]["source"]["args"] == CMD
+
+
+def test_a_command_off_the_list_or_empty_is_refused_before_the_queue(monkeypatch):
+	_command_on(monkeypatch, True)
+	store = Store()
+	c = client(store)
+	other = c.post(
+		"/v1/jobs", json={**BODY, "source": {"kind": "command", "args": ["rm", "-rf", "/"]}}, headers=KEY
+	)
+	assert other.status_code == 422 and "lm_eval" in other.json()["error"]["message"]
+	empty = c.post(
+		"/v1/jobs",
+		json={**BODY, "source": {"kind": "command", "args": []}},
+		headers={"Idempotency-Key": "k" * 12},
+	)
+	assert empty.status_code == 422
+	long = c.post(
+		"/v1/jobs",
+		json={**BODY, "source": {"kind": "command", "args": ["lm_eval", *["--x"] * 64]}},
+		headers={"Idempotency-Key": "k" * 13},
+	)
+	assert long.status_code == 422
+	nul = c.post(
+		"/v1/jobs",
+		json={**BODY, "source": {"kind": "command", "args": ["lm_eval", "--tasks", "a\u0000b"]}},
+		headers={"Idempotency-Key": "k" * 14},
+	)
+	assert nul.status_code == 422
+	assert not store.jobs

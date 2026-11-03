@@ -61,6 +61,49 @@ def _seconds(value: float | None, default: int = 60) -> int:
 	return max(1, min(3600, math.ceil(value)))
 
 
+# A check-in by command (contract 0.6.3, runner.command_checkin, A's ask Nov 2): the whole command line as
+# the source's args, e.g. ["lm_eval", "--model", "hf", ...]. The runner reads it (runner/sources.py
+# `_command`, then `_args`) and refuses what this lets through, after it has used one of the visitor's
+# daily jobs; so this checks the same limits first, read from the runner where it can be.
+
+
+def _command_rules() -> tuple[tuple[str, ...], int, int, int]:
+	"""The command names, and the runner's limits: words, characters a word, characters in all."""
+	try:
+		from preflight.runner.sources import COMMANDS, MAX_ARG_LEN, MAX_ARGS, MAX_COMMAND_CHARS
+	except Exception:
+		# source: A's runner/sources.py as of Nov 2, if the runner's module can't be read here
+		return ("lm_eval",), 64, 4096, 8192
+	return tuple(sorted(COMMANDS)), MAX_ARGS, MAX_ARG_LEN, MAX_COMMAND_CHARS
+
+
+def _check_command(source) -> None:
+	if not flag("runner.command_checkin"):
+		raise ApiError(
+			422,
+			"invalid_request",
+			"Checking in by command isn't open here yet; check in the repository or a script.",
+		)
+	known, max_words, max_word, max_chars = _command_rules()
+	words = list(source.args or [])
+	if not words or not words[0].strip():
+		raise ApiError(
+			422, "invalid_request", "Name the command to run, as its words: lm_eval --model hf ..."
+		)
+	if (
+		len(words) > max_words
+		or sum(len(w) for w in words) > max_chars
+		or any(len(w) > max_word or "\0" in w for w in words)
+	):
+		raise ApiError(
+			422,
+			"invalid_request",
+			f"A command here is up to {max_words} words, {max_word:,} characters a word and {max_chars:,} in all.",
+		)
+	if words[0] not in known:
+		raise ApiError(422, "invalid_request", f"Preflight runs these commands by name: {', '.join(known)}.")
+
+
 def _store(request: Request):
 	store = request.app.state.jobstore
 	if store is None or not flag("runner.queue"):
@@ -147,6 +190,10 @@ async def create_job(request: Request) -> dict:
 				422, "invalid_request", "A probe on a record needs mode probe, the setting and a share token."
 			)
 		body = body.model_copy(update={"purpose": PROBE_HERE_PURPOSE})
+	elif source.kind == "command":
+		_check_command(source)
+		if body.mode != "plan":
+			raise ApiError(422, "invalid_request", "Only a record's probe can name a mode here.")
 	elif source.kind not in SOURCE_KINDS:
 		raise ApiError(422, "invalid_request", f"Jobs can't come from {source.kind!r} here.")
 	elif body.mode != "plan":

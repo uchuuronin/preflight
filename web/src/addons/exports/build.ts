@@ -166,8 +166,9 @@ export function configText(input: ExportInput): string {
 	const out = {
 		preflight: "plan",
 		...(plan.shareUrl ? { link: plan.shareUrl } : {}),
-		...(input.illustrative ? { note: "Sample record: the numbers are illustrative, not measured." } : {}),
-		job: { title: plan.title, lens: plan.lens, entrypoint: plan.source.entrypoint ?? null, command: commandText(input) },
+		...(input.illustrative ? { note: "Sample record: the numbers are examples, not measured." } : {}),
+		// a command record's entry point is the runner's wrapper (preflight_command.py), not a file of the visitor's
+		job: { title: plan.title, lens: plan.lens, entrypoint: plan.source.kind === "command" ? null : (plan.source.entrypoint ?? null), command: commandText(input) },
 		gpu: { type: g.name, count: g.count },
 		settings: plan.config,
 		changed,
@@ -198,6 +199,12 @@ const ARGS_LEFT_OUT = "# The record's script arguments hold control characters, 
 /** The command line that runs the job, from the plan. */
 export function commandText(input: Pick<ExportInput, "plan">): string {
 	const { plan } = input;
+	// A check-in by command (0.6.3, runner.command_checkin): the command is the source's own words
+	// ("lm_eval --model hf ..."), not the runner's wrapper script (A, Nov 2).
+	if (plan.source.kind === "command") {
+		const words = quotedArgs(plan);
+		return words?.length ? words.join(" ") : ARGS_LEFT_OUT;
+	}
 	const entry = plan.source.entrypoint ?? "train.py";
 	const launch = oneLine(plan.launch ?? "").trim();
 	// A's reader writes "python <entrypoint>" unquoted; quote the path so spaces survive.
@@ -294,12 +301,13 @@ export function isApi(input: Pick<ExportInput, "plan" | "record">): boolean {
 
 /**
  * Whether the CLI can measure this job again on the visitor's machine: not an API run (the CLI
- * measures nothing for those), and not a sample or a notebook (no project folder of theirs holds
- * the script the record ran).
+ * measures nothing for those), and not a sample, a notebook or a command (no project folder of
+ * theirs holds the script the record ran).
  */
 export function canRecheck(input: Pick<ExportInput, "plan" | "record">): boolean {
 	const kind = input.plan.source.kind;
-	return !isApi(input) && kind !== "sample" && kind !== "notebook";
+	// A command has no script of the visitor's for `preflight run` to measure (A, Nov 2).
+	return !isApi(input) && kind !== "sample" && kind !== "notebook" && kind !== "command";
 }
 
 /**

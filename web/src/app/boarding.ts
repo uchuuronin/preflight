@@ -10,7 +10,12 @@ import { errorCopy, eventText, type ErrorCopy } from "../lib/errors";
 import type { JobEvent } from "../workspace/record/types";
 
 /** JobEvent plus A's additive fields (contract "Unreleased": share_token, error_code). */
-export type BoardingEvent = JobEvent & { share_token?: string | null; error_code?: string | null };
+export type BoardingEvent = JobEvent & {
+	share_token?: string | null;
+	error_code?: string | null;
+	/** Contract 0.6.5 (A, behind runner.free_resend): the queued event of a resend that didn't count against the day's check-ins. */
+	free_resend?: boolean | null;
+};
 
 /**
  * The route's five legs, in order, and the job stages each covers (A's JobEvent.stage). `calls`
@@ -66,6 +71,8 @@ export interface BoardingState {
 	at: number;
 	/** What the runner last said about the leg it's on (A, Nov 2: "waiting for a free L4 GPU (3 min so far)"), while it's on it. */
 	note: string | null;
+	/** The job is a free resend: the one before it stopped at an import, before measuring anything (A's 0.6.5). */
+	free: boolean;
 }
 
 /**
@@ -105,5 +112,6 @@ export function boardingState(events: readonly BoardingEvent[]): BoardingState {
 	if (failed && at < 0) at = 0;
 	// The runner's own words on the leg it's on (a GPU wait, say); gone once a later event moves on.
 	const note = last && !TERMINAL.has(last.stage) && last.message ? (eventText(last.message)?.text ?? null) : null;
-	return { last, done, failed, cancelled, open, error, at, note };
+	const free = events.some((e) => e.stage === "queued" && e.free_resend === true);
+	return { last, done, failed, cancelled, open, error, at, note, free };
 }

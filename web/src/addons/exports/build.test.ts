@@ -351,8 +351,8 @@ describe("config", () => {
 		for (const [id, p] of Object.entries(plan.predicted as Record<string, { point: number }>)) expect(p.point).toBe(est[id]?.point);
 	});
 
-	it("marks a sample's numbers as illustrative", () => {
-		expect(JSON.parse(configText(input(gold, {}, { illustrative: true }))).note).toMatch(/illustrative/);
+	it("marks a sample's numbers as examples", () => {
+		expect(JSON.parse(configText(input(gold, {}, { illustrative: true }))).note).toMatch(/examples, not measured/);
 	});
 
 	it("says not verified when a code change has no passed patch, in the plan, the edits and the batch file", () => {
@@ -423,5 +423,13 @@ describe("helpers", () => {
 	it("builds the command from the record, quoting arguments", () => {
 		const withArgs = { ...gold, job: { ...gold.job, source: { ...gold.job.source, args: ["--name", "my run"] } } };
 		expect(commandText(input(withArgs))).toBe("python train.py --name 'my run'");
+	});
+
+	it("gives a check-in by command its own words, and no re-check (0.6.3, A, Nov 2)", () => {
+		const words = ["lm_eval", "--model", "hf", "--model_args", "pretrained=gpt2", "--tasks", "gsm8k"];
+		const cmd = { ...gold, job: { ...gold.job, source: { kind: "command", uri: "command://lm_eval", args: words, entrypoint: "preflight_command.py" } } } as unknown as LoadedRecord;
+		expect(commandText(input(cmd))).toBe("lm_eval --model hf --model_args pretrained=gpt2 --tasks gsm8k");
+		expect(recheckText(input(cmd))).toBeNull();
+		expect(JSON.parse(configText(input(cmd))).job.entrypoint).toBeNull();
 	});
 });

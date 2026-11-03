@@ -13,6 +13,7 @@ import { isFixture } from "../record/model";
 import type { KnobValue } from "../record/types";
 import { useWorkspace } from "../state";
 import type { Fit } from "../status";
+import { isRangeTest } from "./lrRange";
 
 const PROBE_FIT: Record<string, Fit> = {
 	ok: "fits",
@@ -46,9 +47,10 @@ export function Measured() {
 	if (!record.probes.length) return null;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 	const total = record.probes.reduce((a, p) => a + (p.cost?.usd ?? 0), 0);
-	const failed = record.probes.filter((p) => PROBE_FIT[p.status] === "fails").length;
+	// The range test ran at rates the script never uses: not one of the run's measurements (D, Nov 2).
+	const failed = record.probes.filter((p) => !isRangeTest(p) && PROBE_FIT[p.status] === "fails").length;
 	// "ran out" when every failure is memory (the usual case); "failed" when any probe errored or timed out.
-	const allOom = failed > 0 && record.probes.every((p) => PROBE_FIT[p.status] !== "fails" || p.status === "oom");
+	const allOom = failed > 0 && record.probes.every((p) => isRangeTest(p) || PROBE_FIT[p.status] !== "fails" || p.status === "oom");
 	// One column order for every chip: the knobs any probe set, in the record's order; a probe
 	// holds a knob it didn't list at the record's current value.
 	const cols = record.knobs.filter((k) => record.probes.some((p) => p.knobs && k.id in p.knobs));
@@ -90,7 +92,8 @@ export function Measured() {
 					{record.probes.map((p) => {
 						const fit = PROBE_FIT[p.status] ?? "unknown";
 						const settings = Object.entries(p.knobs ?? {}).filter((e): e is [string, KnobValue] => e[1] !== undefined && e[1] !== null);
-						const here = settings.length > 0 && settings.every(([k, v]) => state.knobs[k] === v);
+						const rangeTest = isRangeTest(p);
+						const here = !rangeTest && settings.length > 0 && settings.every(([k, v]) => state.knobs[k] === v);
 						const peak = p.memory?.peak_allocated_bytes ?? p.memory?.peak_reserved_bytes ?? null;
 						const err = fit === "fails" ? errorCopy(p.error_code ?? (p.status === "oom" ? "oom" : p.status === "timeout" ? "timeout" : null), p.error) : null;
 						const where = settings.length
@@ -105,14 +108,18 @@ export function Measured() {
 									title={title}
 									aria-label={`${t(`probes.status.${p.status}`)}: ${title}`}
 									aria-pressed={here}
-									disabled={!settings.length}
+									disabled={!settings.length || rangeTest}
 									onClick={() => {
 										for (const [k, v] of settings) if (knobs.has(k)) actions.setKnob(k, v, "user");
 									}}
 								>
 									<FitMark fit={fit} label={t(`probes.status.${p.status}`)} />
 									<span className="pf-chip__where">
-										{cols.length ? cols.map((k) => valueText(k, (p.knobs?.[k.id] as KnobValue | undefined) ?? k.current)).join(" · ") : t("measured.as_written")}
+										{isRangeTest(p)
+											? t("probes.range_test")
+											: cols.length
+												? cols.map((k) => valueText(k, (p.knobs?.[k.id] as KnobValue | undefined) ?? k.current)).join(" · ")
+												: t("measured.as_written")}
 									</span>
 									<span className="pf-chip__nums">
 										{[peak ? fmt(peak, "bytes") : null, p.cost?.usd && !illustrative ? fmt(p.cost.usd, "usd") : null].filter(Boolean).join(" · ")}

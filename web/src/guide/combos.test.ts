@@ -214,3 +214,25 @@ describe("ranking combined moves (PM, Nov 1)", () => {
 		expect(rowsWords({ cut: at(1200) })).toBe("A sequence length of 1,200 cuts at most 1 row in 1,000 short (no more than 50 of 50,724): the 99.9th percentile row is 1,156 tokens.");
 	});
 });
+
+describe("combined moves and Grid.independent_of (0.6.4)", () => {
+	// B's pair grid held lora_r where the record had it; the visitor has since moved it.
+	function held(free: string[] | undefined): LoadedRecord {
+		const r = lora();
+		const grids = r.predictions.grids.map((g) => ({ ...g, fixed: { ...(g.fixed ?? {}), lora_r: 8 }, ...(free ? { independent_of: free } : {}) }));
+		return { ...r, predictions: { ...r.predictions, grids } } as unknown as LoadedRecord;
+	}
+	const moved = (r: LoadedRecord) => ({ ...currentKnobs(r), lora_r: 64 });
+
+	it("without it, a knob the visitor moved off the grid's held value takes the grid out, as before", () => {
+		const r = held(undefined);
+		expect(bestCombo(r, fake, moved(r), { kind: "min_cost" })).toBeNull();
+	});
+
+	it("with it, the grid still answers, and the move leaves the visitor's value of that knob alone", () => {
+		const r = held(["lora_r"]);
+		const c = bestCombo(r, fake, moved(r), { kind: "min_cost" });
+		expect(c).not.toBeNull();
+		expect(c!.changes.map((x) => x.knobId).sort()).toEqual(["eval_batch_size", "seq_len"]);
+	});
+});

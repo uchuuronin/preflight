@@ -6,6 +6,7 @@
 import type { Campaign, CampaignCell, ModelCard } from "../../../../schema/ts/contract";
 import { t } from "../../lib/i18n";
 import type { Estimate, LoadedRecord } from "../record/types";
+import { isRangeTest } from "../cockpit/lrRange";
 
 export interface PlanCell {
 	id: string;
@@ -145,7 +146,8 @@ export function measuredCell(cell: Pick<PlanCell, "knobs">, src: ProbeSource, en
 		if (p.knobs?.gpu_type === undefined && mixed) return false;
 		return same(p.knobs?.gpu_type ?? home, gpu) && compared.every((id) => same(has[id], want[id]));
 	};
-	const here = src.probes.filter(atSetting);
+	// The learning-rate range test ran at rates the script never uses: it neither times nor fails a run.
+	const here = src.probes.filter((p) => !isRangeTest(p) && atSetting(p));
 	if (here.some((p) => p.status !== "ok" && p.status !== "cached")) return null;
 	const timed = here.filter((p) => !p.extras?.eval_off && typeof p.step_time?.mean_s === "number" && p.step_time.mean_s > 0);
 	const probe = timed[timed.length - 1];

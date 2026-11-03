@@ -56,7 +56,14 @@ describe("the check-in desk and intake panels", () => {
 
 	it("starts on Not sure for the GPU, so a visitor who doesn't know isn't sent to an A100", () => {
 		render(<NewFlight onSample={() => {}} />);
-		expect(screen.getByRole("button", { name: en["newflight.gpu.unsure"] }).getAttribute("aria-pressed")).toBe("true");
+		const unsure = screen.getByRole("button", { name: new RegExp(`^${en["newflight.gpu.unsure"]}`) });
+		expect(unsure.textContent).toBe(`${en["newflight.gpu.unsure"]} ${en["newflight.default"]}`);
+		expect(unsure.getAttribute("aria-pressed")).toBe("true");
+		// The starting picks say they're defaults, not choices already made.
+		const cheap = screen.getByRole("button", { name: new RegExp(`^${en["goal.min_cost"]}`) });
+		expect(cheap.textContent).toBe(`${en["goal.min_cost"]} ${en["newflight.default"]}`);
+		expect(cheap.getAttribute("aria-pressed")).toBe("true");
+		expect(screen.getByRole("button", { name: en["goal.min_time"] }).textContent).not.toContain(en["newflight.default"]);
 		expect(screen.getByRole("button", { name: "A100-SXM-80GB" }).getAttribute("aria-pressed")).toBe("false");
 	});
 
@@ -201,7 +208,7 @@ describe("private triage on the check-in desk", () => {
 		const box = screen.getByRole("checkbox", { name: en["newflight.private.label"] });
 		const hint = document.getElementById(box.getAttribute("aria-describedby") ?? "");
 		expect(hint?.textContent).toContain(en["newflight.private.wait"]);
-		expect(hint?.textContent).toMatch(/several minutes/);
+		expect(hint?.textContent).toMatch(/5 to 8 minutes/);
 		// The map and diagnosis lines show only with their own flags on.
 		expect(hint?.textContent).not.toContain(en["newflight.private.map"]);
 		expect(hint?.textContent).not.toContain(en["newflight.private.diagnosis"]);
@@ -211,8 +218,12 @@ describe("private triage on the check-in desk", () => {
 		for (const f of ["harness.spark_open_triage", "harness.glimmer_private", "harness.spark_script_map", "harness.spark_diagnosis"]) flagsOn.add(f);
 		render(<NewFlight onSample={() => {}} />);
 		const box = screen.getByRole("checkbox", { name: en["newflight.private.label"] });
+		// They sit in the private box's fold ("What else changes"), not in the checkbox's description: a
+		// closed <details> isn't read as part of one (review, Nov 2).
+		const fold = box.closest(".pf-private")?.querySelector("details");
+		expect(fold?.textContent).toContain(en["newflight.private.map"]);
+		expect(fold?.textContent).toContain(en["newflight.private.diagnosis"]);
 		const hint = document.getElementById(box.getAttribute("aria-describedby") ?? "");
-		expect(hint?.textContent).toContain(en["newflight.private.map"]);
-		expect(hint?.textContent).toContain(en["newflight.private.diagnosis"]);
+		expect(hint?.contains(fold ?? null)).toBe(false);
 	});
 });

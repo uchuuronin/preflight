@@ -41,7 +41,11 @@ export function CheckinHelp({ trouble, jobId }: { trouble: Trouble; jobId: strin
 	const send = async (next: unknown) => {
 		setBusy(true);
 		setError(null);
-		const sent = JSON.stringify(next);
+		// With A's runner.free_resend on (contract 0.6.5), the resend names the job it follows, so a job
+		// that stopped at an import before measuring anything doesn't cost a second of the day's
+		// check-ins. The runner decides whether it's free; the field only names the earlier job. Off, the
+		// API's schema (extra fields refused) would turn the field away, so it isn't sent.
+		const sent = JSON.stringify(flag("runner.free_resend") && jobId ? { ...(next as object), resend_of: jobId } : next);
 		if (idem.current?.body !== sent) idem.current = { key: newKey(), body: sent };
 		try {
 			const res = await fetch(`${API_BASE}/v1/jobs`, {

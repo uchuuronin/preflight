@@ -5,7 +5,7 @@ export const EXPORTS_EN: Record<string, string> = {
 	"addon.exports.title": "Take this plan with you",
 	"addon.exports.lede": "Built from this record and the settings on screen, so they change as you move the knobs.",
 	"addon.exports.not_verified": "Not verified: a code change here has no Muse Code patch that passed its verify run yet.",
-	"addon.exports.illustrative": "This is a sample: its numbers are illustrative, and the files say so.",
+	"addon.exports.illustrative": "This is a sample: its numbers are examples, and the files say so.",
 	"addon.exports.copy": "Copy",
 	"addon.exports.download": "Download",
 	"addon.exports.copied": "Copied: {what}.",

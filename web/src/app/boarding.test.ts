@@ -57,6 +57,18 @@ describe("boardingState", () => {
 	});
 });
 
+describe("a free resend (A's 0.6.5)", () => {
+	it("is free when the queued event says so, and stays said as the job moves on", () => {
+		const ev = [{ stage: "queued", free_resend: true }, { stage: "probing" }] as BoardingEvent[];
+		expect(boardingState(ev).free).toBe(true);
+	});
+	it("isn't free otherwise, nor on a free_resend that isn't the queued event's", () => {
+		expect(boardingState([{ stage: "queued" }, { stage: "probing" }] as BoardingEvent[]).free).toBe(false);
+		expect(boardingState([{ stage: "queued", free_resend: false }] as BoardingEvent[]).free).toBe(false);
+		expect(boardingState([{ stage: "probing", free_resend: true }] as BoardingEvent[]).free).toBe(false);
+	});
+});
+
 describe("where a job stopped", () => {
 	const ev = (seq: number, stage: string, extra: Record<string, unknown> = {}) =>
 		({ job_id: "j", seq, at: "2026-10-31T00:00:00Z", stage, ...extra }) as never;

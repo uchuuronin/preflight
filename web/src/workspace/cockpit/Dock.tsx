@@ -12,10 +12,13 @@ import { knobChoices } from "../record/model";
 import type { Knob, KnobValue } from "../record/types";
 import { guidedKnobs, useRanked, useWorkspace } from "../state";
 import { fitOf, type Fit } from "../status";
+import { flag } from "../../lib/flags";
+import { rangeTestOf } from "./lrRange";
+import { RangeTestCurve } from "./RangeTest";
 import { Info } from "../components/Info";
 import { FitMark } from "../components/StatusMark";
 import { AddonBoundary } from "../../components/AddonBoundary";
-import { WakeStrip } from "./Dials";
+import { KNOBS_ID, WakeStrip } from "./Dials";
 
 type ValueStatus = Fit | "abstain";
 
@@ -47,6 +50,8 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 	const status = statuses[index] ?? "unknown";
 	const proposed = state.proposal?.knobId === knob.id;
 	const numeric = knob.kind === "int" || knob.kind === "float";
+	// The learning-rate range test's curve, when the record has one (D, Nov 2; behind probes.lr_range).
+	const rangeTest = useMemo(() => (knob.id === "lr" && flag("probes.lr_range") ? rangeTestOf(record) : null), [knob.id, record]);
 	// The editor opens above the rail, and on a laptop the rail sits at the fold: without this only its
 	// title showed (Chiya, Nov 2). Scrolled the least that brings it into view, once, when it opens.
 	const box = useRef<HTMLDivElement>(null);
@@ -129,6 +134,7 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 					))}
 				</div>
 			)}
+			{rangeTest ? <RangeTestCurve test={rangeTest} value={value} choices={values} onPick={pinned ? null : (v) => actions.setKnob(knob.id, v, "user")} /> : null}
 			<WakeStrip />
 			<div className="pf-control__foot">
 				{status === "abstain" ? <span>{t("knob.not_trusted_here")}</span> : null}
@@ -202,7 +208,7 @@ export function Dock() {
 	const shown = showAll ? ordered : view.shown;
 	const labelOf = (k: Knob) => view.labelKeys[k.id] ?? k.label_key;
 	return (
-		<div className="pf-dock">
+		<div className="pf-dock" id={KNOBS_ID}>
 			{active ? <Control key={active.id} knob={active} labelKey={labelOf(active)} ranked={ranked} /> : null}
 			<div className="glass pf-dock__row" role="group" aria-label={t("rail.knobs")}>
 				{shown.map((k) => (

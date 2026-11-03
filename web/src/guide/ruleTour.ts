@@ -314,7 +314,11 @@ export function nextStep(ctx: TourContext): TourStep {
 	if (found) return findingStep(ctx, found);
 	// A failure comes first whatever the aim: when the aim ranks no move that fits, the moves
 	// ranked for memory are the ones that can clear it.
-	const top = candidates(ctx, ctx.pinned)[0] ?? (failing ? candidates({ ...ctx, objective: { ...ctx.objective, kind: "fit_memory" } }, ctx.pinned)[0] : undefined);
+	const forAim = candidates(ctx, ctx.pinned)[0];
+	const top = forAim ?? (failing ? candidates({ ...ctx, objective: { ...ctx.objective, kind: "fit_memory" } }, ctx.pinned)[0] : undefined);
+	// Ranked by memory, not the aim (the aim has no number for the moves that fit): its reason says so,
+	// since "costs your aim the least" wouldn't be true (review, Nov 2).
+	const byMemory = !forAim && !!top;
 	const offer = probeOffer(ctx, top);
 	if (offer) {
 		return {
@@ -344,7 +348,7 @@ export function nextStep(ctx: TourContext): TourStep {
 			move: top,
 			nodes: nodesForKnob(ctx.record, top.knobId),
 			textKey: specific ? keyFor(top.knobId, "line", fixing) : "guide.rule.generic.fix.line",
-			whyKey: specific ? keyFor(top.knobId, "why", fixing) : "guide.rule.generic.fix.why",
+			whyKey: byMemory ? "guide.rule.fix_by_memory.why" : specific ? keyFor(top.knobId, "why", fixing) : "guide.rule.generic.fix.why",
 		};
 	}
 	if (failing) {

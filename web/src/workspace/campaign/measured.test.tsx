@@ -36,6 +36,11 @@ describe("campaign runs timed by a probe at their setting (PM, Nov 2)", () => {
 		expect(measuredCell({ knobs: { batch_size: 8, seq_len: 1024 } }, mixed)).toBeNull();
 		expect(measuredCell({ knobs: { batch_size: 8, seq_len: 1024, gpu_type: "L4" } }, mixed)!.model_id).toBe("probe:p9");
 	});
+	it("isn't stopped by a learning-rate range test at the run's setting, which ran at other rates (D, Nov 2)", () => {
+		const p1 = record.probes.find((p) => p.id === "p1")!;
+		const withRange = { ...record, probes: [...record.probes, { ...p1, id: "p1-lr", status: "error" as const, step_time: null, extras: { lr_range: 1, "lr_range.flat": 1 } }] };
+		expect(measuredCell({ knobs: { batch_size: 8, seq_len: 1024 } }, withRange)!.model_id).toBe("probe:p1");
+	});
 	it("leaves a run with no probe at its setting to the engine", () => {
 		expect(measuredCell({ knobs: { batch_size: 8, seq_len: 512, seed: 0 } }, record)).toBeNull();
 		// another GPU than the probe's isn't measured
