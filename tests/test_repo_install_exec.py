@@ -246,8 +246,9 @@ def test_the_build_runs_on_a_copy_with_compilers_that_fail(tmp_path, monkeypatch
 	assert (
 		kw["env"]["CC"] == "false"
 		and kw["env"]["CXX"] == "false"
-		and kw["env"]["CUDA_HOME"] == "/nonexistent"
-	)
+		and "CUDA_HOME" not in kw["env"]
+		and "CUDA_PATH" not in kw["env"]
+	)  # unset, never a fake path: torch's CUDA lookup then returns None and flash-attn-style builds skip CUDA
 	assert (
 		sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*")) == before
 	)  # the visitor's copy untouched
@@ -373,3 +374,20 @@ def test_a_version_kept_in_the_package_is_read_without_running_it(tmp_path):
 		'[project]\nname = "pkg"\ndynamic = ["version"]\n[tool.hatch.version]\npath = "../outside.py"\n'
 	)
 	assert R.static_name_version(tmp_path) is None
+
+
+def test_a_flash_attn_style_build_sees_no_cuda_home_and_no_nvcc_shim(tmp_path, monkeypatch):
+	(tmp_path / "setup.py").write_text(BUILT)
+	monkeypatch.setenv("CUDA_HOME", "/usr/local/cuda")
+	monkeypatch.setenv("CUDA_PATH", "/usr/local/cuda")
+	seen = {}
+
+	def run(cmd, **kw):
+		seen["env"] = kw["env"]
+		seen["shims"] = sorted(p.name for p in Path(kw["env"]["PATH"].split(":")[0]).iterdir())
+		return _fake_pip(["tqdm"])(cmd, **kw)
+
+	monkeypatch.setattr(R.subprocess, "run", run)
+	assert R.requires_from_build(tmp_path, log=lambda m: None) == ["tqdm"]
+	assert "CUDA_HOME" not in seen["env"] and "CUDA_PATH" not in seen["env"]
+	assert "nvcc" not in seen["shims"] and "gcc" in seen["shims"]  # the host compiler still fails
