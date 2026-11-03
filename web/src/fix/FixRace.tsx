@@ -11,7 +11,8 @@ import { hasKey, t } from "../lib/i18n";
 import type { Finding } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { ensureSaved } from "../guide/limits";
-import { liveCandidates, template, USD_PER_CANDIDATE, whyNoFix } from "./candidates";
+import { SAMPLES } from "../workspace/record/load";
+import { FIXABLE_SAMPLES, liveCandidates, template, USD_PER_CANDIDATE, whyNoFix } from "./candidates";
 import { cancelRace, getRace, POLL_MS, type RaceCandidate, type RaceView, startRace } from "./race";
 
 /** Muse Code's summary as plain text: its Markdown links point into its sandbox (`[train.py](/fix/wt/c1/train.py:74)`, live, Nov 2), so only their words are kept. */
@@ -98,6 +99,9 @@ export function FixRace({ finding }: { finding: Finding }) {
 		};
 	}, [race, slot]);
 
+	// A sample's script reaches Muse Code only for the samples A's runner has one for (record_jobs.SAMPLE_REFS);
+	// the others' Fix would end in "no script" after the visitor pressed Start (review, Nov 3).
+	if (SAMPLES.some((s) => s.id === recordRef) && !FIXABLE_SAMPLES.includes(recordRef)) return <p className="pf-dim">{t("fix.none.sample_script")}</p>;
 	if (!cands.length) {
 		const why = whyNoFix(finding, { record, provider, knobs: state.knobs, pinned: state.pinned, objective: state.objective, limits: state.limits });
 		return <p className="pf-dim">{t(`fix.none.${why}`)}</p>;

@@ -30,15 +30,8 @@ export interface Sample {
 }
 
 export const SAMPLES: Sample[] = [
-	{
-		id: "lora-7b",
-		code: "PF101",
-		titleKey: "sample.lora_7b",
-		lens: "finetune",
-		gpu: "A100",
-		numbers: "illustrative",
-		load: () => import("../fixtures/dev-finetune.record.json").then((m) => m.default as unknown as FlightRecord),
-	},
+	// Every sample is a measured run (PM, Nov 3): the hand-made golden records (LoRA 7B, the agent)
+	// left the list; isFixture and the banner stay for any record that really is illustrative.
 	{
 		// The live record of zoo/finetune_lora_hf on an L4 (Nov 1), its share token removed: A's
 		// measured probes, B's predictions. It replaces the golden's hand-made probes, which gave
@@ -52,26 +45,15 @@ export const SAMPLES: Sample[] = [
 		load: () => import("../fixtures/lora-live-nov1.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
+		// B's A10 check-in of zoo/pretrain_nanogpt (Nov 2, the after-freeze ground-truth set:
+		// tests/fixtures/validation/zoo_gt/pretrain_nanogpt.record.json), share token removed.
 		id: "pretrain",
 		code: "PF412",
-		titleKey: "sample.pretrain",
+		titleKey: "sample.pretrain_a10",
 		lens: "pretrain",
-		gpu: "L4",
-		numbers: "illustrative",
-		load: () => import("../../../../schema/examples/pretrain.json").then((m) => m.default as unknown as FlightRecord),
-	},
-	{
-		// Hidden from Departures (D's walkthrough, Nov 2: every dial abstains and no knob moves anything);
-		// PF331, the measured agent eval, shows the agent cockpit. With the flag off its link doesn't open
-		// either (findSample skips it), as for any flagged sample.
-		id: "agent",
-		code: "PF330",
-		titleKey: "sample.agent",
-		lens: "agent",
-		gpu: "API",
-		numbers: "illustrative",
-		flag: "c.sample_agent_golden",
-		load: () => import("../../../../schema/examples/agent.json").then((m) => m.default as unknown as FlightRecord),
+		gpu: "A10",
+		numbers: "measured",
+		load: () => import("../fixtures/pretrain_nanogpt-a10-nov2.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
 		// A's real run of zoo/agent_eval_spark on Muse Spark (Oct 31, 30 of 500 tasks sampled), with
@@ -85,20 +67,20 @@ export const SAMPLES: Sample[] = [
 		load: () => import("../fixtures/agent-eval-oct31.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
-		// The pretrain golden record with a campaign block from B's planner on a 12-run research
-		// grid (web/scripts/make_campaign_sample.py): illustrative numbers, every one B's.
+		// The LoRA zoo script's four campaign cells measured on an A10 (C's D17, Nov 2) with B's planner
+		// on top (web/scripts/make_campaign_sample.py).
 		id: "campaign-grid",
 		code: "PF420",
 		titleKey: "sample.campaign_grid",
-		lens: "pretrain",
-		gpu: "A100",
-		numbers: "illustrative",
+		lens: "finetune",
+		gpu: "A10",
+		numbers: "measured",
 		flag: "c.campaign_calendar",
 		load: () => import("../fixtures/campaign-grid.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
 		// A's L4 smoke run of zoo/grpo_trl (Nov 1, GitHub run 41260610897) as a record: A's map and
-		// measured probe, B's predictions (web/scripts/make_grpo_sample.py). Measured, not illustrative.
+		// measured probe, B's predictions, refilled on B's engine of Nov 3 (cfe60a5).
 		id: "grpo",
 		code: "PF510",
 		titleKey: "sample.grpo_l4",
@@ -107,43 +89,54 @@ export const SAMPLES: Sample[] = [
 		numbers: "measured",
 		load: () => import("../fixtures/grpo-l4.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
-	// A's L4 smoke runs of D's zoo scripts (Nov 1), committed by A with placeholder share tokens
-	// (zoo/<script>/record_nov1_l4.json): A's map and measured probes, B's predictions. Each lens's
-	// planted problem is what its rule-based tour reaches.
+	// B's A10 check-ins of D's zoo scripts (Nov 2, tests/fixtures/validation/zoo_gt/*_a10.record.json),
+	// share tokens removed: they carry the run's length, so time and cost predict (B, Nov 3).
 	{
 		id: "retrieval",
 		code: "PF610",
-		titleKey: "sample.retrieval_l4",
+		titleKey: "sample.retrieval_a10",
 		lens: "retrieval",
-		gpu: "L4",
+		gpu: "A10",
 		numbers: "measured",
-		load: () => import("../fixtures/retrieval_st-nov1.record.json").then((m) => m.default as unknown as FlightRecord),
+		load: () => import("../fixtures/retrieval_st-a10-nov2.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
 		id: "gnn",
 		code: "PF620",
-		titleKey: "sample.gnn_l4",
+		titleKey: "sample.gnn_a10",
 		lens: "gnn",
-		gpu: "L4",
+		gpu: "A10",
 		numbers: "measured",
-		load: () => import("../fixtures/gnn_pyg-nov1.record.json").then((m) => m.default as unknown as FlightRecord),
+		load: () => import("../fixtures/gnn_pyg-a10-nov2.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
 		id: "vision",
 		code: "PF630",
-		titleKey: "sample.vision_l4",
+		titleKey: "sample.vision_a10",
 		lens: "vision",
-		gpu: "L4",
+		gpu: "A10",
 		numbers: "measured",
-		load: () => import("../fixtures/vision_timm-nov1.record.json").then((m) => m.default as unknown as FlightRecord),
+		load: () => import("../fixtures/vision_timm-a10-nov2.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 ];
 
-export const DEFAULT_SAMPLE = "lora-7b";
+export const DEFAULT_SAMPLE = "lora-qwen";
+
+/**
+ * Samples that left the list (PM, Nov 3: every sample measured), and the measured one an old link,
+ * logbook entry or bookmark opens instead.
+ */
+export const RETIRED_SAMPLES: Readonly<Record<string, string>> = { "lora-7b": "lora-qwen", agent: "agent-eval" };
+
+/** The ref to open: a retired sample's id becomes its replacement's, so every API call uses the one shown. */
+export function currentRef(ref: string): string {
+	return RETIRED_SAMPLES[ref] ?? ref;
+}
 
 export async function loadRecord(ref: string): Promise<LoadedRecord> {
+	const id = currentRef(ref);
 	// A sample listed only behind a flag opens only with it on.
-	const sample = SAMPLES.find((s) => s.id === ref && (!s.flag || flag(s.flag)));
+	const sample = SAMPLES.find((s) => s.id === id && (!s.flag || flag(s.flag)));
 	if (sample) return normaliseRecord(await sample.load());
 	// A live record from `preflight watch`, opened from a file on this machine (live/liveFile.ts)
 	if (ref === LIVE_REF && flag("c.inflight")) {

@@ -15,7 +15,7 @@ if (!process.env.TERMS || /(^\||\|\||\|$)/.test(process.env.TERMS)) {
 	process.exit(2);
 }
 const TERMS = new RegExp(process.env.TERMS, "gi");
-const SAMPLES = (process.env.SAMPLES ?? "lora-7b,lora-qwen,pretrain,agent-eval,campaign-grid,grpo,retrieval,gnn,vision").split(",");
+const SAMPLES = (process.env.SAMPLES ?? "lora-qwen,pretrain,agent-eval,campaign-grid,grpo,retrieval,gnn,vision").split(",");
 
 const browser = await chromium.launch();
 const hits = [];

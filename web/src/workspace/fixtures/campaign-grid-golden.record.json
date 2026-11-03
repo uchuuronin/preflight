@@ -1,0 +1,1753 @@
+{
+	"schema_version": "0.6.0",
+	"record_id": "01JBGOLDENCAMPGRD000000000",
+	"created_at": "2026-10-27T14:00:00Z",
+	"job": {
+		"lens": "pretrain",
+		"source": {
+			"kind": "sample",
+			"uri": "sample://zoo/pretrain_nanogpt",
+			"content_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+			"entrypoint": "zoo/pretrain_nanogpt/train.py",
+			"args": []
+		},
+		"framework": "plain_pytorch",
+		"title": "Pretraining research grid: batch size, sequence length and seed",
+		"objective": {
+			"kind": "min_cost",
+			"weights": {},
+			"description": "Small LM baseline for a class project, cheapest finish"
+		},
+		"constraints": {
+			"budget_usd": 60.0,
+			"gpu_types": [],
+			"max_gpus": 1,
+			"wall_time_cap_s": 172800.0,
+			"preemption": {
+				"kind": "policy",
+				"policy": "Unity preempt partition: jobs may be requeued after 2 h",
+				"grace_s": 120.0
+			}
+		}
+	},
+	"env": {
+		"backend": "cuda",
+		"provider": "modal",
+		"gpu": {
+			"name": "A100-SXM-40GB",
+			"count": 1,
+			"memory_bytes": 42298834944,
+			"vendor": "nvidia",
+			"compute_capability": "8.0"
+		},
+		"nodes": 1,
+		"libraries": {
+			"torch": "2.5.1"
+		},
+		"python": "3.11.10",
+		"seed": 1337
+	},
+	"graph": {
+		"nodes": [
+			{
+				"id": "data",
+				"label": "OpenWebText shards \u00b7 num_workers=0",
+				"kind": "data",
+				"repeat": 1,
+				"metrics": [
+					"probe.data.loader_wait_fraction"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "model",
+				"label": "GPT-2 124M",
+				"kind": "group",
+				"repeat": 1,
+				"params": 124439808,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "wte",
+				"label": "Token + position embedding",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "block",
+				"label": "Transformer block",
+				"kind": "group",
+				"parent": "model",
+				"repeat": 12,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "attn",
+				"label": "Causal self-attention",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.max_attn_logit"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "mlp",
+				"label": "MLP",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "lm_head",
+				"label": "LM head",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "loss",
+				"label": "Cross-entropy",
+				"kind": "loss",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.loss"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "optimizer",
+				"label": "AdamW",
+				"kind": "optimizer",
+				"repeat": 1,
+				"params": 124439808,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "ckpt",
+				"label": "Checkpoint every 20k steps",
+				"kind": "io",
+				"repeat": 1,
+				"metrics": [
+					"risk.preemption_loss"
+				],
+				"attrs": {}
+			}
+		],
+		"edges": [
+			{
+				"source": "data",
+				"target": "wte",
+				"kind": "tokens",
+				"metric": "probe.throughput.tokens_per_s"
+			},
+			{
+				"source": "wte",
+				"target": "attn",
+				"kind": "data"
+			},
+			{
+				"source": "attn",
+				"target": "mlp",
+				"kind": "data"
+			},
+			{
+				"source": "mlp",
+				"target": "lm_head",
+				"kind": "data"
+			},
+			{
+				"source": "lm_head",
+				"target": "loss",
+				"kind": "data"
+			},
+			{
+				"source": "loss",
+				"target": "optimizer",
+				"kind": "grad"
+			},
+			{
+				"source": "optimizer",
+				"target": "wte",
+				"kind": "weights"
+			},
+			{
+				"source": "optimizer",
+				"target": "ckpt",
+				"kind": "control"
+			}
+		],
+		"skeleton": false
+	},
+	"knobs": [
+		{
+			"id": "batch_size",
+			"label_key": "knob.batch_size",
+			"unit": "samples",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 128.0,
+				"values": [],
+				"log": true
+			},
+			"current": 12,
+			"probed_range": {
+				"min": 8.0,
+				"max": 12.0
+			},
+			"gridded": true,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"data",
+				"model"
+			]
+		},
+		{
+			"id": "seq_len",
+			"label_key": "knob.seq_len",
+			"unit": "tokens",
+			"kind": "int",
+			"domain": {
+				"min": 128.0,
+				"max": 4096.0,
+				"values": [],
+				"log": true
+			},
+			"current": 1024,
+			"probed_range": {
+				"min": 1024.0,
+				"max": 1024.0
+			},
+			"gridded": true,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"data",
+				"attn",
+				"lm_head"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "num_workers",
+			"label_key": "knob.num_workers",
+			"kind": "int",
+			"domain": {
+				"min": 0.0,
+				"max": 16.0,
+				"values": [],
+				"log": false
+			},
+			"current": 0,
+			"gridded": false,
+			"needs_code": false,
+			"group": "data",
+			"affects": [
+				"data"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "precision",
+			"label_key": "knob.precision",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"bf16",
+					"fp32"
+				],
+				"log": false
+			},
+			"current": "fp32",
+			"gridded": false,
+			"needs_code": false,
+			"group": "speed",
+			"affects": [
+				"model"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"T4",
+					"L4",
+					"A10",
+					"L40S",
+					"A100-SXM-40GB",
+					"A100-SXM-80GB",
+					"RTX-PRO-6000-96GB",
+					"H100-SXM-80GB",
+					"H200-SXM-141GB",
+					"B200-SXM-180GB",
+					"B300-SXM-288GB"
+				],
+				"log": false
+			},
+			"current": "A100-SXM-40GB",
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"model"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "lr",
+			"label_key": "knob.lr",
+			"kind": "float",
+			"domain": {
+				"min": 1e-05,
+				"max": 0.01,
+				"values": [],
+				"log": true
+			},
+			"current": 0.0006,
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "checkpoint_every",
+			"label_key": "knob.checkpoint_every",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 50.0,
+				"max": 100000.0,
+				"values": [],
+				"log": true
+			},
+			"current": 20000,
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"ckpt"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "max_steps",
+			"label_key": "knob.max_steps",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 100.0,
+				"max": 1000000.0,
+				"values": [],
+				"log": true
+			},
+			"current": 60000,
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"data",
+				"optimizer"
+			],
+			"changes_results": true
+		}
+	],
+	"probes": [
+		{
+			"id": "p1",
+			"knobs": {
+				"batch_size": 8,
+				"seq_len": 1024,
+				"num_workers": 0,
+				"precision": "fp32"
+			},
+			"status": "ok",
+			"steps": 10,
+			"started_at": "2026-10-27T14:01:00Z",
+			"duration_s": 64.0,
+			"memory": {
+				"peak_allocated_bytes": 9352291287,
+				"peak_reserved_bytes": 9749575761,
+				"device_total_bytes": 42298834944,
+				"by_term": {
+					"weights": 497759232,
+					"gradients": 497759232,
+					"optimizer": 995518464,
+					"activations": 5669356830,
+					"logits": 1648361472,
+					"context": 644245094
+				},
+				"peak_step": 2
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.179,
+				"p50_s": 0.179,
+				"p95_s": 0.187,
+				"first_step_s": 21.179,
+				"by_phase": {
+					"data": 0.37,
+					"forward": 0.2,
+					"backward": 0.36,
+					"optimizer": 0.05,
+					"idle": 0.02
+				},
+				"unprofiled": true
+			},
+			"throughput": {
+				"tokens_per_s": 45665.6,
+				"samples_per_s": 44.6,
+				"flops_per_step": 6094848000000.0,
+				"mfu": 0.218
+			},
+			"stability": {
+				"series": {
+					"loss": [
+						10.98,
+						10.21,
+						9.62,
+						9.11,
+						8.7,
+						8.33,
+						8.02,
+						7.79,
+						7.6,
+						7.44
+					],
+					"grad_norm": [
+						1.9,
+						1.4,
+						1.2,
+						1.1,
+						1.05,
+						0.98,
+						0.95,
+						0.93,
+						0.92,
+						0.91
+					],
+					"grad_norm_ma": [
+						1.9,
+						1.65,
+						1.5,
+						1.4,
+						1.33,
+						1.272,
+						1.226,
+						1.189,
+						1.159,
+						1.134
+					],
+					"update_to_weight": [
+						0.0021,
+						0.0018,
+						0.0016,
+						null,
+						null,
+						null,
+						null,
+						null,
+						0.0013,
+						0.0013
+					],
+					"max_attn_logit": [
+						11.2,
+						12.0,
+						12.6,
+						null,
+						null,
+						null,
+						null,
+						null,
+						14.4,
+						14.6
+					],
+					"output_logit_norm": [
+						41.0,
+						39.2,
+						38.7,
+						38.1,
+						37.9,
+						37.6,
+						37.4,
+						37.2,
+						37.0,
+						36.9
+					],
+					"lr": [
+						6e-06,
+						1.2e-05,
+						1.8e-05,
+						2.4e-05,
+						3e-05,
+						3.6e-05,
+						4.2e-05,
+						4.8e-05,
+						5.4e-05,
+						6e-05
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"tokens_per_sample_mean": 1024.0,
+				"loader_wait_fraction": 0.37,
+				"num_workers": 0
+			},
+			"power": {
+				"mean_w": 248.0,
+				"max_w": 301.0,
+				"samples": 64
+			},
+			"extras": {
+				"lr_range_divergence_lr": 0.0048,
+				"resume_exact_match": 1.0,
+				"params_total": 124475904.0,
+				"params_trainable": 124475904.0,
+				"tokens_per_step": 8192.0,
+				"samples_per_step": 8.0,
+				"micro_steps_per_step": 1.0
+			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 21.1794,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.1812,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				},
+				{
+					"index": 3,
+					"kind": "warmup",
+					"wall_s": 0.1776,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.183,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.1758,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				},
+				{
+					"index": 6,
+					"kind": "timed",
+					"wall_s": 0.1794,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				},
+				{
+					"index": 7,
+					"kind": "timed",
+					"wall_s": 0.1812,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				},
+				{
+					"index": 8,
+					"kind": "timed",
+					"wall_s": 0.1776,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				},
+				{
+					"index": 9,
+					"kind": "phase",
+					"wall_s": 0.1848,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				},
+				{
+					"index": 10,
+					"kind": "phase",
+					"wall_s": 0.1866,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9352291287,
+					"peak_reserved_bytes": 9749575761
+				}
+			],
+			"kernels": {
+				"rows": [
+					{
+						"name": "aten::mm",
+						"kernel_class": "gemm",
+						"calls": 444.0,
+						"device_s": 0.053817315356643365,
+						"flops": 6100000000000.0,
+						"bytes": 9800000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_efficient_attention_backward",
+						"kernel_class": "attention",
+						"calls": 12.0,
+						"device_s": 0.014351284095104897,
+						"flops": 770000000000.0,
+						"bytes": 1200000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_efficient_attention_forward",
+						"kernel_class": "attention",
+						"calls": 12.0,
+						"device_s": 0.007175642047552448,
+						"flops": 310000000000.0,
+						"bytes": 600000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::native_layer_norm_backward",
+						"kernel_class": "norm",
+						"calls": 25.0,
+						"device_s": 0.00448477627972028,
+						"bytes": 3100000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::gelu_backward",
+						"kernel_class": "elementwise",
+						"calls": 12.0,
+						"device_s": 0.003587821023776224,
+						"bytes": 2400000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_lerp_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 0.0021526926142657345,
+						"bytes": 1500000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "(tail) elementwise (28 ops)",
+						"kernel_class": "elementwise",
+						"calls": 980.0,
+						"device_s": 0.00896955255944056,
+						"bytes": 7000000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "(tail) copy (5 ops)",
+						"kernel_class": "copy",
+						"calls": 120.0,
+						"device_s": 0.0021526926142657345,
+						"bytes": 1400000000.0,
+						"dtype": "fp32"
+					}
+				],
+				"steps": 3,
+				"backend": "cuda",
+				"allow_tf32": true,
+				"classified_by": "engine.steptime"
+			},
+			"cost": {
+				"gpu_seconds": 64.0,
+				"usd": 0.0373
+			},
+			"trace": "blob://traces/01JBGOLDENPT/p1.json.gz"
+		},
+		{
+			"id": "p2",
+			"knobs": {
+				"batch_size": 12,
+				"seq_len": 1024,
+				"num_workers": 0,
+				"precision": "fp32"
+			},
+			"status": "ok",
+			"steps": 10,
+			"started_at": "2026-10-27T14:03:00Z",
+			"duration_s": 69.0,
+			"memory": {
+				"peak_allocated_bytes": 12960063815,
+				"peak_reserved_bytes": 13443247636,
+				"device_total_bytes": 42298834944,
+				"by_term": {
+					"weights": 497759232,
+					"gradients": 497759232,
+					"optimizer": 995518464,
+					"activations": 8504035246,
+					"logits": 2472542208,
+					"context": 644245094
+				},
+				"peak_step": 2
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.269,
+				"p50_s": 0.269,
+				"p95_s": 0.28,
+				"first_step_s": 21.269,
+				"by_phase": {
+					"data": 0.37,
+					"forward": 0.2,
+					"backward": 0.36,
+					"optimizer": 0.05,
+					"idle": 0.02
+				},
+				"unprofiled": true
+			},
+			"throughput": {
+				"tokens_per_s": 45665.6,
+				"samples_per_s": 44.6,
+				"flops_per_step": 9142272000000.0,
+				"mfu": 0.218
+			},
+			"stability": {
+				"series": {
+					"loss": [
+						10.98,
+						10.21,
+						9.62,
+						9.11,
+						8.7,
+						8.33,
+						8.02,
+						7.79,
+						7.6,
+						7.44
+					],
+					"grad_norm": [
+						1.9,
+						1.4,
+						1.2,
+						1.1,
+						1.05,
+						0.98,
+						0.95,
+						0.93,
+						0.92,
+						0.91
+					],
+					"grad_norm_ma": [
+						1.9,
+						1.65,
+						1.5,
+						1.4,
+						1.33,
+						1.272,
+						1.226,
+						1.189,
+						1.159,
+						1.134
+					],
+					"update_to_weight": [
+						0.0021,
+						0.0018,
+						0.0016,
+						null,
+						null,
+						null,
+						null,
+						null,
+						0.0013,
+						0.0013
+					],
+					"max_attn_logit": [
+						11.2,
+						12.0,
+						12.6,
+						null,
+						null,
+						null,
+						null,
+						null,
+						14.4,
+						14.6
+					],
+					"output_logit_norm": [
+						41.0,
+						39.2,
+						38.7,
+						38.1,
+						37.9,
+						37.6,
+						37.4,
+						37.2,
+						37.0,
+						36.9
+					],
+					"lr": [
+						6e-06,
+						1.2e-05,
+						1.8e-05,
+						2.4e-05,
+						3e-05,
+						3.6e-05,
+						4.2e-05,
+						4.8e-05,
+						5.4e-05,
+						6e-05
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"tokens_per_sample_mean": 1024.0,
+				"loader_wait_fraction": 0.37,
+				"num_workers": 0
+			},
+			"power": {
+				"mean_w": 248.0,
+				"max_w": 301.0,
+				"samples": 64
+			},
+			"extras": {
+				"lr_range_divergence_lr": 0.0048,
+				"resume_exact_match": 1.0,
+				"params_total": 124475904.0,
+				"params_trainable": 124475904.0,
+				"tokens_per_step": 12288.0,
+				"samples_per_step": 12.0,
+				"micro_steps_per_step": 1.0
+			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 21.2691,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.2718,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				},
+				{
+					"index": 3,
+					"kind": "warmup",
+					"wall_s": 0.2664,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.2745,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.2637,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				},
+				{
+					"index": 6,
+					"kind": "timed",
+					"wall_s": 0.2691,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				},
+				{
+					"index": 7,
+					"kind": "timed",
+					"wall_s": 0.2718,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				},
+				{
+					"index": 8,
+					"kind": "timed",
+					"wall_s": 0.2664,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				},
+				{
+					"index": 9,
+					"kind": "phase",
+					"wall_s": 0.2772,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				},
+				{
+					"index": 10,
+					"kind": "phase",
+					"wall_s": 0.2799,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 12960063815,
+					"peak_reserved_bytes": 13443247636
+				}
+			],
+			"cost": {
+				"gpu_seconds": 69.0,
+				"usd": 0.0403
+			},
+			"trace": "blob://traces/01JBGOLDENPT/p2.json.gz"
+		}
+	],
+	"predictions": {
+		"targets": [
+			{
+				"id": "memory.peak",
+				"label_key": "target.memory.peak",
+				"unit": "bytes",
+				"readout": "memory"
+			},
+			{
+				"id": "time.total",
+				"label_key": "target.time.total",
+				"unit": "s",
+				"readout": "time"
+			},
+			{
+				"id": "cost.total",
+				"label_key": "target.cost.total",
+				"unit": "usd",
+				"readout": "cost"
+			},
+			{
+				"id": "risk.oom",
+				"label_key": "target.risk.oom",
+				"unit": "probability",
+				"readout": "risk"
+			},
+			{
+				"id": "risk.preemption_loss",
+				"label_key": "target.risk.preemption_loss",
+				"unit": "s",
+				"readout": "risk"
+			}
+		],
+		"estimates": {
+			"memory.peak": {
+				"point": 12960063815.68,
+				"lo": 12700862539.3664,
+				"hi": 13219265091.9936,
+				"unit": "bytes",
+				"status": "measured",
+				"model_id": "golden-fixture@0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.total": {
+				"point": 16145.194606993007,
+				"lo": 13723.415415944055,
+				"hi": 18566.973798041956,
+				"unit": "s",
+				"status": "predicted",
+				"model_id": "golden-fixture@0",
+				"source": "grid",
+				"level": 0.9
+			},
+			"cost.total": {
+				"point": 9.418030187412587,
+				"lo": 8.005325659300699,
+				"hi": 10.830734715524473,
+				"unit": "usd",
+				"status": "predicted",
+				"model_id": "golden-fixture@0",
+				"source": "grid",
+				"level": 0.9
+			},
+			"risk.oom": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.01,
+				"unit": "probability",
+				"status": "predicted",
+				"model_id": "golden-fixture@0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"risk.preemption_loss": {
+				"point": 3600.0,
+				"lo": 1800.0,
+				"hi": 5400.0,
+				"unit": "s",
+				"status": "predicted",
+				"model_id": "golden-fixture@0",
+				"source": "exact",
+				"level": 0.9
+			}
+		},
+		"grids": [
+			{
+				"id": "g.time.bs_prec",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							4,
+							8,
+							12,
+							16,
+							24,
+							32,
+							48
+						],
+						"scale": "log"
+					},
+					{
+						"knob_id": "precision",
+						"values": [
+							"fp32",
+							"bf16"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "4mM/XOJjP1ziYz9c4mM/XOJjP1ziYz9c4mM/XA==",
+				"lo": "s2I4W7NiOFuzYjhbs2I4W7NiOFuzYjhbs2I4Ww==",
+				"hi": "iGTiXIhk4lyIZOJciGTiXIhk4lyIZOJciGTiXA==",
+				"abstain": "ADw=",
+				"model_id": "golden-fixture@0",
+				"scale": 16.0,
+				"fixed": {
+					"seq_len": 1024,
+					"num_workers": 0
+				}
+			},
+			{
+				"id": "g.memory.bs_prec",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							4,
+							8,
+							12,
+							16,
+							24,
+							32,
+							48
+						],
+						"scale": "log"
+					},
+					{
+						"knob_id": "precision",
+						"values": [
+							"fp32",
+							"bf16"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "WlmtV1tcsFkJXolbt1+xXIphil44YzJgSmULYg==",
+				"lo": "0VjpVtdbHlluXcha8l45XPxg411/Yoxfw2RwYQ==",
+				"hi": "41k5WMpcQVqjXiVcPmApXRdiMV/wY51g0WWlYg==",
+				"abstain": "ADw=",
+				"model_id": "golden-fixture@0",
+				"scale": 33554432.0,
+				"fixed": {
+					"seq_len": 1024,
+					"num_workers": 0
+				}
+			}
+		]
+	},
+	"models": [
+		{
+			"id": "golden-fixture@0",
+			"kind": "rule",
+			"version": "0",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "Hand-made fixture for UI work; not a real model",
+			"fixture": true
+		},
+		{
+			"id": "campaign-mc@0.1.0",
+			"kind": "simulation",
+			"version": "0.1.0",
+			"training_data": "none: built from the engine's predictions for this record",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "Every run's time and cost come from the engine's own 90% intervals, so this plan is exactly as accurate as the engine: it adds scheduling, interruptions and resubmits on top, never accuracy. Runs are assumed to err together (the same script and the same model), which makes the grid's range as wide as it can honestly be.",
+			"fixture": false
+		}
+	],
+	"findings": [
+		{
+			"id": "f1",
+			"severity": "error",
+			"code": "data.num_workers_zero",
+			"title": "GPU waits on the data loader 37% of each step",
+			"node_id": "data",
+			"evidence": [
+				{
+					"metric": "probe.data.loader_wait_fraction",
+					"value": 0.37,
+					"threshold": 0.1,
+					"probe_id": "p2"
+				}
+			],
+			"source": "rule",
+			"fix_template": "data.num_workers",
+			"knob_id": "num_workers",
+			"citations": []
+		},
+		{
+			"id": "f2",
+			"severity": "warn",
+			"code": "precision.fp32",
+			"title": "Training in fp32 on a GPU with bf16 tensor cores",
+			"node_id": "model",
+			"evidence": [
+				{
+					"metric": "probe.throughput.mfu",
+					"value": 0.07,
+					"threshold": 0.3
+				}
+			],
+			"source": "rule",
+			"fix_template": "precision.bf16_autocast",
+			"knob_id": "precision",
+			"citations": []
+		},
+		{
+			"id": "f3",
+			"severity": "warn",
+			"code": "ckpt.sparse",
+			"title": "Checkpoints every 20k steps; a requeue loses up to 7 h",
+			"node_id": "ckpt",
+			"evidence": [
+				{
+					"metric": "checkpoint_every",
+					"value": 20000.0
+				}
+			],
+			"source": "rule",
+			"fix_template": "ckpt.interval",
+			"knob_id": "checkpoint_every",
+			"citations": []
+		},
+		{
+			"id": "f4",
+			"severity": "info",
+			"code": "lr.headroom",
+			"title": "Learning rate is 8x below where the probe diverged",
+			"node_id": "optimizer",
+			"evidence": [
+				{
+					"metric": "probe.extras.lr_range_divergence_lr",
+					"value": 0.0048
+				}
+			],
+			"source": "rule",
+			"knob_id": "lr",
+			"citations": []
+		}
+	],
+	"patches": [],
+	"provenance": [],
+	"costs": {
+		"gpu_usd": 0.0782,
+		"llm_usd": 0.0,
+		"breakdown": {
+			"probes": 0.0782
+		}
+	},
+	"campaign": {
+		"cells": [
+			{
+				"id": "batch_size=8,seq_len=512,seed=0",
+				"knobs": {
+					"batch_size": 8,
+					"seq_len": 512,
+					"seed": 0
+				},
+				"gpu_hours": 1.6774283913934938,
+				"usd": 3.522599621926337,
+				"wall_time_s": 5962.338461538461,
+				"segments": 1,
+				"lane": "chiya",
+				"cut": false,
+				"time": {
+					"point": 5962.338461538461,
+					"lo": 4032.8816735486344,
+					"hi": 8819.739740330551,
+					"unit": "s",
+					"status": "extrapolated",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "below the smallest probed size (8192 work units), so the range is wider; run a probe here for a measured number; batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				},
+				"start_s": {
+					"point": 10861.321260248113,
+					"lo": 9328.140896039973,
+					"hi": 13304.787222132547,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "campaign-mc@0.1.0",
+					"source": "exact",
+					"reason": "when its slot frees up; Monte Carlo",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=8,seq_len=512,seed=1",
+				"knobs": {
+					"batch_size": 8,
+					"seq_len": 512,
+					"seed": 1
+				},
+				"gpu_hours": 1.6754732521160844,
+				"usd": 3.518493829443777,
+				"wall_time_s": 5962.338461538461,
+				"segments": 1,
+				"lane": "ana",
+				"cut": false,
+				"time": {
+					"point": 5962.338461538461,
+					"lo": 4032.8816735486344,
+					"hi": 8819.739740330551,
+					"unit": "s",
+					"status": "extrapolated",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "below the smallest probed size (8192 work units), so the range is wider; run a probe here for a measured number; batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				},
+				"start_s": {
+					"point": 10857.105154903566,
+					"lo": 9344.247029316706,
+					"hi": 13269.531700369005,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "campaign-mc@0.1.0",
+					"source": "exact",
+					"reason": "when its slot frees up; Monte Carlo",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=8,seq_len=1024,seed=0",
+				"knobs": {
+					"batch_size": 8,
+					"seq_len": 1024,
+					"seed": 0
+				},
+				"gpu_hours": 3.051345851180609,
+				"usd": 6.4078262874792795,
+				"wall_time_s": 10761.000000000002,
+				"segments": 1,
+				"lane": "chiya",
+				"cut": false,
+				"time": {
+					"point": 10761.000000000002,
+					"lo": 9289.104679128042,
+					"hi": 12466.6514026827,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				},
+				"start_s": {
+					"point": 0.0,
+					"lo": 0.0,
+					"hi": 0.0,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "campaign-mc@0.1.0",
+					"source": "exact",
+					"reason": "when its slot frees up; Monte Carlo",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=8,seq_len=1024,seed=1",
+				"knobs": {
+					"batch_size": 8,
+					"seq_len": 1024,
+					"seed": 1
+				},
+				"gpu_hours": 3.0509827773846956,
+				"usd": 6.407063832507862,
+				"wall_time_s": 10761.000000000002,
+				"segments": 1,
+				"lane": "ana",
+				"cut": false,
+				"time": {
+					"point": 10761.000000000002,
+					"lo": 9289.104679128042,
+					"hi": 12466.6514026827,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				},
+				"start_s": {
+					"point": 0.0,
+					"lo": 0.0,
+					"hi": 0.0,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "campaign-mc@0.1.0",
+					"source": "exact",
+					"reason": "when its slot frees up; Monte Carlo",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=12,seq_len=512,seed=0",
+				"knobs": {
+					"batch_size": 12,
+					"seq_len": 512,
+					"seed": 0
+				},
+				"gpu_hours": 2.391286351376779,
+				"usd": 5.021701337891236,
+				"wall_time_s": 8462.607692307694,
+				"segments": 1,
+				"lane": "ben",
+				"cut": false,
+				"time": {
+					"point": 8462.607692307694,
+					"lo": 6064.055147086106,
+					"hi": 11813.171128074111,
+					"unit": "s",
+					"status": "extrapolated",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "below the smallest probed size (8192 work units), so the range is wider; run a probe here for a measured number; batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				},
+				"start_s": {
+					"point": 0.0,
+					"lo": 0.0,
+					"hi": 0.0,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "campaign-mc@0.1.0",
+					"source": "exact",
+					"reason": "when its slot frees up; Monte Carlo",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=12,seq_len=512,seed=1",
+				"knobs": {
+					"batch_size": 12,
+					"seq_len": 512,
+					"seed": 1
+				},
+				"gpu_hours": 2.387753730601865,
+				"usd": 5.014282834263916,
+				"wall_time_s": 8462.607692307694,
+				"segments": 1,
+				"lane": "ben",
+				"cut": false,
+				"time": {
+					"point": 8462.607692307694,
+					"lo": 6064.055147086106,
+					"hi": 11813.171128074111,
+					"unit": "s",
+					"status": "extrapolated",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "below the smallest probed size (8192 work units), so the range is wider; run a probe here for a measured number; batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				},
+				"start_s": {
+					"point": 8539.185615571974,
+					"lo": 6112.970687413621,
+					"hi": 12209.118168568435,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "campaign-mc@0.1.0",
+					"source": "exact",
+					"reason": "when its slot frees up; Monte Carlo",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=12,seq_len=1024,seed=0",
+				"knobs": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"seed": 0
+				},
+				"gpu_hours": 5.6351817082150655,
+				"usd": 11.83388158725164,
+				"wall_time_s": 16161.000000000002,
+				"segments": 2,
+				"cut": true,
+				"time": {
+					"point": 16161.000000000002,
+					"lo": 13951.933945752036,
+					"hi": 18720.36366179055,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=12,seq_len=1024,seed=1",
+				"knobs": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"seed": 1
+				},
+				"gpu_hours": 5.633689393444961,
+				"usd": 11.830747726234417,
+				"wall_time_s": 16161.000000000002,
+				"segments": 2,
+				"cut": true,
+				"time": {
+					"point": 16161.000000000002,
+					"lo": 13951.933945752036,
+					"hi": 18720.36366179055,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=16,seq_len=512,seed=0",
+				"knobs": {
+					"batch_size": 16,
+					"seq_len": 512,
+					"seed": 0
+				},
+				"gpu_hours": 4.053507408975276,
+				"usd": 8.51236555884808,
+				"wall_time_s": 10962.876923076925,
+				"segments": 2,
+				"lane": "chiya",
+				"cut": false,
+				"time": {
+					"point": 10962.876923076925,
+					"lo": 8185.184865534731,
+					"hi": 14685.620237249088,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				},
+				"start_s": {
+					"point": 0.0,
+					"lo": 0.0,
+					"hi": 0.0,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "campaign-mc@0.1.0",
+					"source": "exact",
+					"reason": "when its slot frees up; Monte Carlo",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=16,seq_len=512,seed=1",
+				"knobs": {
+					"batch_size": 16,
+					"seq_len": 512,
+					"seed": 1
+				},
+				"gpu_hours": 4.0567308462838705,
+				"usd": 8.519134777196129,
+				"wall_time_s": 10962.876923076925,
+				"segments": 2,
+				"cut": true,
+				"time": {
+					"point": 10962.876923076925,
+					"lo": 8185.184865534731,
+					"hi": 14685.620237249088,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=16,seq_len=1024,seed=0",
+				"knobs": {
+					"batch_size": 16,
+					"seq_len": 1024,
+					"seed": 0
+				},
+				"gpu_hours": 6.295140382508569,
+				"usd": 13.219794803267995,
+				"wall_time_s": 20963.953846153843,
+				"segments": 3,
+				"cut": true,
+				"time": {
+					"point": 20963.953846153843,
+					"lo": 15647.400116944502,
+					"hi": 28089.353076824504,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				}
+			},
+			{
+				"id": "batch_size=16,seq_len=1024,seed=1",
+				"knobs": {
+					"batch_size": 16,
+					"seq_len": 1024,
+					"seed": 1
+				},
+				"gpu_hours": 6.292378662238007,
+				"usd": 13.213995190699814,
+				"wall_time_s": 20963.953846153843,
+				"segments": 3,
+				"cut": true,
+				"time": {
+					"point": 20963.953846153843,
+					"lo": 15647.400116944502,
+					"hi": 28089.353076824504,
+					"unit": "s",
+					"status": "predicted",
+					"model_id": "time-total@0.1.0",
+					"source": "exact",
+					"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
+					"level": 0.9
+				}
+			}
+		],
+		"lanes": [
+			"chiya",
+			"ana",
+			"ben"
+		],
+		"cut_list": [
+			"batch_size=16,seq_len=1024,seed=0",
+			"batch_size=16,seq_len=1024,seed=1",
+			"batch_size=12,seq_len=1024,seed=0",
+			"batch_size=12,seq_len=1024,seed=1",
+			"batch_size=16,seq_len=512,seed=1"
+		],
+		"completion_quantiles": {
+			"p10": "2026-11-09T12:58:45.642971Z",
+			"p50": "2026-11-09T13:54:44.867908Z",
+			"p90": "2026-11-09T15:19:08.140968Z"
+		},
+		"gpu_hours": {
+			"point": 18.287777763028803,
+			"lo": 13.986505875776988,
+			"hi": 24.130489161586105,
+			"unit": "gpu_hours",
+			"status": "predicted",
+			"model_id": "campaign-mc@0.1.0",
+			"source": "exact",
+			"reason": "7 runs after cutting 5; their errors added as if they move together",
+			"level": 0.9
+		},
+		"usd": {
+			"point": 38.40433330236049,
+			"lo": 29.371662339131674,
+			"hi": 50.674027239330826,
+			"unit": "usd",
+			"status": "predicted",
+			"model_id": "campaign-mc@0.1.0",
+			"source": "exact",
+			"reason": "7 runs after cutting 5; their errors added as if they move together",
+			"level": 0.9
+		},
+		"finish_s": {
+			"point": 17684.86790792923,
+			"lo": 13546.879835565549,
+			"hi": 24347.91379023548,
+			"unit": "s",
+			"status": "predicted",
+			"model_id": "campaign-mc@0.1.0",
+			"source": "exact",
+			"reason": "the last of 7 runs ends; Monte Carlo over the engine's intervals",
+			"level": 0.9
+		},
+		"grid_gpu_hours": {
+			"point": 46.20089875571928,
+			"lo": 36.13915553215094,
+			"hi": 59.48414548680614,
+			"unit": "gpu_hours",
+			"status": "predicted",
+			"model_id": "campaign-mc@0.1.0",
+			"source": "exact",
+			"reason": "all 12 runs; their errors added as if they move together",
+			"level": 0.9
+		},
+		"grid_usd": {
+			"point": 97.02188738701051,
+			"lo": 75.89222661751695,
+			"hi": 124.9167055222929,
+			"unit": "usd",
+			"status": "predicted",
+			"model_id": "campaign-mc@0.1.0",
+			"source": "exact",
+			"reason": "all 12 runs; their errors added as if they move together",
+			"level": 0.9
+		},
+		"quota": {
+			"needed_bytes": {
+				"point": null,
+				"lo": null,
+				"hi": null,
+				"unit": "bytes",
+				"status": "abstain",
+				"model_id": "campaign-mc@0.1.0",
+				"source": "exact",
+				"reason": "no probe saved a checkpoint, and the memory model has no weights for this job",
+				"level": 0.9
+			},
+			"reason": "no probe saved a checkpoint, and the memory model has no weights for this job"
+		},
+		"notes": [
+			"seed isn't a knob the engine models, so each value costs what the run costs at its other settings",
+			"no probe timed a checkpoint save, so saves are counted as free",
+			"the grid's high end ($124.92) is over the $60.00 budget: 5 dearest runs cut"
+		]
+	}
+}

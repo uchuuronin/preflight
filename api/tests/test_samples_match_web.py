@@ -20,6 +20,7 @@ def _web_samples() -> dict[str, str]:
 
 
 def test_every_web_sample_is_known_to_the_api_with_the_same_file():
+	"""The API may know more (retired samples, for old links); never fewer, and the same file."""
 	web = _web_samples()
 	assert len(web) >= 8
 	for sid, path in web.items():

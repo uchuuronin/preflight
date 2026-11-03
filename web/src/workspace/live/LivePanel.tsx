@@ -17,8 +17,7 @@ const bytes = (v: number) => fmt(v, "bytes");
 const secs = (v: number) => fmt(v, "s");
 
 export function alertText(a: LiveAlert): string {
-	if (a.kind === "step")
-		return t(a.side === "above" ? "live.alert.step_above" : "live.alert.step_below", { step: fmt(a.step, "count"), value: secs(a.value), lo: secs(a.lo), hi: secs(a.hi) });
+	if (a.kind === "step") return t("live.alert.step_above", { step: fmt(a.step, "count"), value: secs(a.value), lo: secs(a.lo), hi: secs(a.hi) });
 	if (a.kind === "peak") return t("live.alert.peak", { step: fmt(a.step, "count"), value: bytes(a.value), lo: bytes(a.lo), hi: bytes(a.hi) });
 	return t("live.alert.total", { step: fmt(a.step, "count"), value: secs(a.value), lo: secs(a.lo), hi: secs(a.hi) });
 }
@@ -91,7 +90,15 @@ export function LivePanel() {
 				</div>
 			) : null}
 			<Announce kinds={r.alerts.map((a) => a.kind).join(",")} text={r.alerts.map(alertText).join(" ")} />
-			{!r.alerts.length && r.stepS !== null ? <p className="pf-live__ok">{t("live.in_band")}</p> : null}
+			{r.notes.map((n) => (
+				<p key={n.kind} className="pf-live__note">
+					{t("live.note.step_fast", { step: fmt(n.step, "count"), value: secs(n.value), lo: secs(n.lo), hi: secs(n.hi) })}
+				</p>
+			))}
+			{/* Only when the latest window really is inside the band (one window out isn't yet an alert or a note). */}
+			{!r.alerts.length && !r.notes.length && r.stepS !== null && (!r.bands.step || (r.stepS >= r.bands.step[0] && r.stepS <= r.bands.step[1])) ? (
+				<p className="pf-live__ok">{t("live.in_band")}</p>
+			) : null}
 			{recordRef === LIVE_REF ? (
 				<p className="pf-hint">
 					{live.following ? t("live.following", { name: live.name ?? "" }) : t("live.read_once", { name: live.name ?? "" })}{" "}

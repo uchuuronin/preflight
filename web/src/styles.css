@@ -2422,6 +2422,7 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-live__head { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .pf-live__rows { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; font-size: var(--pf-text-sm); }
 .pf-live__alert { margin: 0; color: var(--pf-fail); font-weight: 600; }
+.pf-live__note { margin: 0; font-size: var(--pf-text-sm); color: var(--pf-fg); }
 .pf-live__ok { margin: 0; font-size: var(--pf-text-sm); color: var(--pf-fg-dim); }
 .pf-watch { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: var(--pf-radius-md); }
 .pf-watch__steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }

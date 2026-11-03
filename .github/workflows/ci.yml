@@ -141,6 +141,11 @@ jobs:
           npm test
           npm run typecheck
           npm run hero-cards:check
+          node ../web/scripts/licences.mjs
+      - name: No GPL, AGPL or SSPL in the root's node packages (schema codegen)
+        run: |
+          npm ci --no-audit --no-fund
+          node web/scripts/licences.mjs
 
   secrets:
     runs-on: ubuntu-latest

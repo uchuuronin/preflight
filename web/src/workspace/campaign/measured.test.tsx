@@ -1,6 +1,6 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import campaignRaw from "../fixtures/campaign-grid.record.json";
+import campaignRaw from "../fixtures/campaign-grid-golden.record.json";
 import { type FlightRecord, normaliseRecord } from "../record/types";
 import { CampaignCalendar } from "./Calendar";
 import { measuredCell, planFromRecord } from "./plan";
