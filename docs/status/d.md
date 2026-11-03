@@ -75,6 +75,25 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 
+## Mon Nov 2, 22:30 ET (Chiya's 21:02 list: the stranger walkthrough; readme-final)
+
+Pushed `593be8b` at 21:04 (CI green): the search RESULT line for Tuesday noon in `from-d.md`, and
+`readme-final.md`'s AMD row at 199.3 GB reserved of the 206 GB card. No further search rounds.
+
+Item 1, the stranger walkthrough: `main` `75c9b24` built for production and served by `vite preview`,
+with C's API run locally (no Meta, Baseten or Modal credentials, nothing spent) for the knobs, the
+guide's fallback tour and the check-in up to the press. 20 findings for C, most serious first, in
+`from-d.md`: four measured samples open with blank time and cost dials (the run's length isn't
+known); on retrieval, vision, GNN and GRPO almost no knob move changes a dial, and the API doesn't know
+those samples or PF420 (its `SAMPLES` lists 5 of the 10) [measured]. Read-only fact-check before the
+push; its corrections are in. D changed no code of C's.
+
+Item 2: `readme-final.md` already mirrors main's share host and badge, AMD rows, and diagnosis,
+claim-check and engine-fallback rows; the one deliberate difference is main's stale AMD status row.
+Item 3: no video work tonight.
+
+This push sends: `docs/requests/from-d.md`, this file.
+
 ## Mon Nov 2, 20:40 ET (search fixes pushed; the cap test)
 
 Pushed `4be42a8` (CI green): B's three must-fixes, after four rounds of read-only review. The
