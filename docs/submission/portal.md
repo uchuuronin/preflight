@@ -76,8 +76,8 @@ types (A10, H100, L4, L40S, T4), step time on a GPU Preflight never measured lan
 57% of 6,694 held-out cases (rows from a Nov 1 top-up included, which the published corpus
 doesn't hold yet), under the 90% target, so it is shown with a wide band and labelled rough; and the divergence classifier, refitted on 720 runs, scores a held-out AUROC of 0.66 (0.56 to
 0.76) against a 0.85 target, so it is switched off. On an MI300X,
-step time from its own probe lands within 15% (2 of 2 runs), but from NVIDIA corpus rows it lands within 20% on only
-22% of 1,147 pairs, so a move across vendors isn't shown.
+step time from its own probe lands within 15% (2 of 2 runs), but from NVIDIA corpus rows it is 22% within 20%
+(NVIDIA torch 2.8.0 to MI300X torch 2.5.1+rocm6.2: card and software differ), 254 of 1,147 pairs, so a move across vendors isn't shown.
 
 **The corpus published with a datasheet.** The 2,339 rows of GPU measurements behind the learned
 models and the held-out checks are a dataset on Hugging Face, public with the repository from

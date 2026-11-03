@@ -1343,8 +1343,9 @@ def _with_note(est: Estimate, note: str) -> Estimate:
 # Chiya, Nov 2: the MI300X corpus slice (295 configs, `b-amd-grouped`), scored once from the NVIDIA rows of the same
 # configs; no refit on it, so a move across vendors still abstains, now saying what was measured
 AMD_CROSS = (
-	"measured on the MI300X (295 corpus configs, Nov 2): from NVIDIA rows of the same configs, K1 put the step within "
-	"20% on 254 of 1,147 pairs (22%) and inside its band on 411 (36%), reading about 0.63x the measured step"
+	"measured on the MI300X (295 corpus configs, Nov 2): from NVIDIA rows of the same configs, 22% within 20% (NVIDIA "
+	"torch 2.8.0 to MI300X torch 2.5.1+rocm6.2: card and software differ), 254 of 1,147 pairs, and inside its band on "
+	"411 (36%), reading about 0.63x the measured step"
 )
 
 

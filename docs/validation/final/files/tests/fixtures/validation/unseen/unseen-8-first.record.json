@@ -1,0 +1,2725 @@
+{
+ "schema_version": "0.6.2",
+ "record_id": "01M6EG4WGGQF9GZZ3KKB5DRRDS",
+ "share_token": "unseen-8-first-share-token-00",
+ "created_at": "2026-11-02T16:05:45Z",
+ "job": {
+  "lens": "gnn",
+  "source": {
+   "kind": "repo",
+   "uri": "https://github.com/snap-stanford/ogb",
+   "commit": "61e9784ca76edeaa6e259ba0f836099608ff0586",
+   "content_hash": "sha256:5d78529c73ca0ca971c65eee513680acd53506d301cff6073d4d26b0b0b3574c",
+   "entrypoint": "examples/nodeproppred/arxiv/gnn.py",
+   "args": [
+    "--use_sage",
+    "--runs",
+    "1",
+    "--epochs",
+    "500"
+   ]
+  },
+  "framework": "pyg",
+  "script_map": {
+   "lens": "gnn",
+   "framework": "pyg",
+   "entrypoint": "examples/nodeproppred/arxiv/gnn.py",
+   "launch": "python examples/nodeproppred/arxiv/gnn.py",
+   "model": {
+    "name": "GCNConv",
+    "family": "gnn",
+    "n_layers": 3,
+    "d_model": 256,
+    "shape_source": "code"
+   },
+   "data": {
+    "dataset": "ogbn-arxiv",
+    "batch_size": 128,
+    "eval_batch_size": 4,
+    "seq_len": 5,
+    "num_workers": 0,
+    "languages": []
+   },
+   "training": {
+    "optimizer": "Adam",
+    "lr": 0.0001,
+    "warmup_steps": 0,
+    "grad_accum": 1,
+    "precision": "fp32",
+    "max_steps": 100000,
+    "epochs": 25.0,
+    "eval_every": 10,
+    "grad_checkpointing": false,
+    "eval_under_no_grad": true,
+    "distributed": "ddp"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "examples/lsc/mag240m/gnn.py",
+     "line": 249,
+     "expr": "trainer.fit(model, datamodule=datamodule)"
+    },
+    "step_call": "trainer.fit(model, datamodule=datamodule)",
+    "model_var": "model",
+    "optimizer_var": "optimizer",
+    "dataloader_var": "train_idx"
+   },
+   "knobs": [
+    {
+     "id": "batch_size",
+     "label": "Batch size",
+     "kind": "int",
+     "current": 128,
+     "unit": "samples",
+     "choices": [],
+     "location": {
+      "file": "examples/graphproppred/code2/main_pyg.py",
+      "line": 103,
+      "expr": "default=128"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "epochs",
+     "label": "Epochs",
+     "kind": "int",
+     "current": 500,
+     "choices": [],
+     "location": {
+      "file": "examples/graphproppred/code2/main_pyg.py",
+      "line": 105,
+      "expr": "default=25"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "eval_batch_size",
+     "label": "Eval batch size",
+     "kind": "int",
+     "current": 4,
+     "unit": "samples",
+     "choices": [],
+     "location": {
+      "file": "examples/linkproppred/biokg/run.py",
+      "line": 55,
+      "expr": "default=4"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "eval_every",
+     "label": "Eval interval",
+     "kind": "int",
+     "current": 10,
+     "unit": "steps",
+     "choices": [],
+     "location": {
+      "file": "examples/linkproppred/citation2/cluster_gcn.py",
+      "line": 178,
+      "expr": "default=10"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "lr",
+     "label": "Learning rate",
+     "kind": "float",
+     "current": 0.0001,
+     "choices": [],
+     "location": {
+      "file": "examples/linkproppred/biokg/run.py",
+      "line": 59,
+      "expr": "default=0.0001"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "max_steps",
+     "label": "Training steps",
+     "kind": "int",
+     "current": 100000,
+     "unit": "steps",
+     "choices": [],
+     "location": {
+      "file": "examples/linkproppred/biokg/run.py",
+      "line": 63,
+      "expr": "default=100000"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "n_layer",
+     "label": "Layers",
+     "kind": "int",
+     "current": 3,
+     "choices": [],
+     "location": {
+      "file": "examples/linkproppred/citation2/cluster_gcn.py",
+      "line": 172,
+      "expr": "default=3"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "num_workers",
+     "label": "Data loader workers",
+     "kind": "int",
+     "current": 0,
+     "choices": [],
+     "location": {
+      "file": "examples/graphproppred/code2/main_pyg.py",
+      "line": 108,
+      "expr": "default=0"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "seq_len",
+     "label": "Sequence length",
+     "kind": "int",
+     "current": 5,
+     "unit": "tokens",
+     "choices": [],
+     "location": {
+      "file": "examples/graphproppred/code2/main_pyg.py",
+      "line": 95,
+      "expr": "default=5"
+     },
+     "needs_code": false
+    }
+   ],
+   "blocks": [
+    {
+     "id": "gcn_backbone",
+     "label": "GCN backbone (GCNConv + BatchNorm + ReLU + Dropout)",
+     "kind": "model_call",
+     "repeat": 1
+    },
+    {
+     "id": "sage_backbone",
+     "label": "SAGE backbone (SAGEConv + BatchNorm + ReLU + Dropout, if --use_sage)",
+     "kind": "model_call",
+     "repeat": 1
+    },
+    {
+     "id": "train_step",
+     "label": "Full-graph NLL loss on train_idx",
+     "kind": "loss",
+     "repeat": 1
+    },
+    {
+     "id": "eval_step",
+     "label": "Full-graph accuracy evaluation via OGB Evaluator",
+     "kind": "io",
+     "repeat": 1
+    }
+   ],
+   "risks": [
+    "num_workers=0: the data loader runs in the training process, so the GPU waits on it",
+    "Trains for 25 epochs, so every document repeats 25 times; repeated low-quality data costs more than unique data (give per-document quality scores for the repetition view)",
+    "Full-batch training loads entire ogbn-arxiv graph to single device, may OOM without enough GPU memory.",
+    "Provided partial map was incorrect: loop, knobs and file locations referred to unrelated examples and were removed.",
+    "No checkpointing; only in-memory logger statistics are kept.",
+    "Device defaults to cuda:0 when available with no fallback handling for multi-GPU or CPU-only memory limits."
+   ],
+   "produced_by": "muse_spark",
+   "confidence": 0.92
+  },
+  "objective": {
+   "kind": "min_time",
+   "weights": {}
+  },
+  "constraints": {
+   "gpu_types": [
+    "L4"
+   ],
+   "preemption": {
+    "kind": "none"
+   }
+  }
+ },
+ "env": {
+  "backend": "cpu",
+  "provider": "modal",
+  "nodes": 1,
+  "libraries": {}
+ },
+ "graph": {
+  "nodes": [
+   {
+    "id": "graph",
+    "label": "Graph store",
+    "kind": "store",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "sampler",
+    "label": "Neighbour sampler (CPU)",
+    "kind": "phase",
+    "repeat": 1,
+    "metrics": [
+     "probe.data.loader_wait_fraction"
+    ],
+    "attrs": {}
+   },
+   {
+    "id": "gnn",
+    "label": "GCNConv",
+    "kind": "group",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "layer",
+    "label": "Message-passing layer",
+    "kind": "module",
+    "parent": "gnn",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "loss",
+    "label": "Loss",
+    "kind": "loss",
+    "repeat": 1,
+    "metrics": [
+     "probe.stability.loss"
+    ],
+    "attrs": {}
+   },
+   {
+    "id": "optimizer",
+    "label": "Optimizer",
+    "kind": "optimizer",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   }
+  ],
+  "edges": [
+   {
+    "source": "graph",
+    "target": "sampler",
+    "kind": "data"
+   },
+   {
+    "source": "sampler",
+    "target": "layer",
+    "kind": "data",
+    "metric": "probe.throughput.samples_per_s"
+   },
+   {
+    "source": "layer",
+    "target": "loss",
+    "kind": "data"
+   },
+   {
+    "source": "loss",
+    "target": "optimizer",
+    "kind": "grad"
+   },
+   {
+    "source": "optimizer",
+    "target": "layer",
+    "kind": "weights"
+   }
+  ],
+  "skeleton": true
+ },
+ "knobs": [
+  {
+   "id": "eval_every",
+   "label_key": "knob.eval_every",
+   "unit": "steps",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 100000.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 10,
+   "gridded": false,
+   "needs_code": false,
+   "group": "cluster",
+   "affects": [],
+   "changes_results": false
+  },
+  {
+   "id": "gpu_type",
+   "label_key": "knob.gpu_type",
+   "kind": "categorical",
+   "domain": {
+    "values": [
+     "L4"
+    ],
+    "log": false
+   },
+   "current": "L4",
+   "gridded": false,
+   "needs_code": false,
+   "group": "cluster",
+   "affects": [
+    "gnn"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "max_steps",
+   "label_key": "knob.max_steps",
+   "unit": "steps",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 1000000.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 100000,
+   "gridded": false,
+   "needs_code": false,
+   "group": "cluster",
+   "affects": [
+    "sampler",
+    "optimizer"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "epochs",
+   "label_key": "knob.epochs",
+   "kind": "int",
+   "domain": {
+    "min": 0.0,
+    "max": 5000.0,
+    "values": [],
+    "step": 1.0,
+    "log": false
+   },
+   "current": 500,
+   "gridded": false,
+   "needs_code": false,
+   "group": "data",
+   "affects": [
+    "sampler"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "num_workers",
+   "label_key": "knob.num_workers",
+   "kind": "int",
+   "domain": {
+    "min": 0.0,
+    "max": 32.0,
+    "values": [],
+    "step": 1.0,
+    "log": false
+   },
+   "current": 0,
+   "gridded": false,
+   "needs_code": false,
+   "group": "data",
+   "affects": [
+    "sampler"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "batch_size",
+   "label_key": "knob.batch_size",
+   "unit": "samples",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 2048.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 128,
+   "gridded": false,
+   "needs_code": false,
+   "group": "memory",
+   "affects": [
+    "sampler",
+    "gnn"
+   ]
+  },
+  {
+   "id": "eval_batch_size",
+   "label_key": "knob.eval_batch_size",
+   "unit": "samples",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 512.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 4,
+   "gridded": false,
+   "needs_code": false,
+   "group": "memory",
+   "affects": [],
+   "changes_results": false
+  },
+  {
+   "id": "seq_len",
+   "label_key": "knob.seq_len",
+   "unit": "tokens",
+   "kind": "int",
+   "domain": {
+    "min": 5.0,
+    "max": 32768.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 5,
+   "gridded": false,
+   "needs_code": false,
+   "group": "memory",
+   "affects": [],
+   "changes_results": true
+  },
+  {
+   "id": "lr",
+   "label_key": "knob.lr",
+   "kind": "float",
+   "domain": {
+    "min": 1e-06,
+    "max": 0.01,
+    "values": [],
+    "log": true
+   },
+   "current": 0.0001,
+   "gridded": false,
+   "needs_code": false,
+   "group": "model",
+   "affects": [
+    "optimizer"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "n_layer",
+   "label_key": "knob.n_layer",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 128.0,
+    "values": [],
+    "step": 1.0,
+    "log": false
+   },
+   "current": 3,
+   "gridded": false,
+   "needs_code": false,
+   "group": "model",
+   "affects": [],
+   "changes_results": true
+  }
+ ],
+ "probes": [
+  {
+   "id": "p1",
+   "knobs": {
+    "batch_size": 128,
+    "seq_len": 5
+   },
+   "status": "error",
+   "steps": 0,
+   "duration_s": 0.0,
+   "error": "no L4 could be scheduled in 20 min. Step: waiting for a GPU. By hand: submit again in a few minutes, or pick another GPU.",
+   "error_code": "gpu.unavailable",
+   "extras": {
+    "gpu_wait_s": 1200.1
+   },
+   "step_log": [],
+   "cost": {
+    "gpu_seconds": 0.0,
+    "usd": 0.0
+   },
+   "cache_key": "sha256:e4f605463a1fd4dd44e29d2e6f8dcddb28fb90b33d9e19711ea0deb9da25326f"
+  },
+  {
+   "id": "p2",
+   "knobs": {
+    "batch_size": 64,
+    "seq_len": 5
+   },
+   "status": "error",
+   "steps": 0,
+   "error": "skipped: no GPU could be scheduled (see the first probe). Step: waiting for a GPU. By hand: submit again in a few minutes, or pick another GPU.",
+   "error_code": "gpu.unavailable",
+   "extras": {},
+   "step_log": [],
+   "cost": {
+    "gpu_seconds": 0.0,
+    "usd": 0.0
+   }
+  },
+  {
+   "id": "p3",
+   "knobs": {
+    "batch_size": 128,
+    "seq_len": 2
+   },
+   "status": "error",
+   "steps": 0,
+   "error": "skipped: no GPU could be scheduled (see the first probe). Step: waiting for a GPU. By hand: submit again in a few minutes, or pick another GPU.",
+   "error_code": "gpu.unavailable",
+   "extras": {},
+   "step_log": [],
+   "cost": {
+    "gpu_seconds": 0.0,
+    "usd": 0.0
+   }
+  }
+ ],
+ "predictions": {
+  "targets": [
+   {
+    "id": "memory.peak",
+    "label_key": "target.memory.peak",
+    "unit": "bytes",
+    "readout": "memory"
+   },
+   {
+    "id": "time.total",
+    "label_key": "target.time.total",
+    "unit": "s",
+    "readout": "time"
+   },
+   {
+    "id": "cost.total",
+    "label_key": "target.cost.total",
+    "unit": "usd",
+    "readout": "cost"
+   },
+   {
+    "id": "cost.gpu_hours",
+    "label_key": "target.cost.gpu_hours",
+    "unit": "gpu_hours",
+    "readout": "cost"
+   },
+   {
+    "id": "risk.oom",
+    "label_key": "target.risk.oom",
+    "unit": "probability",
+    "readout": "risk"
+   },
+   {
+    "id": "time.step",
+    "label_key": "target.time.step",
+    "unit": "s"
+   }
+  ],
+  "estimates": {
+   "memory.peak": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "bytes",
+    "status": "abstain",
+    "model_id": "memory-analytical@0.3.1",
+    "source": "exact",
+    "reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through",
+    "level": 0.9
+   },
+   "time.total": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "s",
+    "status": "abstain",
+    "model_id": "time-total@0.1.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   },
+   "cost.total": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "usd",
+    "status": "abstain",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   },
+   "cost.gpu_hours": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "gpu_hours",
+    "status": "abstain",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   },
+   "risk.oom": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "probability",
+    "status": "abstain",
+    "model_id": "memory-analytical@0.3.1",
+    "source": "exact",
+    "reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through",
+    "level": 0.9
+   },
+   "time.step": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "s",
+    "status": "abstain",
+    "model_id": "steptime-phases@0.2.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   }
+  },
+  "grids": [
+   {
+    "id": "g.memory.peak.eval_every",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.time.total.eval_every",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.total.eval_every",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.eval_every",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.risk.oom.eval_every",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.memory.peak.gpu_type",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "L4"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.time.total.gpu_type",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "L4"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.total.gpu_type",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "L4"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.gpu_type",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "L4"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.risk.oom.gpu_type",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "L4"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.memory.peak.max_steps",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "max_steps",
+      "values": [
+       12500,
+       25000,
+       50000,
+       100000,
+       200000,
+       400000,
+       800000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.time.total.max_steps",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "max_steps",
+      "values": [
+       12500,
+       25000,
+       50000,
+       100000,
+       200000,
+       400000,
+       800000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.total.max_steps",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "max_steps",
+      "values": [
+       12500,
+       25000,
+       50000,
+       100000,
+       200000,
+       400000,
+       800000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.max_steps",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "max_steps",
+      "values": [
+       12500,
+       25000,
+       50000,
+       100000,
+       200000,
+       400000,
+       800000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.risk.oom.max_steps",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "max_steps",
+      "values": [
+       12500,
+       25000,
+       50000,
+       100000,
+       200000,
+       400000,
+       800000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.memory.peak.epochs",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.time.total.epochs",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.total.epochs",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.epochs",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.risk.oom.epochs",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.memory.peak.num_workers",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "num_workers",
+      "values": [
+       0,
+       6,
+       13,
+       19,
+       26,
+       32
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.time.total.num_workers",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "num_workers",
+      "values": [
+       0,
+       6,
+       13,
+       19,
+       26,
+       32
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.total.num_workers",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "num_workers",
+      "values": [
+       0,
+       6,
+       13,
+       19,
+       26,
+       32
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.num_workers",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "num_workers",
+      "values": [
+       0,
+       6,
+       13,
+       19,
+       26,
+       32
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.risk.oom.num_workers",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "num_workers",
+      "values": [
+       0,
+       6,
+       13,
+       19,
+       26,
+       32
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.memory.peak.batch_size",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       16,
+       32,
+       64,
+       128,
+       256,
+       512,
+       1024
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.time.total.batch_size",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       16,
+       32,
+       64,
+       128,
+       256,
+       512,
+       1024
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.total.batch_size",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       16,
+       32,
+       64,
+       128,
+       256,
+       512,
+       1024
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.batch_size",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       16,
+       32,
+       64,
+       128,
+       256,
+       512,
+       1024
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.risk.oom.batch_size",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       16,
+       32,
+       64,
+       128,
+       256,
+       512,
+       1024
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.memory.peak.eval_batch_size",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.time.total.eval_batch_size",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.total.eval_batch_size",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.eval_batch_size",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.risk.oom.eval_batch_size",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "seq_len": 5,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.memory.peak.seq_len",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       5,
+       10,
+       20,
+       40
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAA=",
+    "abstain": "Dw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.time.total.seq_len",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       5,
+       10,
+       20,
+       40
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAA=",
+    "abstain": "Dw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.total.seq_len",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       5,
+       10,
+       20,
+       40
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAA=",
+    "abstain": "Dw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.seq_len",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       5,
+       10,
+       20,
+       40
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAA=",
+    "abstain": "Dw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.risk.oom.seq_len",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       5,
+       10,
+       20,
+       40
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAA=",
+    "abstain": "Dw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "lr": 0.0001,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.memory.peak.lr",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.time.total.lr",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.total.lr",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.lr",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.risk.oom.lr",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "n_layer": 3
+    }
+   },
+   {
+    "id": "g.memory.peak.n_layer",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "n_layer",
+      "values": [
+       2,
+       3,
+       6,
+       12,
+       24
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001
+    }
+   },
+   {
+    "id": "g.time.total.n_layer",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "n_layer",
+      "values": [
+       2,
+       3,
+       6,
+       12,
+       24
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001
+    }
+   },
+   {
+    "id": "g.cost.total.n_layer",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "n_layer",
+      "values": [
+       2,
+       3,
+       6,
+       12,
+       24
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.n_layer",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "n_layer",
+      "values": [
+       2,
+       3,
+       6,
+       12,
+       24
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001
+    }
+   },
+   {
+    "id": "g.risk.oom.n_layer",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "n_layer",
+      "values": [
+       2,
+       3,
+       6,
+       12,
+       24
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 10,
+     "gpu_type": "L4",
+     "max_steps": 100000,
+     "epochs": 500,
+     "num_workers": 0,
+     "batch_size": 128,
+     "eval_batch_size": 4,
+     "seq_len": 5,
+     "lr": 0.0001
+    }
+   }
+  ]
+ },
+ "models": [
+  {
+   "id": "cost-gpu-hours@0.1.0",
+   "kind": "rule",
+   "version": "0.1.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. GPU-hours x the dated price in engine/prices",
+   "fixture": false
+  },
+  {
+   "id": "memory-analytical@0.3.1",
+   "kind": "analytical",
+   "version": "0.3.1",
+   "training_data": "remote-runs b-topup-export-2 (Nov 1): L4, A10, L40S, T4, H100 (the Nov 1 top-up's seed 0 and 1 rows included); A100 held out, scored once on Oct 31, not re-scored (8463 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, A100-PCIe-40GB); table 50ea0fb14a",
+   "heldout_error": {},
+   "coverage": 0.9048672566371682,
+   "per_gpu_coverage": {
+    "A100-PCIe-80GB": 0.6666666666666666,
+    "A100-SXM-80GB": 0.875
+   },
+   "notes": "calibration: held_out. Korthikanti-style accounting, calibrated by the probes (E3); S1, S2a-d.  Own cells: H100-SXM-80GB, pretrain (n = 40); H100-SXM-80GB, retrieval (n = 40); H100-SXM-80GB, vision (n = 78); L40S, pretrain (n = 47); L40S, retrieval (n = 48); L40S, vision (n = 91); A10, finetune (n = 19); A10, pretrain (n = 69); A10, retrieval (n = 70); A10, vision (n = 130); L4, finetune (n = 19); L4, pretrain (n = 55); L4, retrieval (n = 53); L4, vision (n = 101); T4, pretrain (n = 11); T4, retrieval (n = 11); T4, vision (n = 22); merged across GPUs and job types (n = 904); finetune, merged across GPUs (n = 38); pretrain, merged across GPUs (n = 222); retrieval, merged across GPUs (n = 222); vision, merged across GPUs (n = 422). A GPU and job type with fewer than 9 held-out runs has no band of its own: it uses its job type merged across GPUs, then all runs. Leave-one-architecture-out coverage 818 of 904 (Wilson 95% 88% to 92%). Holdout, never tuned on: A100-PCIe-80GB 8 of 12 inside the band (Wilson 95% 39% to 86%). Holdout, never tuned on: A100-SXM-80GB 14 of 16 inside the band (Wilson 95% 64% to 97%)",
+   "fixture": false
+  },
+  {
+   "id": "run-cost@0.1.0",
+   "kind": "rule",
+   "version": "0.1.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. run cost lines as quantity x a dated price-table rate, totals added line by line; money at risk is P(OOM) over its bin's edges x the cost up to the crash (S7)",
+   "fixture": false
+  },
+  {
+   "id": "steptime-phases@0.2.0",
+   "kind": "analytical",
+   "version": "0.2.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. per-phase linear fits on the probes; S4b below the smallest probe",
+   "fixture": false
+  },
+  {
+   "id": "time-total@0.1.0",
+   "kind": "analytical",
+   "version": "0.1.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. steps x step time plus measured checkpoint and eval overheads",
+   "fixture": false
+  }
+ ],
+ "findings": [
+  {
+   "id": "read.data.num_workers_zero",
+   "severity": "warn",
+   "code": "data.num_workers_zero",
+   "title": "Data loader runs in the training process (num_workers=0)",
+   "node_id": "sampler",
+   "evidence": [
+    {
+     "metric": "num_workers",
+     "value": 0.0
+    }
+   ],
+   "source": "rule",
+   "fix_template": "data.num_workers",
+   "knob_id": "num_workers",
+   "citations": []
+  },
+  {
+   "id": "read.precision.fp32",
+   "severity": "warn",
+   "code": "precision.fp32",
+   "title": "Trains in fp32",
+   "evidence": [],
+   "source": "rule",
+   "fix_template": "precision.bf16_autocast",
+   "knob_id": "precision",
+   "citations": []
+  },
+  {
+   "id": "read.data.repetition",
+   "severity": "info",
+   "code": "data.repetition",
+   "title": "Every document is seen 25 times",
+   "detail": "Trains for 25 epochs, so every document repeats 25 times; repeated low-quality data costs more than unique data (give per-document quality scores for the repetition view)",
+   "evidence": [
+    {
+     "metric": "epochs",
+     "value": 25.0
+    }
+   ],
+   "source": "rule",
+   "knob_id": "epochs",
+   "citations": []
+  },
+  {
+   "id": "triage.p1",
+   "severity": "info",
+   "code": "triage.infrastructure",
+   "title": "Spark Open on probe p1: infrastructure",
+   "detail": "Probe failed with gpu.unavailable after no L4 GPU could be scheduled within 20 minutes, resulting in 0 optimizer steps. (log: \"no L4 could be scheduled in 20 min\")",
+   "evidence": [
+    {
+     "metric": "triage",
+     "value": 1.0,
+     "probe_id": "p1"
+    }
+   ],
+   "source": "spark_open_triage",
+   "citations": []
+  }
+ ],
+ "patches": [],
+ "provenance": [
+  {
+   "provider": "meta",
+   "model": "muse-spark-1.3",
+   "purpose": "script_map",
+   "input_tokens": 21400,
+   "output_tokens": 2138,
+   "cached_input_tokens": 0,
+   "cost_usd": 0.035837,
+   "request_id": "625db8d7-0812-43fc-a117-600b7a42c662",
+   "at": "2026-11-02T16:05:59Z",
+   "latency_s": 11.731,
+   "ok": true
+  },
+  {
+   "provider": "baseten",
+   "model": "meta-models/muse-spark-open-1026",
+   "purpose": "triage",
+   "input_tokens": 315,
+   "output_tokens": 409,
+   "cached_input_tokens": 0,
+   "cost_usd": 0.002132,
+   "request_id": "chatcmpl-72a923e4d8784150ac2186f2c92f68d3",
+   "at": "2026-11-02T16:26:04Z",
+   "latency_s": 2.049,
+   "ok": true
+  }
+ ],
+ "costs": {
+  "gpu_usd": 0.0,
+  "llm_usd": 0.037969,
+  "breakdown": {
+   "probes": 0.0,
+   "model_calls": 0.037969
+  }
+ },
+ "cost_basis": {
+  "price_table": "prices@2026-11-01",
+  "as_of": "2026-11-01",
+  "provider": "modal",
+  "billing": "on_demand",
+  "currency": "USD",
+  "includes": [
+   "gpu",
+   "tokens"
+  ]
+ },
+ "job_cost": {
+  "lines": [
+   {
+    "kind": "gpu",
+    "label_key": "cost.line.gpu",
+    "quantity": {
+     "point": null,
+     "lo": null,
+     "hi": null,
+     "unit": "gpu_hours",
+     "status": "abstain",
+     "model_id": "run-cost@0.1.0",
+     "source": "exact",
+     "reason": "no probe timed a step yet",
+     "level": 0.9
+    },
+    "rate_usd": 0.8,
+    "usd": {
+     "point": null,
+     "lo": null,
+     "hi": null,
+     "unit": "usd",
+     "status": "abstain",
+     "model_id": "run-cost@0.1.0",
+     "source": "exact",
+     "reason": "no probe timed a step yet",
+     "level": 0.9
+    },
+    "price_row": "gpu/modal/L4/us/on_demand"
+   }
+  ],
+  "total_usd": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "usd",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no probe timed a step yet",
+   "level": 0.9
+  },
+  "gpu_hours": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "gpu_hours",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no probe timed a step yet",
+   "level": 0.9
+  },
+  "at_risk_gpu_hours": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "gpu_hours",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through",
+   "level": 0.9
+  },
+  "at_risk_usd": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "usd",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through",
+   "level": 0.9
+  }
+ }
+}

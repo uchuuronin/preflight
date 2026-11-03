@@ -638,7 +638,8 @@ def test_with_the_held_out_band_a_gpu_move_is_rough_with_a_probe_offer(ft, monke
 		amd.status == "abstain"
 		and amd.reason.startswith("not shown across vendors")
 		and "another vendor" in amd.reason
-		and "within 20% on 254 of 1,147 pairs" in amd.reason
+		and "22% within 20% (NVIDIA torch 2.8.0 to MI300X torch 2.5.1+rocm6.2: card and software differ)"
+		in amd.reason
 	)
 	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
 	assert "Rough, no probe on this GPU" in card.notes and "26 of 28" in card.notes
