@@ -54,3 +54,40 @@ def test_only_code_that_imports_torchvision_is_keyed_with_it():
 	assert not _uses_torchvision(
 		{"t.py": "import torch\n# torchvision later\n", "notes.md": "import torchvision"}
 	)
+
+
+def test_ogb_s_archive_is_copied_by_its_url_and_its_size_check_skipped(tmp_path, monkeypatch):
+	import hashlib
+	import types
+
+	url = C.URL_FILES["ogbn-arxiv"]
+	(tmp_path / "cache" / "by-url").mkdir(parents=True)
+	(tmp_path / "cache" / "by-url" / C.url_key(url)).write_bytes(b"zip bytes")
+	monkeypatch.setitem(C.URL_SHA256, url, hashlib.sha256(b"zip bytes").hexdigest())
+	opened = []
+	mod = types.SimpleNamespace(decide_download=lambda u: opened.append(u) or True,
+		download_url=lambda u, folder, log=True: opened.append(u) or "fetched")  # fmt: skip
+	C.patch_ogb(mod, tmp_path / "cache", log=lambda m: None)
+	assert mod.decide_download(url) is True and opened == []  # no HTTP request for the cached one
+	got = mod.download_url(url, str(tmp_path / "data" / "arxiv"))
+	assert (
+		got.endswith("arxiv.zip") and (tmp_path / "data" / "arxiv" / "arxiv.zip").read_bytes() == b"zip bytes"
+	)
+	other = "http://snap.stanford.edu/ogb/data/nodeproppred/products.zip"
+	assert mod.download_url(other, str(tmp_path)) == "fetched" and opened == [other]
+	assert C.cached_url(tmp_path / "cache", "http://evil/../../x") is None  # only the URLs the cache names
+
+
+def test_ogb_code_gets_the_cache_too():
+	from preflight.runner.pipeline import _uses_torchvision
+
+	assert _uses_torchvision({"gnn.py": "from ogb.nodeproppred import PygNodePropPredDataset\n"})
+
+
+def test_an_archive_whose_hash_isn_t_the_pinned_one_is_never_served(tmp_path, monkeypatch):
+	url = C.URL_FILES["ogbn-arxiv"]
+	(tmp_path / "by-url").mkdir()
+	(tmp_path / "by-url" / C.url_key(url)).write_bytes(b"<html>error page</html>")
+	assert C.cached_url(tmp_path, url) is None  # nothing pinned: never served
+	monkeypatch.setitem(C.URL_SHA256, url, "0" * 64)
+	assert C.cached_url(tmp_path, url) is None  # pinned, but not this file

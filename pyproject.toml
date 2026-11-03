@@ -45,6 +45,8 @@ default-groups = ["dev"]
 line-length = 110
 target-version = "py311"
 src = ["python", "tests"]
+# held-out third-party files kept exactly as published (the fresh list, docs/validation/fresh-hash.txt): never linted
+extend-exclude = ["validation/fresh"]
 
 [tool.ruff.format]
 indent-style = "tab"

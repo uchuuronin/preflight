@@ -76,7 +76,7 @@ from preflight.schema.script_map import ScriptMap
 
 from . import record_jobs
 from .records import RecordReader, RecordWriter
-from .sources import Fetched, extra_lines, fetch
+from .sources import Fetched, content_hash, extra_lines, fetch
 from .worker import JobContext, PermanentError
 
 log = logging.getLogger("preflight.pipeline")
@@ -155,6 +155,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"install_exec": True} if spec.install_exec else {}),  # a list read from the build installs more
 		**({"dataset_cache": True} if spec.dataset_cache else {}),  # no download in the measured time
 		**({"step_clock": True} if spec.step_clock else {}),  # a probe that reports more
+		**({"entry_path": True} if spec.entry_path else {}),  # another path can import other code
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
@@ -289,11 +290,20 @@ def _uses_vllm(sm: ScriptMap, files: dict[str, str]) -> bool:
 	return sm.lens == "eval" and any(_VLLM_IMPORT.search(t) for n, t in files.items() if n.endswith(".py"))
 
 
-_TORCHVISION = re.compile(r"^\s*(?:from|import)\s+torchvision\b", re.M)
+# the libraries whose downloads the dataset volume serves (recorder/dataset_cache.py): torchvision's, OGB's
+_TORCHVISION = re.compile(r"^\s*(?:from|import)\s+(?:torchvision|ogb)\b", re.M)
 
 
 def _uses_torchvision(files: dict[str, str]) -> bool:
 	return any(_TORCHVISION.search(t) for n, t in files.items() if n.endswith(".py"))
+
+
+# a probe that stopped at an import: a package it lacked, or (runner.entrypoint_path) the repo's own module not on its path
+IMPORT_STOPS = ("missing_package", "missing_module.local")
+
+
+def _import_stop(code: str | None) -> bool:
+	return (code or "").startswith("missing_package") or code == "missing_module.local"
 
 
 def _image_pins(image: str) -> str:
@@ -354,6 +364,7 @@ def _spec(
 		# only code that imports torchvision: the flag re-keys no other job's probes (review, Nov 3)
 		dataset_cache=_flag("probes.dataset_cache") and _uses_torchvision(fetched.files),
 		step_clock=_flag("probes.step_clock"),
+		entry_path=_flag("runner.entrypoint_path"),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
 		image=_image(sm, fetched.files),
@@ -492,7 +503,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	fetched = fetch(source, blobs=deps.blobs)
 	if origin is not None and origin.parent is not None:
 		was = origin.parent.job.source.content_hash
-		if was and fetched.source.content_hash != was:
+		# a record read before the closure read data files (B's must-fix 3, Nov 3) hashed its imports alone: the same
+		# code, read as it was then, still matches (review)
+		data = set((fetched.partial or {}).get("data_files") or ())
+		older = content_hash({k: v for k, v in fetched.files.items() if k not in data}) if data else None
+		if was and fetched.source.content_hash != was and older != was:
 			raise InvalidSubmission("this record's code has changed since it was measured; check it in again",
 				code="submission.code_changed")  # fmt: skip
 	ctx.check()
@@ -669,7 +684,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	if (
 		_flag("runner.free_resend")
 		and probes
-		and all(q.steps == 0 and (q.error_code or "").startswith("missing_package") for q in probes)
+		and all(q.steps == 0 and _import_stop(q.error_code) for q in probes)
 	):
 		# every probe stopped at an import: a resend with the packages is free today (runner.free_resend)
 		_emit(
@@ -703,9 +718,14 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	out = _with_dataset_size(out, fetched.files)  # the record's own code: a patch may change the size
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
-	keep = [
-		f for f in keep if not f.id.startswith(("source.partial", "source.map_skipped"))
-	]  # said afresh below
+	# said afresh below; a follow-up that reused the stored map (so never mapped, B's must-fix 5, Nov 3) keeps its
+	# parent's map-skipped finding: its lens, model and GPU still came from the entry point alone
+	afresh = (
+		("source.partial", "source.map_skipped")
+		if fetched.map_skipped or not followup
+		else ("source.partial",)
+	)
+	keep = [f for f in keep if not f.id.startswith(afresh)]
 	out = out.model_copy(
 		update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *_reading_findings(fetched)]}
 	)
@@ -925,12 +945,22 @@ def _reading_findings(fetched: Fetched) -> list:
 		left = (
 			f"; at least {p['skipped']:,} more imported files were left out {why}" if p.get("skipped") else ""
 		)
+		# B, Nov 3: the files the code may open (named in its arguments or its code, or beside what was read)
+		if p.get("data_read") or p.get("data_skipped"):
+			left += f"; it also read {_n_files(p.get('data_read', 0), 'file')} the code may open"
+			if p.get("data_skipped"):
+				names = ", ".join(p.get("data_left_out") or [])
+				left += f" and left out {p['data_skipped']:,} more for the budget" + (
+					f" ({names}{', …' if p['data_skipped'] > 5 else ''})" if names else ""
+				)
 		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
 			title="Read the entry point and what it imports, as asked" if p.get("asked")
 				else "Read the entry point and what it imports, not the whole repository",
 			detail=(f"{_why_partial(p)}, so it read {fetched.entrypoint} and {_n_files(p['imported'], 'Python file')} it imports "
 				f"({_mb(p['bytes'])} in all){left}. The map and the findings cover what was read, and the probes run "
-				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error."),
+				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error, a file "
+				"it opens that wasn't read with a FileNotFoundError, and a package read only in part comes before an "
+				"installed copy of the same name."),
 			evidence=[Evidence(metric="source.files_read", value=float(p["files"])),
 				Evidence(metric="source.repo_files", value=float(p["repo_files"]))]))  # fmt: skip
 	try:  # with the map skipped, its finding above says it: no partial-map finding beside it
@@ -1232,7 +1262,7 @@ def _probe_points(
 			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
 				error="skipped: no GPU could be scheduled (see the first probe)", error_code="gpu.unavailable"))  # fmt: skip
 			continue
-		gone = next((q for q in probes if q.error_code == "missing_package" and not q.steps), None)
+		gone = next((q for q in probes if q.error_code in IMPORT_STOPS and not q.steps), None)
 		if (
 			gone is not None
 			and stop_on_import

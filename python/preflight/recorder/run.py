@@ -33,10 +33,48 @@ def _what_installed(spec: dict) -> str:
 	return what
 
 
+def _local_missing(exc: BaseException, workdir: str, spec: dict) -> str | None:
+	"""runner.entrypoint_path: when the module Python couldn't import is the repo's own top-level module (a folder of
+	Python files, or a file, that sits at an import root: not a subpackage of another package), say that, not "not
+	installed"; None otherwise (review: a `mypkg/datasets/` subpackage isn't Hugging Face's datasets)."""
+	name = (getattr(exc, "name", None) or "")[:200]
+	top = name.split(".")[0]
+	if not top or not top.isidentifier():
+		return None
+	root = Path(workdir)
+
+	def top_level(p: Path) -> bool:  # a module importable as `top` from p's folder, not inside a package
+		return not (p.parent / "__init__.py").is_file() and (p.suffix == ".py" or any(p.glob("*.py")))
+
+	try:
+		hits = sorted(
+			p
+			for p in [*root.rglob(top), *root.rglob(f"{top}.py")]
+			if (p.is_dir() or p.is_file()) and top_level(p)
+		)
+	except OSError:
+		hits = []
+	if not hits:
+		return None
+	where = os.path.relpath(hits[0].parent, root)
+	where = "the top of the repo" if where == "." else f"{where}/"
+	return (f"The script imports {name}, the repo's own module (under {where}), which isn't on the path the script "
+		"runs with")  # fmt: skip
+
+
 def _write(out_path: str, result: dict) -> None:
 	tmp = out_path + ".tmp"
-	Path(tmp).write_text(json.dumps(result, default=str))
-	os.replace(tmp, out_path)
+	Path(tmp).write_text(json.dumps(result, default=str), encoding="utf-8")
+	for i in range(
+		40
+	):  # Windows refuses a replace while the parent is reading the file (D, Nov 3): wait it out
+		try:
+			os.replace(tmp, out_path)
+			return
+		except PermissionError:
+			if i == 39:
+				raise
+			time.sleep(0.05 * min(i + 1, 5))
 
 
 # Limits on the visitor's code, set in this process before it runs (inherited by all it starts).
@@ -52,8 +90,12 @@ RLIMITS = {
 
 
 def set_limits() -> dict:
-	"""Lower each limit to ours (never raise one); returns what was applied, for the log."""
-	import resource
+	"""Lower each limit to ours (never raise one); returns what was applied, for the log. None on Windows,
+	which has no `resource` module (D, Nov 3): the probe runs without them there."""
+	try:
+		import resource
+	except ImportError:
+		return {}
 
 	applied = {}
 	for name, want in RLIMITS.items():
@@ -191,7 +233,8 @@ def main(spec_path: str) -> int:
 			sys.path.insert(i, str(d))  # after the script's own files, before the image
 		parts = [*(str(d) for d in dirs), os.environ.get("PYTHONPATH") or ""]
 		os.environ["PYTHONPATH"] = os.pathsep.join(p for p in parts if p)
-	if spec.get("install_repo"):
+	if spec.get("install_repo") or spec.get("entry_path"):
+		# runner.entrypoint_path (C, Nov 2: `import image_classification` beside a scope-entrypoint main.py) and
 		# probes.repo_install: as `python path/to/script.py` does, the script's own folder comes first, so it
 		# imports the modules beside it (OGB arxiv's gnn.py imports its logger.py; the full run did, the probe
 		# didn't: a-all3-8, Nov 2); after the installs, so the deps keep their place behind the repo's own files
@@ -222,6 +265,9 @@ def main(spec_path: str) -> int:
 
 		if os.path.isdir(CACHE_DIR):
 			rec._importer.on("torchvision.datasets.utils", lambda mod: patch(mod, CACHE_DIR))
+			from .dataset_cache import patch_ogb
+
+			rec._importer.on("ogb.utils.url", lambda mod: patch_ogb(mod, CACHE_DIR))
 
 	status, code, error = "ok", None, None
 	too_few = "script finished after {n} optimizer steps; a probe needs at least 2"
@@ -258,7 +304,15 @@ def main(spec_path: str) -> int:
 		when = f"after step {n}" if n else f"before the first optimizer step (stage: {rec.stage})"
 		detail = f"{type(exc).__name__}: {str(exc)[:500]}"
 		status, code = c.status, c.code
-		error = f"{c.message}. {detail}" + (f" at {where}" if where else "") + f", {when}"
+		msg = c.message
+		local = (
+			_local_missing(exc, workdir, spec)
+			if code == "missing_package" and spec.get("entry_path")
+			else None
+		)
+		if local:  # the repo's own module, not a package to install (C, Nov 2: Boarding said "add it to requirements.txt")
+			code, msg = "missing_module.local", local
+		error = f"{msg}. {detail}" + (f" at {where}" if where else "") + f", {when}"
 	finally:
 		rec.uninstall()
 

@@ -29,7 +29,6 @@ A script that reads PREFLIGHT_SAMPLE_TASKS can stop by itself.
 import os
 import random
 import re
-import signal
 import subprocess
 import time
 from pathlib import Path
@@ -103,7 +102,9 @@ class _LocalProc:
 
 	def kill(self):
 		with _quiet():
-			os.killpg(self.p.pid, signal.SIGKILL)  # the script, and anything it left running
+			from preflight.probes.local import kill_group
+
+			kill_group(self.p.pid)  # the script, and anything it left running (Windows: taskkill, D, Nov 3)
 		self.wait(10)
 
 

@@ -29,6 +29,12 @@ SAMPLE_REFS = {
 	"lora-7b": "finetune_lora_hf",
 	"lora-qwen": "finetune_lora_hf",
 	"pretrain": "pretrain_nanogpt",
+	# C, Nov 3: the Fix button on these samples' findings (eval batch, bf16). Their data is on Hugging Face or made in
+	# the script (gnn_pyg's FakeDataset), which the probe reaches. GRPO and the agent sample stay out: a GRPO fix race
+	# verifies at two seeds on an A10 (dollars, not cents), and an agent run isn't fixed by a GPU probe
+	"retrieval": "retrieval_st",
+	"gnn": "gnn_pyg",
+	"vision": "vision_timm",
 }
 VERIFY_WARMUP = 2  # simulated: probe-plan D1 (same warmup as every probe)
 VERIFY_STEPS = 20  # guess: long enough to see the loss move past warmup; set from the zoo verify runs
