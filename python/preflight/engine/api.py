@@ -556,13 +556,39 @@ def _matching_probe(record: FlightRecord, values: dict, ok=OK_PROBE):
 	return None
 
 
+# D's walkthrough, Nov 3: knobs whose effect the engine computes from the layer shape (heads, MLP width, per-layer
+# activations). On a script map with only a parameter count (GenericArch) they have no analytical effect, so a move
+# would read as no change at all; count them as unmodelled there, as for any knob the engine doesn't model.
+SHAPE_DEPENDENT = {
+	"memory": frozenset({"lora_r", "eval_no_grad", "gradient_checkpointing", "attn"}),
+	# review, Nov 3: the step-time model applies checkpointing's recompute without a layer shape
+	"time": frozenset({"lora_r", "eval_no_grad", "attn"}),
+}
+
+
+def _generic_shape(record: FlightRecord) -> bool:
+	try:
+		arch, _setup, _shape = knobs.setup_from(_script_map(record), _current(record))
+	except (ValueError, AttributeError):
+		return False
+	return isinstance(arch, memory.GenericArch)
+
+
 def _unmodelled_moves(record: FlightRecord, values: dict, readout: str) -> list[str]:
 	"""Knobs that change this readout, aren't modelled for it, and sit where no probe ran."""
 	out = []
+	generic = None
 	for kid, v in values.items():
 		spec = knobs.knob_spec(kid)
-		if readout not in spec.affects or readout in spec.modelled or kid == "gpu_type":
+		if readout not in spec.affects or kid == "gpu_type":
 			continue
+		if readout in spec.modelled:
+			if kid not in SHAPE_DEPENDENT.get(readout, ()):
+				continue
+			if generic is None:
+				generic = _generic_shape(record)
+			if not generic:
+				continue
 		probed = [_probe_values(record, p).get(kid) for p in record.probes if p.status in OK_PROBE]
 		if probed and not any(_same(v, pv) for pv in probed):
 			out.append(kid)
