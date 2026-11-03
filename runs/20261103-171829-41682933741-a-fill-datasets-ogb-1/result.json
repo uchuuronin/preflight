@@ -1,0 +1,11 @@
+{
+	"name": "20261103-171829-41682933741-a-fill-datasets-ogb-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41682933741",
+	"ref": "cf4945fbcbcb06e6f71db0674adc5ba4b6c87c41",
+	"sha": "cf4945fbcbcb06e6f71db0674adc5ba4b6c87c41",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::fill_datasets --only ogbn-arxiv",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T17:19:14Z"
+}

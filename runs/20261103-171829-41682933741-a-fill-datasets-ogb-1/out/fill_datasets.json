@@ -1,0 +1,11 @@
+[
+  {
+    "dataset": "ogbn-arxiv",
+    "url": "http://snap.stanford.edu/ogb/data/nodeproppred/arxiv.zip",
+    "status": "kept",
+    "bytes": 83058288,
+    "seconds": 0.7,
+    "kB_per_s": 116218,
+    "sha256": "49f85c801589ecdcc52cfaca99693aaea7b8af16a9ac3f41dd85a5f3193fe276"
+  }
+]
