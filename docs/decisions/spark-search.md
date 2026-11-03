@@ -186,9 +186,13 @@ C's data-use line; whether the cap goes up is the next decision.
 B took the re-check off A (`from-b.md`, ws-b) and found three things before the flag can go on:
 
 1. **A denial of service on the worker:** `named_keys` ran on the whole raw error, and its address
-   pattern backtracks quadratically on long dotted text (40 KB of `a.` took 41 s). It now reads only
-   the error's end the model is sent (2,500 characters), each word at most 512 characters; the
-   same 40 KB now runs well under 2 s (tested). An address the model never saw can't steer it.
+   pattern backtracks quadratically on long dotted text (40 KB of `a.` took 41 s). Nothing reads
+   the whole error now: the error is cut to its last 5,000 characters before scrubbing (a margin,
+   so a key across the cut is still masked), and only the 2,500 the model is sent are scanned for
+   addresses. A run of text over 512 characters with no space can't be scanned safely, so then
+   every source is ruled out rather than part of the run read (the first fix truncated such runs,
+   which let an address after one through: the second review). Tested: 40 KB of `a.` and 200 KB of
+   `_KEY` (a pattern the scrub is quadratic on) each run in under 2 s.
 2. **A failed call recorded at $0:** a timeout, an error status or a reply with no output may have
    searched and billed already, unseen. Such a call now records the most its searches could cost
    (`max_tool_calls` times the fee); a connection refused before sending records nothing more.

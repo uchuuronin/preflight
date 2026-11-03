@@ -81,8 +81,9 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 - **Range test:** B's re-review clears my side (A's items 1, 2, 3 and 6 fixed with tests; B fixed
   item 4 on ws-b). What's left is A's (the golden's old key names) and C's (the curve). Nothing of
   mine to push for it beyond what's on `ws-d`.
-- **Search, B's three must-fixes:** the quadratic address pattern now reads only what the model is
-  sent (40 KB of `a.`: from 41 s to well under 2 s, tested); a failed call that may have reached
+- **Search, B's three must-fixes:** nothing reads the whole error now (cut to 5,000 characters
+  before scrubbing, 2,500 scanned for addresses; a run over 512 characters with no space rules out
+  every source); 40 KB of `a.` and 200 KB of `_KEY` each under 2 s, tested; a failed call that may have reached
   Meta records its searches' most possible fee; the record shows the search's own titles and hosts,
   not the model's words. `docs/decisions/spark-search.md`. Then the cap test: all 8 cases at
   `max_tool_calls` 10 (about US$0.15 to 0.35 with the fee).

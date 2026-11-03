@@ -42,6 +42,7 @@ after the first failed.
 import json
 import logging
 import re
+import unicodedata
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 
 import httpx
@@ -53,7 +54,9 @@ log = logging.getLogger(__name__)
 
 ERROR_CHARS = 2500  # guess: the end of the recorded error, the exception line and its last frames
 MAX_SOURCES = 3  # Chiya's spec (Nov 2): at most 3 sources
-NAMED_TOKEN = 512  # guess: the longest address an error's text is read for; its host comes first
+NAMED_TOKEN = 512  # guess: the longest unbroken run an error's text is read for addresses in
+SCRUB_CHARS = 2 * ERROR_CHARS  # guess: the margin before the cut, so a key across it is still masked
+EVERYTHING = "*"  # named_keys' answer when it can't read the text safely: every source is ruled out
 # guess: searches and page opens a question may make (the validation's used 1 to 4); not in Meta's
 # docs, but taken without an error (d-spark-search-validate-2)
 MAX_TOOL_CALLS = 4
@@ -239,7 +242,10 @@ def named_keys(text: str) -> set[str]:
 	`a.`), and the visitor's process writes the error. An address the model never saw can't steer
 	it."""
 	text = (text or "")[-ERROR_CHARS:]
-	text = " ".join(w[:NAMED_TOKEN] for w in text.split())
+	if any(len(w) > NAMED_TOKEN for w in text.split()):
+		# a run too long to scan safely could hide an address the model still sees: rule out every
+		# source rather than read part of it (B's review, Nov 2: a cut-off run let one through)
+		return {EVERYTHING}
 	text = text.replace("[.]", ".").replace("(.)", ".").replace("{.}", ".")
 	text = (
 		text.replace("\uff0e", ".").replace("\u3002", ".").replace("\uff61", ".")
@@ -255,6 +261,8 @@ def named_keys(text: str) -> set[str]:
 
 def _is_named(url: str, named: set[str]) -> bool:
 	"""Does an error's `named_keys` rule this address out (a subdomain of a named host too)?"""
+	if EVERYTHING in named:
+		return True
 	host = _host(url)
 	if _public(host):
 		return _page(url) in named
@@ -313,7 +321,8 @@ def search_titles(data: dict) -> dict[str, str]:
 			for a in (part.get("annotations") or []) if isinstance(part, dict) else []:
 				if isinstance(a, dict) and isinstance(a.get("url"), str) and isinstance(a.get("title"), str):
 					got.setdefault(_exact(a["url"]), a["title"])
-	return {k: " ".join(v.split())[:200] for k, v in got.items() if v.strip()}
+	clean = {k: "".join(c for c in v if unicodedata.category(c) not in ("Cc", "Cf")) for k, v in got.items()}
+	return {k: " ".join(v.split())[:200] for k, v in clean.items() if v.strip()}
 
 
 def annotated_urls(data: dict) -> set[str]:
@@ -423,6 +432,8 @@ def kept_sources(answer: Answer, data: dict, error_text: str = "") -> tuple[list
 			and not _is_named(s.url, named)
 			and not _own(s.url)
 		)
+		if ok and any(k.url == got[exact] for k in keep):
+			continue  # the same page named twice: one citation
 		if ok:
 			# what the record shows comes from the search, not the model (B's review, Nov 2): the
 			# search's title for the page, else its host; the model's own reason is dropped
@@ -481,7 +492,11 @@ def ground_failure(
 		return None, []
 	libs = ", ".join(f"{k} {v}" for k, v in sorted((env or {}).items()) if v)
 	# the error can't close its data block early, however it spells the tag
-	error = re.sub(r"(?i)<\s*/\s*error\s*>", "< /error >", scrub(probe.error)[-ERROR_CHARS:])
+	# the end the model is sent, scrubbed once: cut first with a margin, so a key across the cut is
+	# still masked, and nothing reads the whole error (the visitor's process writes it, up to 5 MB;
+	# scrub's patterns are quadratic on some long runs: B's review, Nov 2)
+	sent = scrub(probe.error[-SCRUB_CHARS:])[-ERROR_CHARS:]
+	error = re.sub(r"(?i)<\s*/\s*error\s*>", "< /error >", sent)
 	user = (
 		f"Lens: {lens or 'unknown'}. Libraries: {libs or 'unknown'}.\n"
 		f"Error code (Preflight's): {probe.error_code or 'none'}.\n"
@@ -500,7 +515,7 @@ def ground_failure(
 		first_user = (
 			f"Lens: {lens or 'unknown'}. Libraries: {libs or 'unknown'}.\n"
 			f"Error code (Preflight's): {probe.error_code or 'none'}.\n"
-			f"The probe's recorded error (its end):\n{scrub(probe.error)[-ERROR_CHARS:]}\n\n{ANSWER}"
+			f"The probe's recorded error (its end):\n{sent}\n\n{ANSWER}"
 		)
 		body = {"instructions": SYSTEM_FIRST, "input": first_user, "tools": [{"type": "web_search"}]}
 	before = len(client.calls)
@@ -529,7 +544,6 @@ def ground_failure(
 	if answer is None or not searched(data):
 		# no parseable answer, or no search at all: nothing can be cited, and it doesn't claim none
 		return None, calls
-	sent = scrub(probe.error)[-ERROR_CHARS:]  # the text the model saw: only it can steer the search
 	keep, dropped = kept_sources(answer, data, sent) if answer.status == "found" else ([], [])
 	ev = [Evidence(metric="search", value=float(len(keep)), probe_id=probe.id)]
 	ev += [Evidence(metric=f"search.trace.{k}", value=float(v), probe_id=probe.id) for k, v in trace.items()]

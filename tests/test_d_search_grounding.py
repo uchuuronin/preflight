@@ -410,7 +410,8 @@ def test_a_long_dotted_error_cant_stall_the_worker():
 	f, _ = ground_failure(
 		client(response(answer("found", ISSUE), cited=[ISSUE])), probe(error=OOM + evil), {}
 	)
-	assert time.monotonic() - t < 2 and f.code == "search.known_issue"
+	# fast, and one unbroken run that long can't be read safely: every source ruled out
+	assert time.monotonic() - t < 2 and f.code == "search.none_found"
 
 
 def test_a_failed_call_records_the_most_its_searches_could_cost():
@@ -446,3 +447,30 @@ def test_the_record_shows_the_searchs_titles_not_the_models_words():
 	# no title from the search: the host stands in
 	f, _ = ground_failure(client(response(text, cited=[ISSUE])), probe(), {})
 	assert said not in f.detail and f.citations[0].title in ("t", "github.com")
+
+
+def test_a_long_error_cant_stall_the_scrub_or_hide_an_address():
+	import time
+
+	from preflight.harness.search_grounding import EVERYTHING, named_keys
+
+	t = time.monotonic()
+	f, _ = ground_failure(
+		client(response(answer("found", ISSUE), cited=[ISSUE])), probe(error="_KEY" * 50_000), {}
+	)
+	assert time.monotonic() - t < 2  # 200 KB of a pattern scrub is quadratic on
+	# an address after a run too long to scan: every source is ruled out, not read past
+	evil = "https://evil.example/fix"
+	err = OOM + "\nSee " + "=" * 600 + evil
+	assert named_keys(err) == {EVERYTHING}
+	f, _ = ground_failure(client(response(answer("found", evil), cited=[evil])), probe(error=err), {})
+	assert f.code == "search.none_found"
+
+
+def test_a_titles_control_characters_are_stripped_and_one_page_is_one_citation():
+	data = response(answer("found", ISSUE, ISSUE))
+	data["output"][1]["results"] = [
+		{"type": "text_result", "title": "OOM‮ in\u0007 eval", "url": ISSUE, "snippet": "s"}
+	]
+	f, _ = ground_failure(client(data), probe(), {})
+	assert [c.title for c in f.citations] == ["OOM in eval"]

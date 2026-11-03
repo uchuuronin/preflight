@@ -22,6 +22,7 @@ from pathlib import Path
 
 from preflight.harness.search_grounding import (
 	MAX_TOOL_CALLS,
+	SEARCH_USD_PER_QUERY,
 	annotated_urls,
 	final_text,
 	ground_failure,
@@ -46,13 +47,18 @@ def main() -> None:
 	if shape not in ("current", "first"):
 		raise SystemExit(f"--shape {shape!r}: current or first")
 	# `--max-tool-calls N`: the cap sent with the current shape (the 4 tool calls hypothesis, Nov 2)
-	cap = (
-		int(sys.argv[sys.argv.index("--max-tool-calls") + 1])
-		if "--max-tool-calls" in sys.argv[:-1]
-		else MAX_TOOL_CALLS
-	)
-	if not 1 <= cap <= 16:  # guess: 16 keeps one call's search fee under US$0.04
+	given = [a.split("=", 1)[1] for a in sys.argv if a.startswith("--max-tool-calls=")]
+	if "--max-tool-calls" in sys.argv:
+		at = sys.argv.index("--max-tool-calls")
+		given.append(sys.argv[at + 1] if at + 1 < len(sys.argv) else "")
+	try:
+		cap = int(given[-1]) if given else MAX_TOOL_CALLS
+	except ValueError:
+		raise SystemExit(f"--max-tool-calls {given[-1]!r}: a whole number from 1 to 16") from None
+	if not 1 <= cap <= 16:  # guess: 16 keeps one call's search fee at most US$0.04
 		raise SystemExit("--max-tool-calls runs from 1 to 16")
+	if shape == "first" and given:
+		raise SystemExit("--shape first sends no tool-call cap; drop --max-tool-calls")
 	name = "search_validate.json" if shape == "current" else f"search_validate_{shape}.json"
 	if cap != MAX_TOOL_CALLS:
 		name = name.replace(".json", f"_cap{cap}.json")
@@ -75,7 +81,7 @@ def main() -> None:
 	rows: list[dict] = []
 	spent = 0.0
 	for c in cases:
-		if spent + WORST_CASE_USD > STOP_USD:
+		if spent + WORST_CASE_USD + cap * SEARCH_USD_PER_QUERY > STOP_USD:
 			rows.append({"case": c["case"], "skipped": f"cap: US${spent:.3f} spent"})
 			break
 		probe = Probe(knobs={}, **c["probe"])
