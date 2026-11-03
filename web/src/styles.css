@@ -1809,7 +1809,8 @@ a {
 .pf-log__main { flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 28px; }
 .pf-passes { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 /* The profile stays in view beside a long list of flights. */
-@media (min-width: 900px) { .pf-pilot { position: sticky; top: 96px; } }
+/* Only where the two columns stand side by side: 360 + 28 + 520 of content needs about 960 px. */
+@media (min-width: 960px) { .pf-pilot { position: sticky; top: 96px; } }
 
 .pf-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 26px; border-radius: var(--pf-radius-lg); }
 .pf-empty p { margin: 0; color: var(--pf-fg-dim); line-height: 1.55; }
@@ -1916,7 +1917,7 @@ a {
 	.pf-shape-circle { width: 260px; height: 260px; padding: 36px; }
 	.pf-shape-capsule { width: 260px; min-height: 340px; padding: 44px 30px; }
 	.pf-shape-ticket { width: 100%; max-width: 340px; }
-	.pf-pilot { max-width: none; border-radius: 32px; }
+	.pf-pilot { flex: 1 1 auto; border-radius: 32px; }
 	.pf-pass__route { font-size: 21px; }
 	.pf-ticks { font-size: 9.5px; }
 }
@@ -2378,7 +2379,7 @@ a {
 /* Private triage on the check-in desk (harness.glimmer_private): the box, then what it changes. */
 .pf-private { gap: 6px; }
 .pf-private__hint { display: flex; flex-direction: column; gap: 4px; padding-left: 24px; }
-.pf-private__more > summary { cursor: pointer; width: fit-content; font-size: 12.5px; color: var(--pf-fg-dim); text-decoration: underline; text-underline-offset: 3px; list-style: none; }
+.pf-private__more > summary { cursor: pointer; width: fit-content; min-height: 24px; display: flex; align-items: center; font-size: 12.5px; color: var(--pf-fg-dim); text-decoration: underline; text-underline-offset: 3px; list-style: none; }
 .pf-private__more > summary::-webkit-details-marker { display: none; }
 .pf-private__more[open] > summary { margin-bottom: 4px; }
 .pf-private__more > p { margin: 0 0 4px; }

@@ -4,8 +4,8 @@
  * A's harness marks findings by source, and some sources carry more than one model:
  * - every model triage is `spark_open_triage`, whichever model read the log, with the model named
  *   in the title (python/preflight/harness/triage.py `_who`: "Muse Glimmer on probe …" for a
- *   private check-in). The title is the per-finding signal: a record can hold both, when probes run
- *   later from a private record go to Spark Open. Live check-in, Nov 2 (record
+ *   private check-in). The title is the per-finding signal: a record can hold both (one made before
+ *   Nov 2's pipeline change, when probes run later from a private record still went to Spark Open). Live check-in, Nov 2 (record
  *   01M6EG0284PWZDRXGGQVVZYVND): Glimmer triaged it, and the line said Spark Open.
  * - a Muse Spark diagnosis is `spark_diagnosis`; Spark Open's check of it (diagnosis_check.py)
  *   either adds an evidence entry `spark_open_check` (code writes it, not the model, so it's read

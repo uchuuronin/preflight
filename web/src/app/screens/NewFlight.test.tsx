@@ -211,8 +211,12 @@ describe("private triage on the check-in desk", () => {
 		for (const f of ["harness.spark_open_triage", "harness.glimmer_private", "harness.spark_script_map", "harness.spark_diagnosis"]) flagsOn.add(f);
 		render(<NewFlight onSample={() => {}} />);
 		const box = screen.getByRole("checkbox", { name: en["newflight.private.label"] });
+		// They sit in the private box's fold ("What else changes"), not in the checkbox's description: a
+		// closed <details> isn't read as part of one (review, Nov 2).
+		const fold = box.closest(".pf-private")?.querySelector("details");
+		expect(fold?.textContent).toContain(en["newflight.private.map"]);
+		expect(fold?.textContent).toContain(en["newflight.private.diagnosis"]);
 		const hint = document.getElementById(box.getAttribute("aria-describedby") ?? "");
-		expect(hint?.textContent).toContain(en["newflight.private.map"]);
-		expect(hint?.textContent).toContain(en["newflight.private.diagnosis"]);
+		expect(hint?.contains(fold ?? null)).toBe(false);
 	});
 });

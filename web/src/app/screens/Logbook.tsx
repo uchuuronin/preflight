@@ -94,7 +94,7 @@ export function Logbook({ active }: { active: boolean }) {
 							entries.map((e) => {
 								const w = e.worst ? WORD[e.worst] : WORD.info;
 								return (
-									<a key={e.ref} className="glass pf-pass" href={href("cockpit", e.ref)} aria-label={t("logbook.open", { title: e.title })}>
+									<a key={e.ref} className="glass pf-pass" href={href("cockpit", e.ref)} aria-label={t("logbook.open", { title: flightTitle(e) })}>
 										<span className="pf-pass__main">
 											<span className="pf-pass__route">
 												{t(`lens.${e.lens}`)}

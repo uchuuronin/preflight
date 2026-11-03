@@ -372,19 +372,25 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									<input type="checkbox" checked={privateMode} aria-describedby={ids.privateHint} onChange={(e) => setPrivateMode(e.currentTarget.checked)} />
 									{t("newflight.private.label")}
 								</label>
-								<div id={ids.privateHint} className="pf-private__hint">
-									<p className="pf-hint">{t("newflight.private.body")}</p>
-									{/* The rest folds away: the box used to be the tallest thing on the form (Chiya, Nov 2). */}
-									<details className="pf-private__more">
-										<summary>{t("newflight.private.more")}</summary>
-										{flag("harness.spark_script_map") ? <p className="pf-hint">{t("newflight.private.map")}</p> : null}
-										{/* pipeline.py skips Muse Spark's diagnosis for a private job (contract 0.6.2). */}
-										{flag("harness.spark_diagnosis") ? <p className="pf-hint">{t("newflight.private.diagnosis")}</p> : null}
+								<div className="pf-private__hint">
+									{/* The checkbox is described by what it does and what it costs in time; the rest folds
+									    away (the box was the tallest thing on the form; Chiya, Nov 2). A closed <details>
+									    isn't read as part of a description, so nothing it holds is pointed at. */}
+									<div id={ids.privateHint}>
+										<p className="pf-hint">{t("newflight.private.body")}</p>
 										{/* Source: measured, Glimmer's cold starts on its A100-40GB, Nov 1: 286 s (B's smoke,
 										    docs/decisions/glimmer-host.md) and 330 to 459 s (A's triage runs, docs/status/a.md);
 										    a warm triage took 12.8 s (median of 5). */}
 										<p className="pf-hint">{t("newflight.private.wait")}</p>
-									</details>
+									</div>
+									{flag("harness.spark_script_map") || flag("harness.spark_diagnosis") ? (
+										<details className="pf-private__more">
+											<summary>{t("newflight.private.more")}</summary>
+											{flag("harness.spark_script_map") ? <p className="pf-hint">{t("newflight.private.map")}</p> : null}
+											{/* pipeline.py skips Muse Spark's diagnosis on a record a private job touched (0.6.2). */}
+											{flag("harness.spark_diagnosis") ? <p className="pf-hint">{t("newflight.private.diagnosis")}</p> : null}
+										</details>
+									) : null}
 								</div>
 							</div>
 						) : null}
