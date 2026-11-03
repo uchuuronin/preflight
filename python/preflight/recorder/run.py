@@ -33,6 +33,30 @@ def _what_installed(spec: dict) -> str:
 	return what
 
 
+def _local_missing(exc: BaseException, workdir: str, spec: dict) -> str | None:
+	"""runner.entrypoint_path: when the module Python couldn't import is the repo's own (a folder or file the source
+	has, anywhere in it), say that, not "not installed"; None otherwise."""
+	name = getattr(exc, "name", None) or ""
+	top = name.split(".")[0]
+	if not top or not top.isidentifier():
+		return None
+	root = Path(workdir)
+	entry_dir = (root / spec.get("entrypoint", "")).parent
+	for base in dict.fromkeys([entry_dir, root, root / "src"]):
+		if (base / top).is_dir() or (base / f"{top}.py").is_file():
+			return (f"The script imports {name}, the repo's own module, which Python couldn't find on its path "
+				f"(it's under {os.path.relpath(base, root) if base != root else 'the top of the repo'}/)")  # fmt: skip
+	try:  # elsewhere in the source: not read, or not on the path the script runs with
+		hits = [p for p in root.rglob(top) if p.is_dir()][:1] or [p for p in root.rglob(f"{top}.py")][:1]
+	except OSError:
+		hits = []
+	if hits:
+		where = os.path.relpath(hits[0].parent, root)
+		return (f"The script imports {name}, the repo's own module under {where}/, which isn't on the path "
+			"the script runs with")  # fmt: skip
+	return None
+
+
 def _write(out_path: str, result: dict) -> None:
 	tmp = out_path + ".tmp"
 	Path(tmp).write_text(json.dumps(result, default=str), encoding="utf-8")
@@ -204,7 +228,8 @@ def main(spec_path: str) -> int:
 			sys.path.insert(i, str(d))  # after the script's own files, before the image
 		parts = [*(str(d) for d in dirs), os.environ.get("PYTHONPATH") or ""]
 		os.environ["PYTHONPATH"] = os.pathsep.join(p for p in parts if p)
-	if spec.get("install_repo"):
+	if spec.get("install_repo") or spec.get("entry_path"):
+		# runner.entrypoint_path (C, Nov 2: `import image_classification` beside a scope-entrypoint main.py) and
 		# probes.repo_install: as `python path/to/script.py` does, the script's own folder comes first, so it
 		# imports the modules beside it (OGB arxiv's gnn.py imports its logger.py; the full run did, the probe
 		# didn't: a-all3-8, Nov 2); after the installs, so the deps keep their place behind the repo's own files
@@ -271,7 +296,15 @@ def main(spec_path: str) -> int:
 		when = f"after step {n}" if n else f"before the first optimizer step (stage: {rec.stage})"
 		detail = f"{type(exc).__name__}: {str(exc)[:500]}"
 		status, code = c.status, c.code
-		error = f"{c.message}. {detail}" + (f" at {where}" if where else "") + f", {when}"
+		msg = c.message
+		local = (
+			_local_missing(exc, workdir, spec)
+			if code == "missing_package" and spec.get("entry_path")
+			else None
+		)
+		if local:  # the repo's own module, not a package to install (C, Nov 2: Boarding said "add it to requirements.txt")
+			code, msg = "missing_module.local", local
+		error = f"{msg}. {detail}" + (f" at {where}" if where else "") + f", {when}"
 	finally:
 		rec.uninstall()
 

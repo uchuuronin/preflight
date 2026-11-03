@@ -228,6 +228,8 @@ class ProbeSpec:
 		False  # probes.torch_new: say plainly when the code asks for a newer torch than the image's
 	)
 	dataset_cache: bool = False  # probes.dataset_cache: torchvision's datasets from the read-only volume
+	# runner.entrypoint_path: the script's own folder first on its path, as `python dir/main.py` puts it
+	entry_path: bool = False
 	step_clock: bool = False  # probes.step_clock: the GPU's SM clock on each timed step
 	install_sdists: tuple[
 		str, ...
@@ -736,9 +738,15 @@ _NEEDS = re.compile(
 )
 
 
+_LOCAL = re.compile(r"The script imports ([A-Za-z_][A-Za-z0-9_.]{0,199}), the repo's own module")
+
+
 def _missing(code: str | None, error: str | None) -> dict:
 	"""Probe.missing_module and .missing_package (0.6.3) for a missing import: the module as Python named
 	it, and the PyPI name on Preflight's list that provides it (absent when it isn't on the list)."""
+	if code == "missing_module.local" and error:  # runner.entrypoint_path: the repo's own module, no package
+		m = _LOCAL.search(error)
+		return {"missing_module": m.group(1).rstrip(".")} if m else {}
 	if code != "missing_package" or not error:
 		return {}
 	from preflight.recorder.requirements import known_packages, package_for_module
@@ -1044,6 +1052,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"install_exec": spec.install_exec,
 				"torch_note": spec.torch_note,
 				"dataset_cache": spec.dataset_cache,
+				"entry_path": spec.entry_path,
 				"step_clock": spec.step_clock,
 				"install_sdists": list(spec.install_sdists),
 				"eval_units": spec.eval_units,

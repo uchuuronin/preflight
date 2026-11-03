@@ -155,6 +155,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"install_exec": True} if spec.install_exec else {}),  # a list read from the build installs more
 		**({"dataset_cache": True} if spec.dataset_cache else {}),  # no download in the measured time
 		**({"step_clock": True} if spec.step_clock else {}),  # a probe that reports more
+		**({"entry_path": True} if spec.entry_path else {}),  # another path can import other code
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
@@ -354,6 +355,7 @@ def _spec(
 		# only code that imports torchvision: the flag re-keys no other job's probes (review, Nov 3)
 		dataset_cache=_flag("probes.dataset_cache") and _uses_torchvision(fetched.files),
 		step_clock=_flag("probes.step_clock"),
+		entry_path=_flag("runner.entrypoint_path"),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
 		image=_image(sm, fetched.files),
