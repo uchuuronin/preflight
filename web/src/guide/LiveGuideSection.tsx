@@ -20,7 +20,8 @@ export function LiveGuideSection({
 	onStatus,
 	language,
 }: {
-	onFallback: (message: string) => void;
+	/** `moved`: the live guide moved a knob before it failed (its suggestion stays the visitor's to decide). */
+	onFallback: (message: string, moved: boolean) => void;
 	onStatus?: (status: string) => void;
 	language?: string;
 }) {
@@ -80,7 +81,7 @@ export function LiveGuideSection({
 			await step(tour);
 		} catch (e) {
 			if (e instanceof TourCancelled) return;
-			onFallback(e instanceof GuideFallback && e.message ? e.message : t("guide.fallback"));
+			onFallback(e instanceof GuideFallback && e.message ? e.message : t("guide.fallback"), tour.moved);
 		} finally {
 			setBusy(false);
 		}

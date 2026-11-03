@@ -115,7 +115,9 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 	const trouble = failed
 		? troubleFromFailure(last?.error_code, last?.message)
 		: done
-			? (troubleFromProbes(probes, known.known, known.noWheels) ?? nothingMeasured(probes, last?.error_code))
+			? (troubleFromProbes(probes, known.known, known.noWheels) ??
+				// A's runner says so on the done event (contract 0.6.6, `nothing_measured`); the record's probes otherwise.
+				(last?.nothing_measured ? ({ step: "measure", code: last.error_code ?? null } as const) : nothingMeasured(probes, last?.error_code)))
 			: null;
 	const installStop = trouble?.step === "install";
 	const measuredNothing = trouble?.step === "measure";
@@ -141,7 +143,8 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		<div className="pf-scroll">
 			<div className="pf-inner pf-boarding">
 				<span className="pf-eyebrow">{t("boarding.eyebrow")}</span>
-				<h1 className="pf-display pf-display--md">{!jobId ? t("boarding.idle") : done ? t(installStop ? "boarding.stopped_install" : measuredNothing ? "boarding.nothing_measured" : probesRead || !open ? "boarding.ready" : "boarding.reading") : cancelled ? t("boarding.cancelled") : failed ? t("boarding.failed") : t("boarding.measuring")}</h1>
+				{/* Polite: the end of boarding (ready, nothing measured, stopped) is read out when it comes. */}
+				<h1 className="pf-display pf-display--md" aria-live="polite">{!jobId ? t("boarding.idle") : done ? t(installStop ? "boarding.stopped_install" : measuredNothing ? "boarding.nothing_measured" : probesRead || !open ? "boarding.ready" : "boarding.reading") : cancelled ? t("boarding.cancelled") : failed ? t("boarding.failed") : t("boarding.measuring")}</h1>
 				{last?.queue_position ? <p className="pf-lede pf-lede--sm">{t("boarding.queue", { n: last.queue_position })}</p> : null}
 				{free ? <p className="pf-lede pf-lede--sm">{t("boarding.free_resend")}</p> : null}
 				<div className="pf-route">
@@ -170,7 +173,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 									{m}
 								</span>
 							))}
-							{i === idx && failed ? <span className="pf-stage__stopped">{t(cancelled ? "boarding.stage.cancelled_here" : "boarding.stage.stopped_here")}</span> : null}
+							{(i === idx && failed) || i === stopAt ? <span className="pf-stage__stopped">{t(cancelled ? "boarding.stage.cancelled_here" : "boarding.stage.stopped_here")}</span> : null}
 						</li>
 					))}
 				</ol>

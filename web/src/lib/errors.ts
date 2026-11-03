@@ -14,6 +14,11 @@ export interface ErrorCopy {
 export function errorCopy(code: string | null | undefined, raw?: string | null): ErrorCopy {
 	const tries = code ? [code, code.split(".")[0] ?? code] : [];
 	for (const c of tries) {
+		// A's refusals of a check-in (submission.*) are written for the visitor and name what to change; a
+		// sub-code this page doesn't know yet keeps its own words, under the family's hint (D's walkthrough, Nov 3).
+		if (c === "submission" && c !== code && raw?.trim() && hasKey("error.submission")) {
+			return { code: code ?? null, message: raw.trim(), hint: hasKey("error.submission.hint") ? t("error.submission.hint") : "" };
+		}
 		if (hasKey(`error.${c}`)) {
 			return { code: c, message: t(`error.${c}`), hint: hasKey(`error.${c}.hint`) ? t(`error.${c}.hint`) : "" };
 		}

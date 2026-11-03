@@ -181,3 +181,38 @@ describe("what the visitor wrote on New flight", () => {
 		expect(JSON.parse(calls.at(-1)![1].body as string).message).toBe(said);
 	});
 });
+
+describe("a first answer cut off after a round of reading tools (live, Nov 3)", () => {
+	const twoRounds = (first: Record<string, unknown>) => {
+		let n = 0;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string) => {
+				if (!url.startsWith("/v1/guide/turns")) return ok({ limits: null, saved: true });
+				n++;
+				if (n === 1) return ok(answer({ text: "Starting your cost tour.", awaiting: "results", ...first }));
+				return new Response(JSON.stringify({ error: { code: "timeout", message: "The guide model took too long to answer.", fallback: "rule_based", reason: "timeout" } }), { status: 504 });
+			}),
+		);
+	};
+
+	it("still hands over to the rule-based tour, with its first move", async () => {
+		twoRounds({ calls: [{ call_id: "c1", name: "highlight", arguments: { nodes: [] }, runs_in: "browser" }] });
+		mount();
+		await start();
+		for (let i = 0; i < 6; i++) await frame();
+		expect(screen.getAllByRole("button", { name: /^Apply / }).length).toBeGreaterThan(0);
+	});
+
+	it("puts back a knob Muse Spark moved, then starts the rule-based tour from the visitor's setting", async () => {
+		twoRounds({ calls: [{ call_id: "c1", name: "set_knob", arguments: { knob_id: "eval_batch_size", value: 8 }, runs_in: "browser" }] });
+		const r = mount();
+		const before = r.ws!.state.knobs.eval_batch_size;
+		await start();
+		for (let i = 0; i < 4; i++) await frame();
+		expect(document.querySelector(".pf-guide__notice")?.textContent).toMatch(/too long/);
+		// the rule tour's first step starts from the visitor's own eval batch, not Muse Spark's
+		expect(screen.getAllByRole("button", { name: /^Apply / }).length).toBeGreaterThan(0);
+		expect(r.ws!.state.proposal?.from).toBe(before);
+	});
+});

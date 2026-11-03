@@ -76,6 +76,8 @@ export function GuidePanel() {
 	// Whether the live guide has answered at least once, and whether a failed first press has already
 	// started the rule-based tour (it's started once, not again on a later failure).
 	const liveAnswered = useRef(false);
+	// Muse Spark has sent back any round (it may have spoken or run a tool): the quick read goes then.
+	const liveSpoke = useRef(false);
 	const autoStarted = useRef(false);
 	// The visitor took the rule-based tour's quick read while Muse Spark was still reading the record.
 	const [tookQuick, setTookQuick] = useState(false);
@@ -298,7 +300,7 @@ export function GuidePanel() {
 	// guide's first answer replaces it. A failed answer starts the rule-based tour on this same step.
 	// Only before Muse Spark has said or moved anything: once a round comes back ("working": it may have
 	// moved a knob), the quick read goes, so taking it never starts from the guide's setting (review, Nov 3).
-	const quickOn = live && liveStatus === "thinking" && !liveAnswered.current;
+	const quickOn = live && liveStatus === "thinking" && !liveSpoke.current && !liveAnswered.current;
 	const quick = useMemo<{ active: Active; text: string } | null>(() => {
 		if (!quickOn) return null;
 		// As restart() will see it: a fresh tour with the knobs set aside cleared.
@@ -520,21 +522,41 @@ export function GuidePanel() {
 
 			{live ? (
 				<LiveGuideSection
-					onFallback={(message) => {
+					onFallback={(message, moved) => {
 						setFallback(message);
 						// The live guide failed before it ever answered (the visitor's first press): the
 						// rule-based tour starts in its place at once, rather than leaving a notice and a second
 						// button to press (the deploy's stranger gate, Nov 1: with the live guide on and no API,
 						// no move was offered). Only once, and not after the live guide has been talking: then
 						// the visitor's own moves and any suggestion on screen stay theirs to decide (review).
+						// Also not when Muse Spark already moved a knob or left a suggestion on the map: the rule-based
+						// tour would start from its setting (review, Nov 3). A first answer cut off after a round of
+						// reading tools (live, Nov 3: the second turn timed out) still hands over at once.
+						// (`moved` comes from the tour itself: the state here may not have caught up with its last move.)
 						if (liveAnswered.current || autoStarted.current) return;
 						autoStarted.current = true;
+						if (moved) {
+							// Muse Spark moved a knob before it failed, and its Apply / Not this went with it: put the
+							// knob back, then start the rule-based tour from the visitor's own setting (review, Nov 3).
+							requestAnimationFrame(() => {
+								const p = latest.current.state.proposal;
+								if (p) {
+									actions.propose(null);
+									actions.setKnob(p.knobId, p.from, "user", { putBack: true });
+								}
+								requestAnimationFrame(restart);
+							});
+							focusFirstMove();
+							return;
+						}
 						restart();
 						// The pressed button is gone: focus the tour's first move, so a screen reader hears it.
 						focusFirstMove();
 					}}
 					onStatus={(s) => {
-						if (s !== "ready" && s !== "thinking") liveAnswered.current = true;
+						if (s !== "ready" && s !== "thinking") liveSpoke.current = true;
+						// Answered: it's waiting on the visitor (a move to decide, a go-ahead, a message), not mid-answer.
+						if (s !== "ready" && s !== "thinking" && s !== "working" && s !== "results") liveAnswered.current = true;
 						setLiveStatus(s);
 					}}
 				/>

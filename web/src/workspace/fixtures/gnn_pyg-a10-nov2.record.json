@@ -1930,7 +1930,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.time.total.gpu_type",
@@ -1958,7 +1961,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.total.gpu_type",
@@ -1986,7 +1992,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.gpu_type",
@@ -2014,7 +2023,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.risk.oom.gpu_type",
@@ -2042,7 +2054,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.memory.peak.epochs",
@@ -2063,10 +2078,10 @@
 						"scale": "linear"
 					}
 				],
-				"point": "32TfZN9k32TfZN9k32Q=",
-				"lo": "Q2RDZENkQ2RDZENkQ2Q=",
-				"hi": "kmWSZZJlkmWSZZJlkmU=",
-				"abstain": "AA==",
+				"point": "AADfZN9k32TfZN9k32Q=",
+				"lo": "AABDZENkQ2RDZENkQ2Q=",
+				"hi": "AACSZZJlkmWSZZJlkmU=",
+				"abstain": "AQ==",
 				"model_id": "memory-analytical@0.3.1",
 				"scale": 4194304.0,
 				"fixed": {
@@ -2076,7 +2091,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.time.total.epochs",
@@ -2097,10 +2115,10 @@
 						"scale": "linear"
 					}
 				],
-				"point": "Q1BDUENQQ1BDUENQQ1A=",
-				"lo": "DVANUA1QDVANUA1QDVA=",
-				"hi": "flB+UH5QflB+UH5QflA=",
-				"abstain": "AA==",
+				"point": "AAAeTFJOQ1CRUxdX2Vo=",
+				"lo": "AAD0SwpODVAkU6lWbFo=",
+				"hi": "AABFTKBOflADVItXTls=",
+				"abstain": "AQ==",
 				"model_id": "time-total@0.1.0",
 				"scale": 1.0,
 				"fixed": {
@@ -2110,7 +2128,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.total.epochs",
@@ -2131,10 +2152,10 @@
 						"scale": "linear"
 					}
 				],
-				"point": "ViFWIVYhViFWIVYhViE=",
-				"lo": "ESERIREhESERIREhESE=",
-				"hi": "nyGfIZ8hnyGfIZ8hnyE=",
-				"abstain": "AA==",
+				"point": "AAAoHekfViG8JHAoSSw=",
+				"lo": "AAD6HI4fESF4JCsoBSw=",
+				"hi": "AABYHSUgnyEFJbkokiw=",
+				"abstain": "AQ==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
 				"fixed": {
@@ -2144,7 +2165,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.epochs",
@@ -2165,12 +2189,12 @@
 						"scale": "linear"
 					}
 				],
-				"point": "2mTaZNpk2mTaZNpk2mQ=",
-				"lo": "m2SbZJtkm2SbZJtkm2Q=",
-				"hi": "HGUcZRxlHGUcZRxlHGU=",
-				"abstain": "AA==",
+				"point": "AACwHDEf2iBOJAgoyys=",
+				"lo": "AACGHN4emyAQJJQnTys=",
+				"hi": "AADcHIofHCGQJEsoKCw=",
+				"abstain": "AQ==",
 				"model_id": "cost-gpu-hours@0.1.0",
-				"scale": 7.62939453125e-06,
+				"scale": 1.0,
 				"fixed": {
 					"gpu_type": "A10",
 					"batch_size": 1024,
@@ -2178,7 +2202,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.risk.oom.epochs",
@@ -2199,10 +2226,10 @@
 						"scale": "linear"
 					}
 				],
-				"point": "h2SHZIdkh2SHZIdkh2Q=",
-				"lo": "h2SHZIdkh2SHZIdkh2Q=",
-				"hi": "h2SHZIdkh2SHZIdkh2Q=",
-				"abstain": "AA==",
+				"point": "AACHZIdkh2SHZIdkh2Q=",
+				"lo": "AACHZIdkh2SHZIdkh2Q=",
+				"hi": "AACHZIdkh2SHZIdkh2Q=",
+				"abstain": "AQ==",
 				"model_id": "memory-analytical@0.3.1",
 				"scale": 4.76837158203125e-07,
 				"fixed": {
@@ -2212,7 +2239,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.memory.peak.batch_size",
@@ -2246,7 +2276,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.time.total.batch_size",
@@ -2267,9 +2300,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "i0/0Tp5PQ1AYUAAAAAA=",
-				"lo": "YU6hTj9PDVBpTwAAAAA=",
-				"hi": "gVBOTwJQflCJUAAAAAA=",
+				"point": "3VmFValSQ1APTQAAAAA=",
+				"lo": "s1gxVUpSDVCrTAAAAAA=",
+				"hi": "VVveVQ5TflCATQAAAAA=",
 				"abstain": "YA==",
 				"model_id": "time-total@0.1.0",
 				"scale": 1.0,
@@ -2280,7 +2313,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.total.batch_size",
@@ -2301,9 +2337,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "uCBaIMQgViEfIQAAAAA=",
-				"lo": "+x8mIIkgESGjIAAAAAA=",
-				"hi": "oyGSIAQhnyGtIQAAAAA=",
+				"point": "VyvoJiskViFUHgAAAAA=",
+				"lo": "4il/Jt8jESHYHQAAAAA=",
+				"hi": "lyxYJ2oknyHjHgAAAAA=",
 				"abstain": "YA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -2314,7 +2350,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.batch_size",
@@ -2335,9 +2374,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "SiDqH1Ug2iCoIAAAAAA=",
-				"lo": "QR+KHx8gmyA3IAAAAAA=",
-				"hi": "ICEoII8gHCEpIQAAAAA=",
+				"point": "rCpHJpQj2iDBHQAAAAA=",
+				"lo": "WSnoJSgjmyBQHQAAAAA=",
+				"hi": "LCytJgMkHCFCHgAAAAA=",
 				"abstain": "YA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -2348,7 +2387,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.risk.oom.batch_size",
@@ -2382,7 +2424,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.memory.peak.fanout.hop1",
@@ -2415,7 +2460,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.time.total.fanout.hop1",
@@ -2448,7 +2496,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.total.fanout.hop1",
@@ -2481,7 +2532,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.fanout.hop1",
@@ -2514,7 +2568,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.risk.oom.fanout.hop1",
@@ -2547,7 +2604,10 @@
 					"fanout.hop2": 25,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.memory.peak.fanout.hop2",
@@ -2580,7 +2640,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.time.total.fanout.hop2",
@@ -2613,7 +2676,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.total.fanout.hop2",
@@ -2646,7 +2712,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.fanout.hop2",
@@ -2679,7 +2748,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.risk.oom.fanout.hop2",
@@ -2712,7 +2784,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop3": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.memory.peak.fanout.hop3",
@@ -2745,7 +2820,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop2": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.time.total.fanout.hop3",
@@ -2778,7 +2856,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop2": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.total.fanout.hop3",
@@ -2811,7 +2892,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop2": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.fanout.hop3",
@@ -2844,7 +2928,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop2": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.risk.oom.fanout.hop3",
@@ -2877,7 +2964,10 @@
 					"fanout.hop1": 15,
 					"fanout.hop2": 25,
 					"lr": 0.003
-				}
+				},
+				"independent_of": [
+					"lr"
+				]
 			},
 			{
 				"id": "g.memory.peak.lr",

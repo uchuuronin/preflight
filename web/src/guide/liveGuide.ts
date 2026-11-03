@@ -345,6 +345,8 @@ export class LiveTour {
 	) {}
 
 	private cancelled = false;
+	/** A knob this tour moved on the map (set_knob): the rule-based tour must not take over from its setting. */
+	moved = false;
 
 	get current(): LiveView {
 		return this.view;
@@ -429,7 +431,10 @@ export class LiveTour {
 			for (const call of browser) {
 				const ctx = this.ctx();
 				const r = runBrowserCall(call, ctx, moved);
-				if (r.tool === "set_knob" && r.moved) moved = true;
+				if (r.tool === "set_knob" && r.moved) {
+					moved = true;
+					this.moved = true;
+				}
 				ctx.actions.trace({
 					id: ++traceSeq,
 					tool: call.name,

@@ -114,8 +114,8 @@ export function CheckinHelp({ trouble, jobId }: { trouble: Trouble; jobId: strin
 				{/* The same request again only where it can end differently (a GPU free now); otherwise the
 				    change the hint names comes first, on New flight (review, Nov 3). */}
 				{on && body && trouble.code && TRANSIENT_STOPS.has(trouble.code) ? (
-					<button type="button" className="pf-btn pf-btn--primary" disabled={busy} onClick={() => void send(body)}>
-						{t("checkin.measure.again")}
+					<button type="button" className="pf-btn pf-btn--primary" disabled={busy} aria-busy={busy || undefined} onClick={() => void send(body)}>
+						{t(busy ? "checkin.measure.sending" : "checkin.measure.again")}
 					</button>
 				) : (
 					<p className="pf-dim">{t("checkin.measure.again_hand")}</p>

@@ -46,3 +46,22 @@ describe("A's new stops (Nov 3)", () => {
 		expect(torch.hint).toMatch(/torch>=2\.6/);
 	});
 });
+
+describe("an entry point that runs nothing (A, Nov 3)", () => {
+	it("says so and what to name instead", () => {
+		const c = errorCopy("entry.runs_nothing", "raw");
+		expect(c.message).toMatch(/runs nothing/);
+		expect(c.hint).toMatch(/python/);
+	});
+	it("shows A's own words for a sub-code it doesn't know yet", () => {
+		expect(errorCopy("entry.something_else", "The file defines no code to run.").message).toBe("The file defines no code to run.");
+	});
+});
+
+describe("a check-in refusal this page doesn't know yet", () => {
+	it("keeps A's own words, under the family's hint", () => {
+		const c = errorCopy("submission.no_entry_code", "The entry point defines no code that runs.");
+		expect(c.message).toBe("The entry point defines no code that runs.");
+		expect(c.hint).toBe(t("error.submission.hint"));
+	});
+});
