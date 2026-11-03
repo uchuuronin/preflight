@@ -113,7 +113,16 @@ def test_the_engine_answers_with_the_runners_models(monkeypatch):
 	assert api._FEATURES_NOW.get() is None  # set only in the request's worker thread
 
 
-@pytest.mark.parametrize("ref,cell", [("grpo", {"gpu_type": "A10"}), ("retrieval", {"gpu_type": "A10"}), ("gnn", {"gpu_type": "A10"}), ("vision", {"gpu_type": "A10"}), ("campaign-grid", {"batch_size": 16})])
+@pytest.mark.parametrize(
+	"ref,cell",
+	[
+		("grpo", {"gpu_type": "A10"}),
+		("retrieval", {"gpu_type": "A10"}),
+		("gnn", {"gpu_type": "A10"}),
+		("vision", {"gpu_type": "A10"}),
+		("campaign-grid", {"batch_size": 16}),
+	],
+)
 def test_every_sample_answers(monkeypatch, ref, cell):
 	"""D's walkthrough (Nov 2): the API knew 5 of the 10 samples, so these five answered 404."""
 	_env(monkeypatch, True)

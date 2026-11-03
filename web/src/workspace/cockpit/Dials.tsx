@@ -86,10 +86,15 @@ export function deltaText(from: number, to: number, format: (v: number) => strin
  * True when a change is big enough to mark: more than 1% of the old value, or for a probability
  * more than one point (a share of a chance near zero means nothing).
  */
+/** Source: judgment, D's walkthrough: 2-point moves on unrelated knobs read as noise; 5 points is a real change. */
+const RISK_WAKE_MIN = 0.05;
+
 export function worthMarking(from: number, to: number, scale: DialScale | null): boolean {
 	const d = Math.abs(to - from);
 	if (!(d > 0)) return false;
-	if (scale?.source === "probability") return d > WAKE_MIN;
+	// A chance moves by more than noise before it's marked: knobs that can't touch memory moved the
+	// out-of-memory chance by 2 points (D's walkthrough, Nov 2), inside the engine's own spread.
+	if (scale?.source === "probability") return d >= RISK_WAKE_MIN;
 	return from === 0 || d > WAKE_MIN * Math.abs(from);
 }
 
@@ -249,7 +254,7 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 			<span className="pf-dial__status">
 				{failedHere ? (
 					<span className="pf-prov pf-prov--abstain">{t("readout.abstain_failed")}</span>
-				) : lengthUnknown ? null : (
+				) : stepNote ? null : (
 					<Provenance status={est?.status ?? "abstain"} />
 				)}
 				{at.off ? <span className="pf-dial__off">{t("dial.off_scale_short")}</span> : null}

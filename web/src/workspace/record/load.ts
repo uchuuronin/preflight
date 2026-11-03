@@ -62,7 +62,8 @@ export const SAMPLES: Sample[] = [
 	},
 	{
 		// Hidden from Departures (D's walkthrough, Nov 2: every dial abstains and no knob moves anything);
-		// PF331, the measured agent eval, shows the agent cockpit. Its link still opens.
+		// PF331, the measured agent eval, shows the agent cockpit. With the flag off its link doesn't open
+		// either (findSample skips it), as for any flagged sample.
 		id: "agent",
 		code: "PF330",
 		titleKey: "sample.agent",

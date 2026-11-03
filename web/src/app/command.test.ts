@@ -7,6 +7,11 @@ describe("a typed command as its words", () => {
 	});
 	it("refuses what only a shell runs, but takes a quoted pipe as a word", () => {
 		expect(commandWords("lm_eval --tasks x | tee out")).toMatchObject({ ok: false, reason: "shell", word: "|" });
+		expect(commandWords("lm_eval --tasks x >out.txt")).toMatchObject({ ok: false, reason: "shell", word: ">" });
+		expect(commandWords("lm_eval --tasks x 2>/dev/null")).toMatchObject({ ok: false, reason: "shell", word: ">" });
+		expect(commandWords("lm_eval --model_args pretrained=$MODEL")).toMatchObject({ ok: false, reason: "shell", word: "$" });
+		expect(commandWords(`lm_eval --x "$HOME"`)).toMatchObject({ ok: false, reason: "shell", word: "$" });
+		expect(commandWords("lm_eval --x 'a>b'")).toEqual({ ok: true, words: ["lm_eval", "--x", "a>b"] });
 		expect(commandWords("lm_eval --sep '|'")).toEqual({ ok: true, words: ["lm_eval", "--sep", "|"] });
 	});
 	it("names an open quote, an empty line and a command off the list", () => {

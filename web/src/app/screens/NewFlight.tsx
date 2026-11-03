@@ -44,8 +44,9 @@ const GOALS: Array<{ kind: ObjectiveKind; key: string }> = [
 ];
 
 /** Canonical names from B's GPU table (engine/gpus.py, generated into gpus.json). */
-// The default is an L4, which gives way to an A10 when none is free within two minutes (A's
-// GPU_FALLBACK, runner/pipeline.py): "L4 or A10" (PM, Nov 3). Bigger cards are a choice, never a default.
+// The default is an L4, which gives way to an A10 and then an L40S when none is free within two
+// minutes (A's GPU_FALLBACK, runner/pipeline.py), and an out-of-memory can move it to a bigger card:
+// "L4 or A10" (PM, Nov 3) with a line saying the rest. Bigger cards are a choice, never a default.
 const DEFAULT_GPU = "L4";
 const GPUS = ["L40S", "A100-SXM-80GB", "H100-SXM-80GB", "MI300X"];
 
@@ -149,7 +150,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const commandBad = intake === "command" && commandSettled && command.trim() !== "" && !cmd.ok;
 	// Extra packages (contract 0.6.3): optional, for any source; names Preflight installs.
 	const pkgs = parsePackages(packages);
-	const pkgAsked = packages.split(/[\s,]+/).filter(Boolean).length;
+	const pkgAsked = new Set(packages.split(/[\s,]+/).filter(Boolean).map((p) => p.toLowerCase())).size;
 	const pkgBad = pkgs.bad.length > 0 || pkgAsked > MAX_EXTRA_PACKAGES;
 	const canSubmit =
 		!pkgBad &&
@@ -182,8 +183,8 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 		setError(null);
 		if (intake === "upload" && !check.ok) return;
 		if (handedTooBig) return;
-		setBusy(true);
 		if (intake === "command" && !cmd.ok) return;
+		setBusy(true);
 		const body: JobRequest = {
 			source:
 				intake === "command" && cmd.ok
@@ -465,6 +466,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 										{t("newflight.gpu.unsure")}
 									</button>
 								</div>
+								{gpu === DEFAULT_GPU ? <p className="pf-hint">{t("newflight.gpu.hint")}</p> : null}
 							</div>
 						</div>
 						{privateOffered ? (

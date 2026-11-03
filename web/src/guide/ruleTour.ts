@@ -10,7 +10,6 @@ import type { Move, PredictionProvider } from "../workspace/provider/PredictionP
 import { costStraddlesBudget, failureTarget, objectiveTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
 import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
-import { template } from "../fix/candidates";
 import { changesResults } from "./changesResults";
 import { beat, bestCombo, bestSingleRisk, type ComboMove, comboKeys } from "./combos";
 import { type Limits, NO_LIMITS, withinLimits } from "./limits";
@@ -155,19 +154,17 @@ export function likelyFails(ctx: Pick<TourContext, "record" | "provider" | "knob
 	return riskNow(ctx) >= FAILS_AT;
 }
 
-/** The knob a finding's own fix moves: its fix template's, else the knob it names. */
-function findingFixKnob(f: Finding): string | null {
-	return template(f.fix_template)?.knob ?? f.knob_id ?? null;
-}
+/** The GPU model itself (not how many): the GPU fix's reason fits only these. */
+const GPU_TYPE_KNOBS = new Set(["gpu_type", "gpu"]);
 
 /** Knobs that change the hardware rather than the job. */
 const GPU_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
 export const isGpuMove = (m: Pick<Move, "knobId">): boolean => GPU_KNOBS.has(m.knobId);
 
 /**
- * The fitting moves, ranked for the aim. While the run fails, a move on the current GPU comes before any
- * GPU change, and a finding's own fix first among those (PM, Nov 3: the LoRA sample's first step was
- * L4 → B300 when its own eval fix clears it): a GPU move is offered only when nothing on this GPU clears
+ * The fitting moves, ranked for the aim. While the run fails, every move on the current GPU (a
+ * finding's own fix among them) comes before any GPU change (PM, Nov 3: the LoRA sample's first step was
+ * L4 → B300 while its own eval fix clears it): a GPU move is offered only when nothing on this GPU clears
  * the failure.
  */
 function candidates(ctx: TourContext, pinned: ReadonlySet<string>): Move[] {
@@ -178,9 +175,10 @@ function candidates(ctx: TourContext, pinned: ReadonlySet<string>): Move[] {
 		.filter((m) => !ctx.visited.has(m.knobId))
 		.filter((m) => failing || !changesResults(m.knobId, ctx.record));
 	if (!failing) return ranked;
-	const ownFix = new Set(ctx.record.findings.map((f) => findingFixKnob(f)).filter((k): k is string => !!k));
-	const order = (m: Move) => (isGpuMove(m) ? 2 : ownFix.has(m.knobId) ? 0 : 1);
-	return [...ranked].sort((a, b) => order(a) - order(b)); // stable: the aim's ranking within each group
+	// Stable: the aim's ranking within each group, so the first on-GPU move is the cheapest one that
+	// clears it, a finding's own fix included (review, Nov 3: putting it first could make "costs your
+	// aim the least" untrue).
+	return [...ranked].sort((a, b) => Number(isGpuMove(a)) - Number(isGpuMove(b)));
 }
 
 /** The best "tight" setting worth measuring: beats the best "fits" move by PROBE_WORTH. */
@@ -370,7 +368,7 @@ export function nextStep(ctx: TourContext): TourStep {
 			textKey: specific ? keyFor(top.knobId, "line", fixing) : "guide.rule.generic.fix.line",
 			whyKey: byMemory
 				? "guide.rule.fix_by_memory.why"
-				: fixing && isGpuMove(top)
+				: fixing && GPU_TYPE_KNOBS.has(top.knobId)
 					? "guide.rule.gpu_type.fix.why"
 					: specific
 						? keyFor(top.knobId, "why", fixing)

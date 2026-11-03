@@ -13,8 +13,8 @@ export const MAX_WORDS = 64;
 export const MAX_WORD_CHARS = 4096;
 export const MAX_COMMAND_CHARS = 8192;
 
-/** Words a shell would treat as its own (a pipe, a redirect, a second command): there's no shell here. */
-const SHELL_WORDS = new Set(["|", "||", "&&", "&", ";", ">", ">>", "<", "2>", "2>&1", "&>"]);
+/** Characters a shell would act on outside quotes (pipes, redirects, a second command, expansions): there's no shell here. */
+const SHELL_CHARS = new Set(["|", "&", ";", ">", "<", "$", "`"]);
 
 export type CommandCheck =
 	| { ok: true; words: string[] }
@@ -29,16 +29,11 @@ export function commandWords(text: string): CommandCheck {
 	const words: string[] = [];
 	let cur = "";
 	let started = false;
-	let quoted = false; // the current word had a quote in it, so `"|"` is a word, not a pipe
 	let i = 0;
 	const push = () => {
-		if (started) {
-			if (!quoted && SHELL_WORDS.has(cur)) throw { reason: "shell", word: cur };
-			words.push(cur);
-		}
+		if (started) words.push(cur);
 		cur = "";
 		started = false;
-		quoted = false;
 	};
 	try {
 		while (i < text.length) {
@@ -50,11 +45,11 @@ export function commandWords(text: string): CommandCheck {
 				const end = text.indexOf("'", i + 1);
 				if (end < 0) return { ok: false, reason: "quote" };
 				cur += text.slice(i + 1, end);
-				started = quoted = true;
+				started = true;
 				i = end + 1;
 			} else if (c === '"') {
 				i++;
-				started = quoted = true;
+				started = true;
 				for (;;) {
 					if (i >= text.length) return { ok: false, reason: "quote" };
 					const d = text[i]!;
@@ -65,6 +60,8 @@ export function commandWords(text: string): CommandCheck {
 					if (d === "\\" && i + 1 < text.length && '"\\$`'.includes(text[i + 1]!)) {
 						cur += text[i + 1];
 						i += 2;
+					} else if (d === "$" || d === "`") {
+						throw { reason: "shell", word: d }; // a shell expands these inside double quotes too
 					} else {
 						cur += d;
 						i++;
@@ -72,8 +69,10 @@ export function commandWords(text: string): CommandCheck {
 				}
 			} else if (c === "\\") {
 				if (i + 1 < text.length) cur += text[i + 1];
-				started = quoted = true;
+				started = true;
 				i += 2;
+			} else if (SHELL_CHARS.has(c)) {
+				throw { reason: "shell", word: c };
 			} else {
 				cur += c;
 				started = true;

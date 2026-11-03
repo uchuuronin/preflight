@@ -133,6 +133,8 @@ export function whyNoFix(finding: Finding, ctx: Ctx): "lens" | "pinned" | "froze
 	if (t.knob && ctx.pinned.has(t.knob)) return "pinned";
 	if (t.knob && limits.frozen.includes(t.knob)) return "frozen";
 	const knob = t.knob ? ctx.record.knobs.find((k) => k.id === t.knob) : undefined;
+	const fixed = CODE_ONLY_VALUES[t.id];
+	if (!knob && fixed !== undefined && !valueAllowed(limits, t.knob ?? t.id, fixed)) return "ruled_out";
 	if (knob?.kind === "bool" && ctx.knobs[knob.id] === true) return "already";
 	if (knob?.kind === "bool" && !valueAllowed(limits, knob.id, true)) return "ruled_out";
 	return "no_value";
