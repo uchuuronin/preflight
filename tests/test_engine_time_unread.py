@@ -89,10 +89,12 @@ def test_a_gnn_s_epochs_and_batch_move_its_run_length():
 	assert more.point > 1.5 * base.point
 
 
-def test_a_trainer_s_step_cap_is_never_rescaled_and_epochs_zero_is_no_steps():
+def test_a_trainer_s_step_cap_is_never_rescaled_and_epochs_zero_abstains():
 	rec = _rec("gnn_pyg_a10.record.json")
 	cur = api._current(rec)
-	assert api._total_steps(rec, {**cur, "epochs": 0})[0] == 0
+	for e in (0, -1):
+		t = api.predict(rec, {"epochs": e}).root["time.total"]
+		assert t.status == "abstain" and "epochs must be more than 0" in t.reason
 	sm = rec.job.script_map.model_copy(update={"framework": "hf_trainer"})
 	capped = rec.model_copy(update={"job": rec.job.model_copy(update={"script_map": sm})})
 	assert api._total_steps(capped, {**cur, "epochs": 6})[0] == 471

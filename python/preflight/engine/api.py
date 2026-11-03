@@ -285,6 +285,9 @@ def _invalid(values: dict) -> str | None:
 		v = values[kid]
 		if v is not None and not isinstance(v, bool) and isinstance(v, int | float) and v <= 0:
 			return f"{kid} must be at least 1"
+	e = values.get("epochs")
+	if e is not None and not isinstance(e, bool) and isinstance(e, int | float) and e <= 0:
+		return "epochs must be more than 0"  # 0 read as the map's epochs, a negative as a negative time (review, Nov 3)
 	for kid in _PRECISION_KNOBS:
 		v = values.get(kid)
 		if isinstance(v, str) and v not in ("mixed", "unknown") and _precision({kid: v}) is None:
@@ -1904,7 +1907,7 @@ _PACKING_MOVED = (
 
 # frameworks whose max_steps is a cap the trainer enforces whatever the epochs (review, Nov 3): a map's step count
 # there is never rescaled, even when its knob wasn't kept
-_HARD_STEP_CAPS = frozenset({"hf_trainer", "trl", "lightning", "torchtitan"})
+_HARD_STEP_CAPS = frozenset({"hf_trainer", "trl", "lightning", "torchtitan", "sentence_transformers"})
 
 
 def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]:
