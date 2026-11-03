@@ -1,0 +1,48 @@
+{
+  "shape": {
+    "model": "muse-spark-1.3",
+    "messages": "list",
+    "stop": [
+      "Observation:",
+      "Calling tools:"
+    ],
+    "tool_choice": "required",
+    "tools": "list"
+  },
+  "variants": [
+    {
+      "variant": "as sent",
+      "status": 400,
+      "code": "invalid_request_error",
+      "message": "only `\"auto\"` is supported for `tool_choice`. `\"none\"`, `\"required\"`, and named function choices are not currently supported"
+    },
+    {
+      "variant": "without stop",
+      "status": 400,
+      "code": "invalid_request_error",
+      "message": "only `\"auto\"` is supported for `tool_choice`. `\"none\"`, `\"required\"`, and named function choices are not currently supported"
+    },
+    {
+      "variant": "without tool_choice",
+      "status": 400,
+      "code": "invalid_request_error",
+      "message": "`stop` is not supported"
+    },
+    {
+      "variant": "without stop and tool_choice",
+      "status": 200,
+      "code": "",
+      "message": "",
+      "tokens": [
+        1520,
+        16
+      ]
+    },
+    {
+      "variant": "without tools and tool_choice",
+      "status": 400,
+      "code": "invalid_request_error",
+      "message": "`stop` is not supported"
+    }
+  ]
+}
