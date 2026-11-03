@@ -4,7 +4,9 @@
 
 A repository too big to read whole (lm-evaluation-harness, vLLM) or to map whole (torchtune: over
 2 MB of Python) is read as its entry point plus the files that entry point imports, transitively,
-nearest first, until a file, byte or time budget is spent. Nothing outside the repository is
+nearest first, until a file, byte or lookup budget is spent. The cut is deterministic: the same
+repository and entry point always read the same files (no clock), so a record's content hash doesn't
+change between reads. Nothing outside the repository is
 followed (an import of torch resolves to no file here), nothing is executed, and a file that
 doesn't parse is kept but not followed. Resolution is the static, ordinary case: `import a.b` and
 `from a.b import c` to `a/b.py` or `a/b/__init__.py` (and `a/b/c.py` for the `from` form), each
@@ -22,7 +24,6 @@ object store is read once per layer, never whole).
 """
 
 import ast
-import time
 from collections.abc import Callable, Iterable
 
 # read beside the code when they're at the repository's top (a probe installs from them); never followed
@@ -31,7 +32,9 @@ MAX_PARTS = 32  # guess: dotted parts of one module name (real packages nest a h
 MAX_NAMES = 64  # names in one `from x import ...` followed as possible submodules
 MAX_IMPORTS = 2_000  # import statements followed in one file
 MAX_LINE = 4_000  # guess: characters in a line before a file's imports aren't followed
-DEADLINE_S = 30.0  # guess: the whole walk, checked between layers (one read or parse can run past it)
+# guess: import resolutions in the whole walk, each a few dict lookups (MAX_PARTS deep at most), so the
+# walk's work is bounded by the bytes read and this, not a clock
+MAX_LOOKUPS = 200_000
 
 
 def _type_checking(node: ast.AST) -> bool:
@@ -100,7 +103,7 @@ def import_closure(
 	max_files: int,
 	max_bytes: int,
 	sizes: dict[str, int] | None = None,
-	deadline_s: float = DEADLINE_S,
+	max_lookups: int = MAX_LOOKUPS,
 ) -> tuple[dict[str, str], dict]:
 	"""({path: text} of the entry point and what it imports, nearest first; what happened).
 
@@ -108,7 +111,8 @@ def import_closure(
 	tree's), so a file over the budget is never read (the entry point is always read). info: files,
 	Python files imported (`imported`, the entry point and project files not counted), bytes, how
 	many imported files were found but left out for the budget (`skipped`, a floor: what they
-	import is never seen), and whether the time ran out."""
+	import is never seen), and `cut`: "lookups" when the lookup budget ran out (the rest of the walk
+	is skipped and counted), else None."""
 	have = set(paths)
 	dirs: set[str] = set()
 	for p in have:
@@ -116,16 +120,14 @@ def import_closure(
 		dirs.update("/".join(parts[:k]) for k in range(1, len(parts)))
 	entry_dir = entry.rsplit("/", 1)[0] if "/" in entry else ""
 	roots = list(dict.fromkeys([entry_dir, "", *(["src"] if "src" in dirs else [])]))
-	started = time.monotonic()
 	out: dict[str, str] = {}
-	total, skipped, timed_out = 0, 0, False
+	total, skipped, lookups, cut = 0, 0, 0, None
 	extra = [p for p in PROJECT_FILES if p in have and p != entry]
 	seen = {entry, *extra}
 	layer = [entry, *extra]
 	while layer:
-		if time.monotonic() - started > deadline_s:
-			timed_out = True
-			skipped += len(layer)
+		if cut:
+			skipped += sum(p not in PROJECT_FILES for p in layer)
 			break
 		want = []
 		for p in layer:
@@ -151,6 +153,12 @@ def import_closure(
 				continue
 			pkg = p.rsplit("/", 1)[0] if "/" in p else ""
 			for parts, level, names in _imports(p, text):
+				if cut:
+					break
+				lookups += (1 + len(names)) * (1 if level else len(roots))  # _resolve's calls and names tried
+				if lookups > max_lookups:
+					cut = "lookups"  # files later in this layer are still read; their imports aren't followed
+					break
 				if level:
 					up = pkg.split("/") if pkg else []
 					if level - 1 > len(up):
@@ -167,4 +175,4 @@ def import_closure(
 		layer = nxt
 	imported = sum(1 for p in out if p.endswith(".py") and p != entry and p not in PROJECT_FILES)
 	return out, {"files": len(out), "imported": imported, "bytes": total, "skipped": skipped,
-		"timed_out": timed_out, "repo_files": len(have)}  # fmt: skip
+		"cut": cut, "repo_files": len(have)}  # fmt: skip

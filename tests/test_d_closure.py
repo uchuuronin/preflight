@@ -201,3 +201,22 @@ def test_no_imported_files_reads_as_none():
 
 	assert _n_files(0, "file") == "none of the files" and _n_files(1, "file") == "the 1 file"
 	assert _n_files(2_000, "file") == "the 2,000 files"
+
+
+def test_the_cut_is_by_lookups_not_a_clock_so_two_reads_match():
+	"""A's fix (Nov 3): the 30 s clock could read different files on a slow day, changing a record's
+	content hash; the walk now stops on a lookup count, the same on every read."""
+	import preflight.harness.closure as C
+
+	repo = {
+		"main.py": "".join(f"import m{i}\n" for i in range(50)),
+		**{f"m{i}.py": f"import n{i}\n" for i in range(50)},
+		**{f"n{i}.py": "" for i in range(50)},
+	}
+	read = lambda ps: {p: repo[p] for p in ps}  # noqa: E731
+	assert not hasattr(C, "time")  # no clock in the walk
+	a, ia = import_closure(repo, read, "main.py", max_files=999, max_bytes=10**7, max_lookups=60)
+	b, ib = import_closure(repo, read, "main.py", max_files=999, max_bytes=10**7, max_lookups=60)
+	assert a == b and ia == ib and ia["cut"] == "lookups" and ia["skipped"] > 0
+	full, info = import_closure(repo, read, "main.py", max_files=999, max_bytes=10**7)
+	assert len(full) == 101 and info["cut"] is None and info["skipped"] == 0
