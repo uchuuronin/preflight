@@ -84,10 +84,19 @@ EGRESS = [
 	"codeload.github.com",
 	"*.githubusercontent.com",
 ]
-# probes.extra_hosts (off): PyG's wheel index (torch-sparse and the rest, which PyPI has only as source) and
+# probes.extra_hosts (on in production since Nov 3): PyG's wheel index (torch-sparse and the rest, which PyPI has only as source) and
 # torchvision's dataset host for CIFAR (Nov 2: unseen scripts 8 and 9 stopped there)
 # torchvision 0.20's CIFAR comes from cave.cs.toronto.edu (a-all3-9, Nov 2), not www.cs.toronto.edu
-EXTRA_EGRESS = ["data.pyg.org", "www.cs.toronto.edu", "cave.cs.toronto.edu"]
+# OGB's datasets (snap.stanford.edu) and BEIR's (public.ukp.informatik.tu-darmstadt.de): unseen 8 and 7 measured on the
+# ops rig, which has no allowlist; through production OGB stopped at its download (a-fresh-live-ogb-checkin, Nov 3), and
+# BEIR's script downloads from its host the same way
+EXTRA_EGRESS = [
+	"data.pyg.org",
+	"www.cs.toronto.edu",
+	"cave.cs.toronto.edu",
+	"snap.stanford.edu",
+	"public.ukp.informatik.tu-darmstadt.de",
+]
 PYG_INDEX = "https://data.pyg.org/whl/torch-2.5.0+cu124.html"  # PyPI's torch 2.5.1 is built for CUDA 12.4
 # pinned so a probe measures the same stack every time; part of the probe-cache key
 PROBE_PACKAGES = [
