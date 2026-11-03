@@ -35,8 +35,17 @@ def _what_installed(spec: dict) -> str:
 
 def _write(out_path: str, result: dict) -> None:
 	tmp = out_path + ".tmp"
-	Path(tmp).write_text(json.dumps(result, default=str))
-	os.replace(tmp, out_path)
+	Path(tmp).write_text(json.dumps(result, default=str), encoding="utf-8")
+	for i in range(
+		40
+	):  # Windows refuses a replace while the parent is reading the file (D, Nov 3): wait it out
+		try:
+			os.replace(tmp, out_path)
+			return
+		except PermissionError:
+			if i == 39:
+				raise
+			time.sleep(0.05 * min(i + 1, 5))
 
 
 # Limits on the visitor's code, set in this process before it runs (inherited by all it starts).
@@ -52,8 +61,12 @@ RLIMITS = {
 
 
 def set_limits() -> dict:
-	"""Lower each limit to ours (never raise one); returns what was applied, for the log."""
-	import resource
+	"""Lower each limit to ours (never raise one); returns what was applied, for the log. None on Windows,
+	which has no `resource` module (D, Nov 3): the probe runs without them there."""
+	try:
+		import resource
+	except ImportError:
+		return {}
 
 	applied = {}
 	for name, want in RLIMITS.items():

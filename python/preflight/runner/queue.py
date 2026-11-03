@@ -90,21 +90,51 @@ JOB_BUDGET_USD = 0.60  # what a queued or running job may still spend (runner/pi
 _ET = None
 
 
+def _et_zone():
+	"""America/New_York, or None where there's no time-zone database (native Windows without the tzdata
+	package: ZoneInfoNotFoundError, D's Windows run 2, Nov 3); the US rule then gives the offset (_et_offset_s)."""
+	from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+	try:
+		return ZoneInfo("America/New_York")
+	except ZoneInfoNotFoundError:
+		return None
+
+
+def _et_offset_s(ts: float) -> int:
+	"""Eastern time's UTC offset at a Unix time by the US rule since 2007: daylight time from the second
+	Sunday of March, 2 AM local (07:00 UTC), to the first Sunday of November, 2 AM local (06:00 UTC)."""
+	from datetime import datetime, timedelta
+
+	utc = datetime.fromtimestamp(ts, UTC)
+
+	def sunday(month: int, n: int, hour: int) -> datetime:
+		first = datetime(utc.year, month, 1, hour, tzinfo=UTC)
+		return first + timedelta(days=(6 - first.weekday()) % 7 + 7 * (n - 1))
+
+	return -4 * 3600 if sunday(3, 2, 7) <= utc < sunday(11, 1, 6) else -5 * 3600
+
+
 def et_day(ts: float) -> str:
 	"""The America/New_York calendar date of a Unix time, e.g. "2026-11-01"."""
 	global _ET
 	from datetime import datetime
-	from zoneinfo import ZoneInfo
 
-	_ET = _ET or ZoneInfo("America/New_York")
+	_ET = _ET or _et_zone() or False
+	if _ET is False:
+		return datetime.fromtimestamp(ts + _et_offset_s(ts), UTC).date().isoformat()
 	return datetime.fromtimestamp(ts, _ET).date().isoformat()
 
 
 def seconds_to_midnight_et(ts: float) -> int:
 	from datetime import datetime, timedelta
-	from zoneinfo import ZoneInfo
 
-	et = ZoneInfo("America/New_York")
+	et = _et_zone()
+	if et is None:  # no time-zone database: midnight by the US rule's offset (taken at midnight itself)
+		local = datetime.fromtimestamp(ts + _et_offset_s(ts), UTC)
+		nxt = datetime(local.year, local.month, local.day, tzinfo=UTC) + timedelta(days=1)
+		guess = nxt.timestamp() - _et_offset_s(ts)
+		return max(60, int(nxt.timestamp() - _et_offset_s(guess) - ts))
 	tomorrow = datetime.fromtimestamp(ts, et).date() + timedelta(days=1)
 	nxt = datetime(tomorrow.year, tomorrow.month, tomorrow.day, tzinfo=et)
 	return max(60, int(nxt.timestamp() - ts))  # by timestamps: a DST day is 23 or 25 hours
