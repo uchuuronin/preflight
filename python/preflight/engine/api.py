@@ -99,6 +99,8 @@ FEATURES = {
 	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row
 	"carry_free_knobs": False,  # flags.json engine.carry_free_knobs: after the freeze (Nov 2), off until checked
 	"context_same_stack": False,  # flags.json engine.context_same_stack: after the freeze (Nov 2), off until checked
+	"memory_reserved": False,  # flags.json engine.memory_reserved: Nov 3, off until the PM turns it on
+	"eval_passes": False,  # flags.json engine.eval_passes: Nov 3, off until checked
 }  # the defaults when the caller passes no flags (scripts, tests); keep them the same as flags.json
 # the flags.json key for each feature: fill_predictions(record, flags=flag) reads them for that call
 FLAG_OF = {
@@ -108,6 +110,8 @@ FLAG_OF = {
 	"divergence": "engine.divergence",
 	"carry_free_knobs": "engine.carry_free_knobs",
 	"context_same_stack": "engine.context_same_stack",
+	"memory_reserved": "engine.memory_reserved",
+	"eval_passes": "engine.eval_passes",
 }
 _FEATURES_NOW: contextvars.ContextVar[dict[str, bool] | None] = contextvars.ContextVar(
 	"preflight_features", default=None
@@ -552,13 +556,39 @@ def _matching_probe(record: FlightRecord, values: dict, ok=OK_PROBE):
 	return None
 
 
+# D's walkthrough, Nov 3: knobs whose effect the engine computes from the layer shape (heads, MLP width, per-layer
+# activations). On a script map with only a parameter count (GenericArch) they have no analytical effect, so a move
+# would read as no change at all; count them as unmodelled there, as for any knob the engine doesn't model.
+SHAPE_DEPENDENT = {
+	"memory": frozenset({"lora_r", "eval_no_grad", "gradient_checkpointing", "attn"}),
+	# review, Nov 3: the step-time model applies checkpointing's recompute without a layer shape
+	"time": frozenset({"lora_r", "eval_no_grad", "attn"}),
+}
+
+
+def _generic_shape(record: FlightRecord) -> bool:
+	try:
+		arch, _setup, _shape = knobs.setup_from(_script_map(record), _current(record))
+	except (ValueError, AttributeError):
+		return False
+	return isinstance(arch, memory.GenericArch)
+
+
 def _unmodelled_moves(record: FlightRecord, values: dict, readout: str) -> list[str]:
 	"""Knobs that change this readout, aren't modelled for it, and sit where no probe ran."""
 	out = []
+	generic = None
 	for kid, v in values.items():
 		spec = knobs.knob_spec(kid)
-		if readout not in spec.affects or readout in spec.modelled or kid == "gpu_type":
+		if readout not in spec.affects or kid == "gpu_type":
 			continue
+		if readout in spec.modelled:
+			if kid not in SHAPE_DEPENDENT.get(readout, ()):
+				continue
+			if generic is None:
+				generic = _generic_shape(record)
+			if not generic:
+				continue
 		probed = [_probe_values(record, p).get(kid) for p in record.probes if p.status in OK_PROBE]
 		if probed and not any(_same(v, pv) for pv in probed):
 			out.append(kid)
@@ -884,6 +914,86 @@ def _sized(shape, values: dict, seq: float | None) -> tuple[knobs.Shape, dict]:
 	return replace(shape, seq=s), {**values, "seq_len": s}
 
 
+# Chiya, Nov 3: the reserved pool. The probes measure the allocator's reserved peak, but a short probe can stop before
+# the pool settles. The corpus margin (reserved over allocated, by family and size, fitted on the
+# calibration split by scripts/fit_reserved_margin.py into `_reserved_margin.py`, never the zoo) raises a prediction only where the probes' own
+# ratio is below it: the point to the family's median, the upper end to its 90th percentile.
+_MARGIN_FAMILY = {
+	"finetune": "hf",
+	"rl": "hf",
+	"pretrain": "gpt",
+	"vision": "cnn",
+	"retrieval": "encoder",
+}
+# review, Nov 3: a training-step margin says nothing about inference: vLLM preallocates its pool, and an eval's batches
+# aren't training steps
+_MARGIN_SKIP = ("serving", "eval")
+_MARGIN_SIZES = ((1e7, "<10M"), (1e8, "<100M"), (1e9, "<1B"), (float("inf"), ">=1B"))
+
+
+def _margins() -> dict:
+	from preflight.engine._reserved_margin import MARGINS
+
+	return MARGINS
+
+
+def _margin(lens: str, n_params: float | None) -> tuple[float, float, str]:
+	"""(median, q90, what it is) for this lens and size; a lens with no corpus family takes the widest family."""
+	t = _margins()
+	fam = _MARGIN_FAMILY.get(lens)
+	if fam is None:
+		m50 = max(c["median"] for c in t["by_family"].values())
+		m90 = max(c["q90"] for c in t["by_family"].values())
+		return m50, m90, f"no corpus family for {lens}, so the widest family's"
+	if n_params:
+		size = next(name for top, name in _MARGIN_SIZES if n_params < top)
+		c = t["by_size"].get(f"{fam}|{size}")
+		if c:
+			return c["median"], c["q90"], f"{fam} models {size}"
+	c = t["by_family"][fam]
+	return c["median"], c["q90"], f"{fam} models"
+
+
+def _probe_pool_ratio(record: FlightRecord) -> float | None:
+	"""Reserved over allocated at the probe with the largest reserved peak (the one the prediction leans on)."""
+	best = None
+	for p in record.probes:
+		m = p.memory
+		usable = p.status in OK_PROBE and m and m.peak_reserved_bytes and m.peak_allocated_bytes
+		if usable and (best is None or m.peak_reserved_bytes > best.peak_reserved_bytes):
+			best = m
+	return best.peak_reserved_bytes / best.peak_allocated_bytes if best else None
+
+
+def _with_reserved_margin(
+	record: FlightRecord, est: memory.MemoryEstimate, ctx: float, capacity: float, n_params: float | None
+) -> memory.MemoryEstimate:
+	if (
+		not feature("memory_reserved")
+		or record.job.lens in _MARGIN_SKIP
+		or est.status in ("abstain", "measured")
+		or not est.point
+	):
+		return est
+	ratio = _probe_pool_ratio(record)
+	if ratio is None:
+		return est
+	m50, m90, what = _margin(record.job.lens, n_params)
+	f50, f90 = max(1.0, m50 / ratio), max(1.0, m90 / ratio)
+	if f90 <= 1.0:
+		return est
+	alloc = max(0.0, est.point - ctx)
+	point = ctx + alloc * f50
+	hi = max(est.hi or point, ctx + alloc * f90)
+	why = (
+		f"the probes' reserved pool is {ratio:.2f}x their allocated peak, under the corpus's {m50:.2f}x median and "
+		f"{m90:.2f}x 90th percentile for {what}, so the point and the upper end are raised to them"
+	)
+	p = memory.p_oom(point, est.sigma_log, capacity)
+	return replace(est, point=point, hi=hi, p_oom=p, oom_status=memory.oom_status(p),
+		reason="; ".join(x for x in (est.reason, why) if x))  # fmt: skip
+
+
 def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _MemoryResult:
 	mid = memory.MODEL_ID
 	gpu = _target_gpu(record, values)
@@ -962,6 +1072,9 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	):
 		why = f"the peak comes at {est.breakdown.peak_moment}, which no probe ran; run a probe with {est.breakdown.peak_moment} in it"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
+	est = _with_reserved_margin(
+		record, est, ctx, capacity, arch.param_count() if hasattr(arch, "param_count") else None
+	)
 	cell = conformal.TABLE.lookup("memory.peak", gpu, lens)
 	if est.status != "abstain" and est.point and cell is not None and cell.residuals:
 		# P(OOM) from held-out residuals of the allocator peak (context is added outside the residual)
@@ -1213,6 +1326,7 @@ def _empirical_memory(
 			_band_note(cell) if cell is not None and not measured else None,
 		) if x),
 	)  # fmt: skip
+	est = _with_reserved_margin(record, est, ctx, capacity, None)
 	return _from_memory_estimate(est, mid)
 
 
@@ -1743,6 +1857,51 @@ class _TimeResult:
 	phases: dict | None = None
 	first_s: float = 0.0  # compile and warm-up, paid once before the first step
 	steps: float | None = None
+
+
+# Chiya, Nov 3: an eval by command (lm_eval's loglikelihood tasks) has no optimizer steps; A's eval probe (probes.eval_units)
+# times its scoring batches instead. Total = the probe's time outside its scoring batches (load, tokenizing, lm_eval's
+# batch-size search; the warm-up batches count as passes) + scoring passes x the per-pass time, passes = the eval's
+# requests / the rows a batch holds. Only at the probe's own GPU and knobs: nothing here scales to another.
+EVAL_PASS_SIGMA = 0.30  # guess: log-space, as serving.SIGMA_UNCALIBRATED; no eval run has calibrated it
+MODEL_ID_EVAL = "eval-passes@0.1.0"
+
+
+def _eval_passes_total(record: FlightRecord, moved: bool = False) -> Estimate:
+	if moved:
+		why = "the eval's passes are timed at the probe's GPU and settings only; run a probe at these"
+		return _abstain("s", MODEL_ID_EVAL, why)
+	probe = next(
+		(p for p in record.probes if p.status in OK_PROBE and (p.extras or {}).get("eval_forward_batches")),
+		None,
+	)
+	if probe is None:
+		return _abstain(
+			"s", MODEL_ID_EVAL, "no eval probe timed a scoring batch; run a probe with probes.eval_units"
+		)
+	x = probe.extras
+	per, rows, n = x.get("eval_forward_s_p50"), x.get("eval_forward_rows_mean"), x.get("eval_forward_batches")
+	requests = x.get("eval_requests_total")
+	if not per or not rows or not requests:
+		why = "the probe timed scoring batches but didn't record how many requests the eval has, so the passes aren't known"
+		return _abstain("s", MODEL_ID_EVAL, why)
+	passes = math.ceil(requests / rows)
+	fixed = max(0.0, (probe.duration_s or 0.0) - (n + EVAL_WARMUP_BATCHES) * per)
+	pt = passes * per
+	h = memory.Z90 * EVAL_PASS_SIGMA
+	why = (
+		f"{passes:,} scoring passes ({requests:,.0f} requests at {rows:.0f} a batch) x {per:.2f} s a pass (the probe's "
+		f"{n:.0f} batches, p50) + {fixed:.0f} s outside the scoring batches; an eval that scores its longest requests first "
+		"(lm_eval does) makes the probe's batches the slowest, so this leans long"
+	)
+	return _est(
+		pt + fixed, pt * math.exp(-h) + fixed, pt * math.exp(h) + fixed, "s", "predicted", MODEL_ID_EVAL, why
+	)
+
+
+EVAL_WARMUP_BATCHES = (
+	2  # cited: recorder/runtime.py, probes.eval_units runs two scoring batches before the measured ones
+)
 
 
 def _time(record: FlightRecord, values: dict) -> _TimeResult:
@@ -2406,6 +2565,11 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		return Prediction(_agent(record, values))
 	mem = _memory(record, values, eval_off=eval_off)
 	tm = _time(record, values)
+	if feature("eval_passes") and record.job.lens == "eval" and tm.total.status == "abstain":
+		moved = _target_gpu(record, values) != _env_gpu(record) or any(
+			values.get(k) != v for k, v in _current(record).items()
+		)
+		tm = replace(tm, total=_eval_passes_total(record, moved), sigma=EVAL_PASS_SIGMA)
 	out = {
 		"memory.peak": mem.peak,
 		"risk.oom": mem.oom,
