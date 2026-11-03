@@ -1,0 +1,120 @@
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+
+Service restarts being deferred:
+ systemctl restart hosted-compute-agent.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+{
+ "base": "https://preflight-cqn.pages.dev",
+ "passed": 16,
+ "failed": 1,
+ "checks": [
+  {
+   "name": "sample opens to a map",
+   "ok": true,
+   "ms": 635
+  },
+  {
+   "name": "four readouts",
+   "ok": true,
+   "dials": 3,
+   "core": 1
+  },
+  {
+   "name": "every dial has a status word",
+   "ok": true,
+   "dials": [
+    {
+     "label": "Time to finish",
+     "status": "Predicted If it didn't run out of memory",
+     "value": "1 h 34 min"
+    },
+    {
+     "label": "Run cost",
+     "status": "Predicted If it didn't run out of memory",
+     "value": "US$1.26"
+    },
+    {
+     "label": "Chance it runs out of memory",
+     "status": "Predicted Likely to fail",
+     "value": "100%"
+    }
+   ]
+  },
+  {
+   "name": "a status line says where the run stands",
+   "ok": true,
+   "status": "Likely runs out of memory on L4 (100% chance)."
+  },
+  {
+   "name": "probes open as chips in a drawer",
+   "ok": true,
+   "chips": 4
+  },
+  {
+   "name": "every button has a name",
+   "ok": true,
+   "unnamed": 0
+  },
+  {
+   "name": "moving a knob changes the readouts",
+   "ok": true,
+   "changes": 10
+  },
+  {
+   "name": "knob to readout p95 under 400 ms at 4x CPU slowdown",
+   "ok": true,
+   "p95_ms": 321
+  },
+  {
+   "name": "the guide says something",
+   "ok": true,
+   "said": "Muse Spark will move the knobs that matter for your aim one at a time, on the map, and you decide each move."
+  },
+  {
+   "name": "the guide offers a move on the sample",
+   "ok": false
+  },
+  {
+   "name": "data-use notice is shown",
+   "ok": true
+  },
+  {
+   "name": "check-in waits for the notice",
+   "ok": true
+  },
+  {
+   "name": "ticking the notice enables check-in",
+   "ok": true
+  },
+  {
+   "name": "no page errors",
+   "ok": true,
+   "errors": []
+  },
+  {
+   "name": "no sideways scroll on a phone at /",
+   "ok": true,
+   "overflow_px": 0
+  },
+  {
+   "name": "no sideways scroll on a phone at /#/new",
+   "ok": true,
+   "overflow_px": 0
+  },
+  {
+   "name": "no sideways scroll on a phone at /#/cockpit/lora-qwen",
+   "ok": true,
+   "overflow_px": 0
+  }
+ ]
+}
+::error title=stranger test::the guide offers a move on the sample {"name":"the guide offers a move on the sample","ok":false}
+::notice title=stranger test::16/17 checks passed
