@@ -788,7 +788,7 @@ def ground_truth(
 		print(f"[ground truth] notebook {notebook}: {entrypoint}, {sorted(files)}", flush=True)
 	if sum(map(bool, (script, dir, repo, command_hex, notebook))) != 1:
 		raise SystemExit(
-			"name one of a zoo script (--script), a directory in this checkout (--dir) or a repo (--repo)"
+			"name one of a zoo script (--script), a directory in this checkout (--dir), a repo (--repo), a notebook (--notebook) or a command (--command-hex)"
 		)
 	if script:
 		if script not in ZOO_SCRIPTS:
