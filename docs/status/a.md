@@ -1,8 +1,8 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Mon Nov 2, 5:40 PM ET.
+Updated Mon Nov 2, 7:55 PM ET.
 
-**Production runner: deployed from main a132c0a** (`a-deploy-main-26`, GitHub 41554416912, Nov 3 00:40 UTC / Nov 2 7:40 PM ET), after both startup checks passed (`a-startup-check-26` 41553993474, `a-startup-check-serving-12` 41554253275); the limit check passed after it (`a-limit-check-7`, 41554506106). New in production with it: `harness.spark_diagnosis` and `harness.spark_claim_check` on (the PM's merge 2), check-in help's fields (contract 0.6.3), and the new probe image (torchvision 0.20.1, uv 0.5.11), so every probe is measured afresh. The previous deploy was 8ec03bc (22:38 UTC); rollback is `modal deploy --env main` from 8ec03bc.
+**Production runner: deployed from main a132c0a** (`a-deploy-main-26`, GitHub 41554416912, Nov 3 00:40 UTC / Nov 2 7:40 PM ET), after both startup checks passed (`a-startup-check-26` 41553993474, `a-startup-check-serving-12` 41554253275); the limit check passed after it (`a-limit-check-7`, 41554506106). New in production with it: `harness.spark_diagnosis` and `harness.spark_claim_check` on (the PM's merge 2), check-in help's fields (contract 0.6.3/0.6.4), and the new probe image (torchvision 0.20.1, uv 0.5.11), so every probe is measured afresh. The previous deploy was 8ec03bc (22:38 UTC); rollback is `modal deploy --env main` from 8ec03bc.
 
 ## Unseen validation runs (Nov 2): all nine posted
 

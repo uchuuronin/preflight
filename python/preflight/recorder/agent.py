@@ -29,6 +29,7 @@ caps are guesses until the agent validation run.
 
 import contextlib
 import hashlib
+import heapq
 import json
 import re
 import secrets
@@ -294,7 +295,7 @@ def request_shape(body: bytes) -> str:
 		return "not JSON"
 	if not isinstance(req, dict):
 		return "not an object"
-	keys = sorted(k for k in req if isinstance(k, str) and re.fullmatch(r"[a-z_]{1,40}", k))[:16]
+	keys = heapq.nsmallest(16, (k for k in req if isinstance(k, str) and re.fullmatch(r"[a-z_]{1,40}", k)))
 	msgs = req.get("messages") if isinstance(req.get("messages"), list) else []
 	roles = sorted({m["role"] for m in msgs[:200] if isinstance(m, dict) and isinstance(m.get("role"), str)
 		and re.fullmatch(r"[a-z_]{1,20}", m["role"])})  # fmt: skip
