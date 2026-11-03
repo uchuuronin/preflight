@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { finishBand, planFromRecord } from "../workspace/campaign/plan";
 import { currentKnobs } from "../workspace/record/model";
 import { estimateFactor } from "../workspace/rate";
-import { fmt, fmtDelta, fmtRange } from "../lib/fmt";
+import { fmt, fmtDelta, fmtRange, fmtSpread } from "../lib/fmt";
 import { wilson } from "../addons/_stats/wilson";
 import { probeCap, rlProbe, spreadCount } from "../workspace/rl";
 import { flag } from "../lib/flags";
@@ -301,7 +301,7 @@ export function GuidePanel() {
 		const cap = probeCap(p);
 		const e = (id: string) => {
 			const x = estimates[id];
-			return x && trusted(x) ? `${fmt(x.point, "probability")} (${fmtRange(x.lo ?? x.point, x.hi ?? x.point, "probability")})` : t("value.none");
+			return x && trusted(x) ? `${fmt(x.point, "probability")}${fmtSpread(x.lo ?? x.point, x.hi ?? x.point, "probability") ? ` (${fmtSpread(x.lo ?? x.point, x.hi ?? x.point, "probability")})` : ""}` : t("value.none");
 		};
 		return {
 			k: w ? fmt(w.k, "count") : "",
@@ -583,16 +583,21 @@ export function GuidePanel() {
 			))}
 
 			{state.trace.length ? (
-				<ol className="pf-trace" aria-label={t("guide.trace")}>
-					{state.trace.slice(-4).map((e) => (
-						<li key={e.id} className={e.ok ? "" : "is-error"}>
-							<span className="pf-trace__call">
-								{e.tool}({e.args})
-							</span>
-							<span className="pf-trace__result">→ {e.result}</span>
-						</li>
-					))}
-				</ol>
+				// The raw calls stay available, folded: open, they read as developer noise under a plain-words
+				// step (Chiya, Nov 2).
+				<details className="pf-trace-fold">
+					<summary>{t("guide.trace")}</summary>
+					<ol className="pf-trace">
+						{state.trace.slice(-4).map((e) => (
+							<li key={e.id} className={e.ok ? "" : "is-error"}>
+								<span className="pf-trace__call">
+									{e.tool}({e.args})
+								</span>
+								<span className="pf-trace__result">→ {e.result}</span>
+							</li>
+						))}
+					</ol>
+				</details>
 			) : null}
 
 			{footer.map((p) => (

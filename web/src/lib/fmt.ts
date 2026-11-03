@@ -181,6 +181,11 @@ export function fmtRange(lo: number, hi: number, unit: Unit | string): string {
 	return t("value.range", { lo: fmt(lo, unit), hi: fmt(hi, unit) });
 }
 
+/** The range, or null when its ends read the same ("100% to 100%" says nothing; review, Nov 2). */
+export function fmtSpread(lo: number, hi: number, unit: Unit | string): string | null {
+	return fmt(lo, unit) === fmt(hi, unit) ? null : fmtRange(lo, hi, unit);
+}
+
 /** A signed change for delta badges: "+2.1 GiB", "−14 min". */
 export function fmtDelta(delta: number, unit: Unit | string): string {
 	if (delta === 0) return t("value.no_change");

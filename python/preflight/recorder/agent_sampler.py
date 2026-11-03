@@ -36,6 +36,10 @@ from pathlib import Path
 
 from preflight.schema import AgentSample
 
+# AgentSample.selection holds 200; a top-up appends " + top-up of N" (engine/agent_cost.combine_samples) and
+# its marker is how a sample is known to be topped up, so the first sample leaves it room (A, Nov 2)
+SELECTION_CHARS = 180
+FAILED_WITH_NOTE = 60  # the script's error line beside a proxy or provider note
 DEFAULT_SAMPLE = 30  # cited: Chiya, Oct 27 (Contracts tab); B's engine.agent_cost.DEFAULT_SAMPLE
 TOP_UP_TASKS = 20  # cited: Chiya, Oct 27: 20 more when the cost range straddles the budget
 SAMPLE_SEED = 20261031  # derived: fixed, so a rerun samples the same tasks
@@ -209,14 +213,27 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	own = [r for r in own if r[0] != 404]  # a stray request at the tunnel's address, not the script's
 	if own:  # what the script heard from the proxy itself, which its SDK may not say
 		parts.insert(2, "proxy answered " + ", ".join(_own_reply(*r) for r in own[:2]))
+	bad = proxy.provider_errors() if note_replies and hasattr(proxy, "provider_errors") else []
+	if bad:  # what the provider refused, and what the request held (its keys, never their values)
+		status, code, model, shape, n = bad[0]
+		parts.insert(2, f"provider answered {_own_reply(status, code, model, n)} to {shape[:70]}")
 	if failed:  # probes.agent_error_line: why a script that made no calls stopped, ahead of the rest
-		parts.insert(2, f"script failed: {failed}")
+		# with a proxy or provider note, the exception's own line is cut so the note fits the 180 (Nov 2: the
+		# provider's 400 was cut off behind smolagents' long exception name)
+		short = (
+			failed
+			if not (own or bad)
+			else (failed[:FAILED_WITH_NOTE] + "..." if len(failed) > FAILED_WITH_NOTE else failed)
+		)
+		parts.insert(
+			2 + bool(own) + bool(bad), f"script failed: {short}"
+		)  # a note is the cause: it goes first
 	if cut == "stalled" and waiting:
 		w = at_cut.get("peak_concurrent") or 1
 		parts.insert(2, f"{len(waiting)} ended on a tool call, up to {min(w, len(waiting))} may be stuck")
 	selection = "; ".join(parts)
-	if len(selection) > 200:
-		selection = selection[:197].rsplit(" ", 1)[0] + "..."
+	if len(selection) > SELECTION_CHARS:
+		selection = selection[: SELECTION_CHARS - 3].rsplit(" ", 1)[0] + "..."
 	if inspect is not None:
 		# how each task ended, for an ops run's own scoring (counts and order only, never content): its
 		# opening rank, the last call's finish reason, and whether it ended waiting on a tool
