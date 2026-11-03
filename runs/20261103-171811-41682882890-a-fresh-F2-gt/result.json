@@ -1,0 +1,11 @@
+{
+	"name": "20261103-171811-41682882890-a-fresh-F2-gt",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41682882890",
+	"ref": "cf4945fbcbcb06e6f71db0674adc5ba4b6c87c41",
+	"sha": "cf4945fbcbcb06e6f71db0674adc5ba4b6c87c41",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --notebook validation/fresh/f2/text_classification.ipynb --bare-steps 1000000 --recorder-steps 60 --budget-min 25 --first-gpu A10 --install-requirements",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T17:19:32Z"
+}

@@ -1,0 +1,90 @@
+{
+  "script": "text_classification",
+  "entrypoint": "text_classification.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ImportError",
+    "error": "ImportError: The `notebook_login` function can only be used in a notebook (Jupyter or Colab) and you need the `ipywidgets` module: `pip install ipywidgets`.\n",
+    "seconds": 0.3026688619999991,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 13.4
+  },
+  "recorder": {
+    "status": "error",
+    "error": "A library in the script needs a package, which is not installed in the probe image. ImportError: The `notebook_login` function can only be used in a notebook (Jupyter or Colab) and you need the `ipywidgets` module: `pip install ipywidgets`. at text_classification.py:5, before the first optimizer step (stage: running script)",
+    "error_code": "missing_package",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 11.941,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {},
+    "step_log": [],
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n[preflight] requirements: installing optuna, ray[tune]\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T17:18:49Z",
+      "duration_s": 11.941,
+      "error": "A library in the script needs a package, which is not installed in the probe image. ImportError: The `notebook_login` function can only be used in a notebook (Jupyter or Colab) and you need the `ipywidgets` module: `pip install ipywidgets`. at text_classification.py:5, before the first optimizer step (stage: running script)",
+      "error_code": "missing_package",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": null,
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {},
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 11.941,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "finetune",
+  "image": "probe"
+}
