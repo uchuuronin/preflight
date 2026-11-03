@@ -188,9 +188,12 @@ B took the re-check off A (`from-b.md`, ws-b) and found three things before the 
 1. **A denial of service on the worker:** `named_keys` ran on the whole raw error, and its address
    pattern backtracks quadratically on long dotted text (40 KB of `a.` took 41 s). Nothing reads
    the whole error now: the error is cut to its last 5,000 characters before scrubbing, and the
-   cut's first run is dropped (a key has no spaces, and scrubbing can shrink what follows, which
-   would pull a cut key into view: the third review's case, tested), and only the 2,500 characters
-   the model is sent are scanned for addresses. When that text has a run over 512 characters with
+   cut line is dropped whole, through its first line break (a cut can split a secret's name from
+   its value, "Bearer" from its token or "password =" from its value, and scrubbing can shrink what
+   follows, pulling the cut into view: the reviews' cases, tested at every cut position across three
+   such lines); with no line break left, nothing is sent. Only the 2,500 characters the model is
+   sent are scanned for addresses. One gap stays: a secret's name and value on two lines with the cut
+   between them; a key-shaped value is still masked by its shape. When that text has a run over 512 characters with
    no space, it can't be scanned safely, and every source would be ruled out, so no search is made
    or paid for (the first fix truncated such runs, which let an address after one through: the
    second review). Tested: 40 KB of `a.` and 200 KB of

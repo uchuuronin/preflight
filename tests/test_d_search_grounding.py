@@ -485,3 +485,27 @@ def test_a_titles_control_characters_are_stripped_and_one_page_is_one_citation()
 	]
 	f, _ = ground_failure(client(data), probe(), {})
 	assert [c.title for c in f.citations] == ["OOM in eval"]
+
+
+def test_a_secrets_name_cut_off_at_the_window_edge_never_sends_its_value():
+	# the third review's cases: the cut drops or splits a secret's name, so the value loses its label
+	from preflight.harness.search_grounding import SCRUB_CHARS
+
+	for line in (
+		"Authorization: Bearer abcdefgh12345678",
+		"password = hunter2hunter2",
+		"API_KEY: v4lu3s3cr3t",
+	):
+		value = line.split()[-1]
+		for cut in range(len(line) + 1):
+			# the window (the error's last SCRUB_CHARS) starts at line[cut:]; presigned URLs after it
+			# shrink when scrubbed, which would pull the window's start into what the model sees
+			urls = "".join(f"\nhttps://s3.example/o{i}?" + "X" * 400 for i in range(10))
+			rest = urls + "\nOOM"
+			pad = SCRUB_CHARS - len(line[cut:]) - len(rest) - 1
+			body = line[cut:] + "\n" + ("log line\n" * (pad // 9 + 1))[:pad] + rest
+			err = "earlier log line\n" + line[:cut] + body
+			assert err[-SCRUB_CHARS:] == body
+			seen: list = []
+			ground_failure(client(response(answer("none_found")), seen), probe(error=err), {})
+			assert seen and value not in seen[0][1]["input"], (line, cut)

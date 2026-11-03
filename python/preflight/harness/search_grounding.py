@@ -497,11 +497,12 @@ def ground_failure(
 	# scrub's patterns are quadratic on some long runs: B's review, Nov 2)
 	window = probe.error[-SCRUB_CHARS:]
 	if len(probe.error) > SCRUB_CHARS:
-		# the cut may fall inside a key: drop the window's first run (a key has no spaces), since
-		# scrubbing can shrink what follows (a long URL query becomes `?<query>`) and pull the cut's
-		# start into what the model sees (second review, Nov 2)
-		parts = re.split(r"(\s)", window, maxsplit=1)
-		window = "".join(parts[1:]) if len(parts) > 1 else ""
+		# the cut may fall inside a secret's line, splitting its name from its value ("password = x",
+		# "Bearer x"), which scrubbing then can't recognise: drop the window through its first line
+		# break, and with none left there's nothing safe to send (third review, Nov 2). A name and
+		# value split across lines at the cut stays a gap; key-shaped values are masked by shape.
+		nl = window.find("\n")
+		window = window[nl + 1 :] if nl >= 0 else ""
 	sent = scrub(window)[-ERROR_CHARS:]
 	if not sent.strip() or named_keys(sent) == {EVERYTHING}:
 		# a run too long to scan (or one filling the whole window): every source would be ruled out,

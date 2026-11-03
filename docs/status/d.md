@@ -82,7 +82,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
   item 4 on ws-b). What's left is A's (the golden's old key names) and C's (the curve). Nothing of
   mine to push for it beyond what's on `ws-d`.
 - **Search, B's three must-fixes:** nothing reads the whole error now (cut to 5,000 characters
-  before scrubbing, the cut's first run dropped so no cut key is sent, 2,500 scanned for
+  before scrubbing, the cut line dropped whole so a secret split by the cut isn't sent, 2,500 scanned for
   addresses; an error with a run over 512 characters and no space isn't searched at all); 40 KB of `a.` and 200 KB of `_KEY` each under 2 s, tested; a failed call that may have reached
   Meta records its searches' most possible fee; the record shows the search's own titles and hosts,
   not the model's words. `docs/decisions/spark-search.md`. Then the cap test: all 8 cases at
