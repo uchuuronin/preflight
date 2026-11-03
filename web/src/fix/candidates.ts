@@ -140,6 +140,9 @@ export function whyNoFix(finding: Finding, ctx: Ctx): "lens" | "pinned" | "froze
 	return "no_value";
 }
 
+/** Source: derived, A's `runner.record_jobs.SAMPLE_REFS`: the samples whose zoo script Muse Code can read (api/tests/test_fixable_samples.py). */
+export const FIXABLE_SAMPLES: readonly string[] = ["lora-7b", "lora-qwen", "pretrain"];
+
 const GPU_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
 
 /**

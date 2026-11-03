@@ -124,10 +124,12 @@ export function fmt(value: number | null | undefined, unit: Unit | string = "non
 			return duration(value * 3600);
 		case "usd": {
 			const v = value * currency.rate;
+			// Under a cent, two significant figures: the vision sample's US$0.004 read "US$0.00".
+			const subCent = Math.abs(v) > 0 && Math.abs(v) < 0.01;
 			return new Intl.NumberFormat(locale(), {
 				style: "currency",
 				currency: currency.code,
-				maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0,
+				...(subCent ? { maximumSignificantDigits: 2 } : { maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 }),
 			}).format(v);
 		}
 		case "usd_small": {
@@ -192,6 +194,6 @@ export function fmtDelta(delta: number, unit: Unit | string): string {
 	const sign = delta > 0 ? "+" : "−";
 	const shown = fmt(Math.abs(delta), unit);
 	// A finite change too small to show at this precision reads "almost nothing", never "+US$0".
-	if (Number.isFinite(delta) && shown === fmt(0, unit)) return t("value.tiny_change");
+	if (Number.isFinite(delta) && (shown === fmt(0, unit) || (unit === "usd" && Math.abs(delta * currency.rate) < 0.01))) return t("value.tiny_change");
 	return `${sign}${shown}`;
 }

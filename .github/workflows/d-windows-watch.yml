@@ -1,6 +1,8 @@
 # D's check of shot 9b's laptop steps on Windows (docs/demo/shot-9b-laptop.md), on a GitHub
 # Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts.
-# Runs only when this file changes on ws-d. Everything lives on D:, as the laptop's steps keep
+# Runs only when this file changes on ws-d. Step 5 also runs `preflight run` with every Linux-only call D found stubbed, Windows'
+# own variables kept in the probe's environment (and tzdata
+# installed, a sandbox folder set), to check nothing else stops it on Windows. Everything lives on D:, as the laptop's steps keep
 # everything on E:. No secrets are used. The job fails if any checked step failed, after every
 # step has reported and the logs are uploaded.
 name: d-windows-watch
@@ -43,7 +45,7 @@ jobs:
         shell: pwsh
         env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PIP_CACHE_DIR: 'D:\pf9b\pip-cache' }
         run: |
-          D:\pf9b\venv\Scripts\python.exe -m pip install "${{ github.workspace }}\src[probe]"
+          D:\pf9b\venv\Scripts\python.exe -m pip install "${{ github.workspace }}\src[probe]" tzdata
           D:\pf9b\venv\Scripts\python.exe -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
           D:\pf9b\venv\Scripts\preflight.exe --help
       - name: "4. The script, copied, with its steps raised"
@@ -59,11 +61,19 @@ jobs:
         timeout-minutes: 10
         shell: pwsh
         working-directory: D:\pf9b
-        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8 }
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8, PREFLIGHT_SANDBOX_DIR: 'D:\pf9b\sandbox' }
         run: |
+          New-Item -ItemType Directory -Force D:\pf9b\sandbox | Out-Null
           D:\pf9b\venv\Scripts\preflight.exe run film\tiny_train.py *> D:\pf9b\run.log
           $code = $LASTEXITCODE
-          Get-Content D:\pf9b\run.log -Tail 80
+          Get-Content D:\pf9b\run.log -Tail 15
+          # every Linux-only call D found on the path, stubbed, to see whether anything else stops a real
+          # measurement: a do-nothing `resource` module for the probe process, and in this one
+          Set-Content D:\pf9b\venv\Lib\site-packages\resource.py '# stand-in: no rlimits on Windows'
+          D:\pf9b\venv\Scripts\python.exe -c "import os, sys, signal; os.geteuid = lambda: 1000; signal.SIGKILL = signal.SIGTERM; import subprocess; os.killpg = lambda pid, sig: subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], capture_output=True); os.O_NOFOLLOW = 0; os.O_NONBLOCK = 0; import preflight.probes.local as L; L.SAFE_ENV = L.SAFE_ENV + ('SYSTEMROOT', 'WINDIR', 'USERPROFILE', 'USERNAME', 'APPDATA', 'LOCALAPPDATA', 'PATHEXT', 'COMSPEC', 'TEMP', 'TMP'); from preflight.cli.main import main; sys.exit(main(['run', 'film\\tiny_train.py']))" *> D:\pf9b\run-stubbed.log
+          $code = $LASTEXITCODE
+          "--- with every Linux-only call stubbed:"
+          Get-Content D:\pf9b\run-stubbed.log -Tail 120
           $rec = Get-ChildItem D:\pf9b\records\*.json -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($rec) { "record=$($rec.FullName)" >> $env:GITHUB_OUTPUT }
           exit $code
@@ -112,6 +122,7 @@ jobs:
           path: |
             D:\pf9b\*.log
             D:\pf9b\records
+            D:\pf9b\tmp\**\*.log
           if-no-files-found: warn
       - name: "Outcomes (fails if any checked step failed)"
         if: always()

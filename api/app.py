@@ -34,15 +34,16 @@ RECORDS_DIR = "/records"
 SAMPLE_FILES = [
 	"web/src/workspace/fixtures/dev-finetune.record.json",
 	"schema/examples/finetune.json",
-	"web/src/workspace/fixtures/lora-live-nov1.record.json",
-	"schema/examples/pretrain.json",
 	"schema/examples/agent.json",
+	"schema/examples/pretrain.json",
+	"web/src/workspace/fixtures/lora-live-nov1.record.json",
+	"web/src/workspace/fixtures/pretrain_nanogpt-a10-nov2.record.json",
 	"web/src/workspace/fixtures/agent-eval-oct31.record.json",
 	"web/src/workspace/fixtures/campaign-grid.record.json",
 	"web/src/workspace/fixtures/grpo-l4.record.json",
-	"web/src/workspace/fixtures/retrieval_st-nov1.record.json",
-	"web/src/workspace/fixtures/gnn_pyg-nov1.record.json",
-	"web/src/workspace/fixtures/vision_timm-nov1.record.json",
+	"web/src/workspace/fixtures/retrieval_st-a10-nov2.record.json",
+	"web/src/workspace/fixtures/gnn_pyg-a10-nov2.record.json",
+	"web/src/workspace/fixtures/vision_timm-a10-nov2.record.json",
 ]
 
 image = (

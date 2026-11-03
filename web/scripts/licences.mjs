@@ -1,9 +1,18 @@
-// Fail on copyleft dependencies (gap 22): GPL, AGPL or SSPL anywhere in web/node_modules.
-// LGPL passes; an "MIT OR GPL-3.0" choice passes. Run from web/: node scripts/licences.mjs
+// Fail on copyleft dependencies (gap 22): GPL, AGPL or SSPL anywhere in ./node_modules.
+// LGPL passes; an "MIT OR GPL-3.0" choice passes. A package that names no licence at all fails too,
+// unless it's listed in NO_LICENCE_OK with the reason a person checked (D, Nov 3: it passed silently).
+// Run from any package folder: node scripts/licences.mjs (web/), node ../web/scripts/licences.mjs
+// (workers/), node web/scripts/licences.mjs (the root).
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-const BAD = /(^|[^L])\b(A?GPL|SSPL)\b/i;
+// No \b after the name: "GPLv3" is GPL too (D, Nov 3).
+const BAD = /(^|[^L])\b(A?GPL|SSPL)/i;
+// Packages that name no licence, each checked by hand: name -> why it's fine.
+const NO_LICENCE_OK = {};
+// A licence file: LICENSE, LICENCE or COPYING, any case, with or without a suffix (LICENSE-MIT, LICENSE.txt).
+const LICENCE_FILE = /^(licen[cs]e|copying)([.-][\w.-]*)?$/i;
+const unnamed = [];
 const found = [];
 const seen = new Set();
 
@@ -31,6 +40,7 @@ function walk(dir) {
 			if (!seen.has(key)) {
 				seen.add(key);
 				const l = licenceOf(pkg);
+				if (!l.trim() && !(pkg.name in NO_LICENCE_OK) && !readdirSync(path).some((f) => LICENCE_FILE.test(f))) unnamed.push(key);
 				const options = l.replace(/[()]/g, "").split(/\s+OR\s+/i);
 				if (options.length && options.every((o) => BAD.test(o) && !/LGPL/i.test(o))) found.push(`${key}: ${l}`);
 			}
@@ -41,5 +51,6 @@ function walk(dir) {
 
 walk("node_modules");
 for (const f of found) console.log(`::error title=copyleft dependency::${f}`);
-console.log(`${seen.size} packages checked, ${found.length} copyleft`);
-process.exit(found.length ? 1 : 0);
+for (const u of unnamed) console.log(`::error title=no licence named::${u} (check it by hand, then list it in NO_LICENCE_OK)`);
+console.log(`${seen.size} packages checked, ${found.length} copyleft, ${unnamed.length} with no licence named`);
+process.exit(found.length || unnamed.length ? 1 : 0);

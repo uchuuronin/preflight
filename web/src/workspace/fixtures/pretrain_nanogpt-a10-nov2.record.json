@@ -1,0 +1,6133 @@
+{
+	"schema_version": "0.6.2",
+	"record_id": "01M6F7CYM36S4Z6WD87S82J96Q",
+	"created_at": "2026-11-02T22:52:07Z",
+	"job": {
+		"lens": "pretrain",
+		"source": {
+			"kind": "sample",
+			"uri": "sample://zoo/pretrain_nanogpt",
+			"content_hash": "sha256:76d2dc9e7006fd08edfe09c4f881c5ab09b37632fb9ba3f48f2638c13a5be7c4",
+			"entrypoint": "train.py",
+			"args": []
+		},
+		"framework": "plain_pytorch",
+		"script_map": {
+			"lens": "pretrain",
+			"framework": "plain_pytorch",
+			"entrypoint": "train.py",
+			"launch": "python train.py",
+			"model": {
+				"name": "GPT",
+				"family": "decoder",
+				"param_count": 123568128,
+				"n_layers": 12,
+				"d_model": 768,
+				"n_heads": 12,
+				"n_kv_heads": 12,
+				"d_ff": 3072,
+				"vocab_size": 50304,
+				"head_dim": 64,
+				"max_positions": 1024,
+				"gated_mlp": false,
+				"tie_embeddings": true,
+				"norm": "layernorm",
+				"attn_impl": "sdpa",
+				"dtype": "float32",
+				"shape_source": "modules"
+			},
+			"data": {
+				"dataset": "roneneldan/TinyStories",
+				"batch_size": 12,
+				"seq_len": 1024,
+				"num_workers": 0,
+				"packing": false,
+				"padding": "none",
+				"n_examples": 2119719,
+				"languages": []
+			},
+			"training": {
+				"optimizer": "AdamW",
+				"lr": 0.0006,
+				"warmup_steps": 2000,
+				"grad_accum": 1,
+				"precision": "fp32",
+				"max_steps": 60000,
+				"checkpoint_every": 20000,
+				"grad_checkpointing": false,
+				"eval_under_no_grad": true,
+				"distributed": "none"
+			},
+			"loop": {
+				"kind": "plain",
+				"location": {
+					"file": "train.py",
+					"line": 156,
+					"expr": "optimizer.step()"
+				},
+				"step_call": "optimizer.step()",
+				"model_var": "model",
+				"optimizer_var": "optimizer",
+				"dataloader_var": "loader"
+			},
+			"knobs": [
+				{
+					"id": "batch_size",
+					"label": "Batch size",
+					"kind": "int",
+					"current": 12,
+					"unit": "samples",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 27,
+						"expr": "batch_size = 12"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "checkpoint_every",
+					"label": "Checkpoint interval",
+					"kind": "int",
+					"current": 20000,
+					"unit": "steps",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 42,
+						"expr": "checkpoint_every = 20000"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "d_model",
+					"label": "Model width",
+					"kind": "int",
+					"current": 768,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 31,
+						"expr": "n_embd = 768"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "grad_clip",
+					"label": "Gradient clip",
+					"kind": "float",
+					"current": 1.0,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 39,
+						"expr": "grad_clip = 1.0"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "lr",
+					"label": "Learning rate",
+					"kind": "float",
+					"current": 0.0006,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 34,
+						"expr": "learning_rate = 6e-4"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "max_steps",
+					"label": "Training steps",
+					"kind": "int",
+					"current": 60000,
+					"unit": "steps",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 37,
+						"expr": "max_iters = 60000"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "n_head",
+					"label": "Attention heads",
+					"kind": "int",
+					"current": 12,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 30,
+						"expr": "n_head = 12"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "n_layer",
+					"label": "Layers",
+					"kind": "int",
+					"current": 12,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 29,
+						"expr": "n_layer = 12"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "num_workers",
+					"label": "Data loader workers",
+					"kind": "int",
+					"current": 0,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 40,
+						"expr": "num_workers = 0"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "precision",
+					"label": "Precision",
+					"kind": "categorical",
+					"current": "float32",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 41,
+						"expr": "dtype = \"float32\""
+					},
+					"needs_code": false
+				},
+				{
+					"id": "seq_len",
+					"label": "Sequence length",
+					"kind": "int",
+					"current": 1024,
+					"unit": "tokens",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 28,
+						"expr": "block_size = 1024"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "warmup_steps",
+					"label": "Warm-up steps",
+					"kind": "int",
+					"current": 2000,
+					"unit": "steps",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 36,
+						"expr": "warmup_iters = 2000"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "weight_decay",
+					"label": "Weight decay",
+					"kind": "float",
+					"current": 0.1,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 38,
+						"expr": "weight_decay = 0.1"
+					},
+					"needs_code": false
+				}
+			],
+			"blocks": [
+				{
+					"id": "gpt",
+					"label": "GPT",
+					"kind": "module",
+					"repeat": 1,
+					"params": 123568128
+				},
+				{
+					"id": "block",
+					"label": "Block",
+					"kind": "module",
+					"parent": "gpt",
+					"repeat": 12,
+					"params": 7087872
+				}
+			],
+			"risks": [
+				"num_workers=0: the data loader runs in the training process, so the GPU waits on it",
+				"Trains in fp32; bf16 autocast is usually several times faster on tensor-core GPUs",
+				"num_workers is 0 while TokenStream tokenizes on the fly, so data loading stalls the GPU.",
+				"Training uses float32 instead of bfloat16, wasting GPU tensor-core throughput.",
+				"Checkpoint interval is 20000 steps, so a 2-hour preemption loses hours of work."
+			],
+			"produced_by": "muse_spark",
+			"confidence": 0.95
+		},
+		"objective": {
+			"kind": "min_time",
+			"weights": {}
+		},
+		"constraints": {
+			"gpu_types": [
+				"A10"
+			],
+			"preemption": {
+				"kind": "none"
+			}
+		}
+	},
+	"env": {
+		"backend": "cuda",
+		"provider": "local",
+		"gpu": {
+			"name": "A10",
+			"count": 1,
+			"memory_bytes": 23684186112,
+			"vendor": "nvidia",
+			"compute_capability": "8.6"
+		},
+		"nodes": 1,
+		"libraries": {
+			"torch": "2.5.1",
+			"transformers": "4.46.3",
+			"peft": "0.13.2",
+			"trl": "0.14.0",
+			"accelerate": "1.1.1",
+			"datasets": "3.1.0"
+		},
+		"python": "3.11.12"
+	},
+	"graph": {
+		"nodes": [
+			{
+				"id": "data",
+				"label": "TinyStories · num_workers=0 · padded (none)",
+				"kind": "data",
+				"repeat": 1,
+				"metrics": [
+					"probe.data.loader_wait_fraction",
+					"probe.data.padding_fraction"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "model",
+				"label": "GPT",
+				"kind": "group",
+				"repeat": 1,
+				"params": 123568128,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "embed",
+				"label": "Embedding",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "block",
+				"label": "Decoder block",
+				"kind": "group",
+				"parent": "model",
+				"repeat": 12,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "attn",
+				"label": "Self-attention",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.max_attn_logit"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "mlp",
+				"label": "MLP",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "lm_head",
+				"label": "LM head",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [
+					"memory.by_term.logits"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "loss",
+				"label": "Loss",
+				"kind": "loss",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.loss"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "optimizer",
+				"label": "AdamW",
+				"kind": "optimizer",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.grad_norm"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "ckpt",
+				"label": "Checkpoint every 20,000 steps",
+				"kind": "io",
+				"repeat": 1,
+				"metrics": [
+					"risk.preemption_loss",
+					"probe.checkpoint.seconds_mean"
+				],
+				"attrs": {}
+			}
+		],
+		"edges": [
+			{
+				"source": "embed",
+				"target": "attn",
+				"kind": "data"
+			},
+			{
+				"source": "attn",
+				"target": "mlp",
+				"kind": "data"
+			},
+			{
+				"source": "mlp",
+				"target": "lm_head",
+				"kind": "data"
+			},
+			{
+				"source": "data",
+				"target": "embed",
+				"kind": "tokens",
+				"metric": "probe.throughput.tokens_per_s"
+			},
+			{
+				"source": "lm_head",
+				"target": "loss",
+				"kind": "data"
+			},
+			{
+				"source": "loss",
+				"target": "optimizer",
+				"kind": "grad"
+			},
+			{
+				"source": "optimizer",
+				"target": "embed",
+				"kind": "weights"
+			},
+			{
+				"source": "optimizer",
+				"target": "ckpt",
+				"kind": "control"
+			}
+		],
+		"skeleton": true
+	},
+	"knobs": [
+		{
+			"id": "checkpoint_every",
+			"label_key": "knob.checkpoint_every",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 1000000.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 20000,
+			"probed_range": {
+				"min": 20000.0,
+				"max": 20000.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"ckpt"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"A10"
+				],
+				"log": false
+			},
+			"current": "A10",
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"model"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "max_steps",
+			"label_key": "knob.max_steps",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 1000000.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 60000,
+			"probed_range": {
+				"min": 60000.0,
+				"max": 60000.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"data",
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "num_workers",
+			"label_key": "knob.num_workers",
+			"kind": "int",
+			"domain": {
+				"min": 0.0,
+				"max": 32.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 0,
+			"probed_range": {
+				"min": 0.0,
+				"max": 0.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "data",
+			"affects": [
+				"data"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "packing",
+			"label_key": "knob.packing",
+			"kind": "bool",
+			"domain": {
+				"values": [],
+				"log": false
+			},
+			"current": false,
+			"gridded": false,
+			"needs_code": true,
+			"patch_template": "data.enable_packing",
+			"group": "data",
+			"affects": [
+				"data"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "batch_size",
+			"label_key": "knob.batch_size",
+			"unit": "samples",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 1024.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 12,
+			"probed_range": {
+				"min": 6.0,
+				"max": 12.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"data",
+				"model"
+			]
+		},
+		{
+			"id": "gradient_checkpointing",
+			"label_key": "knob.gradient_checkpointing",
+			"kind": "bool",
+			"domain": {
+				"values": [],
+				"log": false
+			},
+			"current": false,
+			"gridded": false,
+			"needs_code": true,
+			"patch_template": "memory.gradient_checkpointing",
+			"group": "memory",
+			"affects": [
+				"block",
+				"attn",
+				"mlp"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "seq_len",
+			"label_key": "knob.seq_len",
+			"unit": "tokens",
+			"kind": "int",
+			"domain": {
+				"min": 64.0,
+				"max": 32768.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 1024,
+			"probed_range": {
+				"min": 512.0,
+				"max": 1024.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"data",
+				"attn",
+				"lm_head"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "d_model",
+			"label_key": "knob.d_model",
+			"kind": "int",
+			"domain": {
+				"min": 64.0,
+				"max": 16384.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 768,
+			"probed_range": {
+				"min": 768.0,
+				"max": 768.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"block",
+				"embed",
+				"lm_head"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "grad_clip",
+			"label_key": "knob.grad_clip",
+			"kind": "float",
+			"domain": {
+				"min": 0.01,
+				"max": 100.0,
+				"values": [],
+				"log": true
+			},
+			"current": 1.0,
+			"probed_range": {
+				"min": 1.0,
+				"max": 1.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "lr",
+			"label_key": "knob.lr",
+			"kind": "float",
+			"domain": {
+				"min": 5.999999999999999e-06,
+				"max": 0.06,
+				"values": [],
+				"log": true
+			},
+			"current": 0.0006,
+			"probed_range": {
+				"min": 0.0006,
+				"max": 0.0006
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "n_head",
+			"label_key": "knob.n_head",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 256.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 12,
+			"probed_range": {
+				"min": 12.0,
+				"max": 12.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"attn"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "n_layer",
+			"label_key": "knob.n_layer",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 128.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 12,
+			"probed_range": {
+				"min": 12.0,
+				"max": 12.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"block",
+				"model"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "warmup_steps",
+			"label_key": "knob.warmup_steps",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 0.0,
+				"max": 100000.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 2000,
+			"probed_range": {
+				"min": 2000.0,
+				"max": 2000.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "weight_decay",
+			"label_key": "knob.weight_decay",
+			"kind": "float",
+			"domain": {
+				"min": 0.0,
+				"max": 1.0,
+				"values": [],
+				"log": false
+			},
+			"current": 0.1,
+			"probed_range": {
+				"min": 0.1,
+				"max": 0.1
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "precision",
+			"label_key": "knob.precision",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"fp32",
+					"bf16",
+					"fp16"
+				],
+				"log": false
+			},
+			"current": "fp32",
+			"gridded": false,
+			"needs_code": false,
+			"group": "speed",
+			"affects": [
+				"model"
+			],
+			"changes_results": true
+		}
+	],
+	"probes": [
+		{
+			"id": "p1",
+			"knobs": {
+				"batch_size": 12,
+				"seq_len": 1024
+			},
+			"status": "ok",
+			"steps": 14,
+			"started_at": "2026-11-02T22:52:36Z",
+			"duration_s": 55.881,
+			"memory": {
+				"peak_allocated_bytes": 18735233536,
+				"peak_reserved_bytes": 20275265536,
+				"by_term": {
+					"weights": 497903616,
+					"gradients": 497903616,
+					"optimizer": 995807824,
+					"logits": 2472542208,
+					"activations": 14271076272
+				},
+				"peak_step": 8
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.9602212889367188,
+				"p50_s": 0.9549240112304688,
+				"p95_s": 0.9745213623046876,
+				"first_step_s": 1.4962447759999975,
+				"by_phase": {
+					"data": 0.02910882904897047,
+					"forward": 0.3508606495474533,
+					"backward": 0.5970133264116169,
+					"optimizer": 0.023017194991959356,
+					"other": 0.0
+				},
+				"unprofiled": true
+			},
+			"throughput": {
+				"tokens_per_s": 12797.050160809144,
+				"samples_per_s": 12.49711929766518,
+				"flops_per_step": 9177359450112.0,
+				"mfu": 0.3080309351971536
+			},
+			"stability": {
+				"series": {
+					"loss": [
+						10.983738899230957,
+						10.982514381408691,
+						10.971672058105469,
+						10.970096588134766,
+						10.953925132751465,
+						10.927898406982422,
+						10.905223846435547,
+						10.88907241821289,
+						10.870471954345703,
+						10.835755348205566,
+						10.806281089782715,
+						10.769092559814453,
+						10.717536926269531,
+						10.702824592590332
+					],
+					"grad_norm": [
+						0.9999995827674866,
+						0.9999995231628418,
+						0.9999995827674866,
+						0.9999995827674866,
+						0.9999995827674866,
+						0.9999995827674866,
+						0.9999995827674866,
+						0.9999995231628418,
+						0.9999995231628418,
+						0.9999996423721313,
+						0.9999995231628418,
+						0.9999995231628418,
+						0.9999995827674866,
+						0.9999995231628418
+					],
+					"grad_norm_ma": [
+						0.9999995827674866,
+						0.9999995529651642,
+						0.9999995628992716,
+						0.9999995678663254,
+						0.9999995708465577,
+						0.9999995728333791,
+						0.9999995742525373,
+						0.9999995678663254,
+						0.9999995628992716,
+						0.9999995708465577,
+						0.9999995665116743,
+						0.9999995628992716,
+						0.9999995644275959,
+						0.9999995614801135
+					],
+					"update_to_weight": [
+						2.1569798263954e-05,
+						3.857247884297976e-05,
+						null,
+						null,
+						null,
+						null,
+						null,
+						0.00014226260282157455,
+						0.0001593767028680304,
+						0.0001767633148119785,
+						0.0001937275483214762,
+						0.00021045078574388754,
+						0.00022694758627039846,
+						0.000243317692365963
+					],
+					"output_logit_norm": [
+						null,
+						129.47845458984375,
+						129.47738647460938,
+						129.47653198242188,
+						129.4747314453125,
+						129.47349548339844,
+						129.4715576171875,
+						129.47012329101562,
+						129.46868896484375,
+						129.4677276611328,
+						129.46722412109375,
+						129.46774291992188,
+						129.46949768066406,
+						129.47268676757812
+					],
+					"lr": [
+						3e-07,
+						6e-07,
+						9e-07,
+						1.2e-06,
+						1.4999999999999998e-06,
+						1.8e-06,
+						2.1e-06,
+						2.4e-06,
+						2.6999999999999996e-06,
+						2.9999999999999997e-06,
+						3.2999999999999997e-06,
+						3.6e-06,
+						3.9e-06,
+						4.2e-06
+					],
+					"max_attn_logit": [
+						2.1343283653259277,
+						2.106239080429077,
+						null,
+						null,
+						null,
+						null,
+						null,
+						2.0957460403442383,
+						2.085920572280884,
+						2.1082892417907715,
+						2.0867440700531006,
+						2.0912771224975586,
+						2.096067428588867,
+						2.0950255393981934
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"padding_fraction": 0.0,
+				"tokens_per_sample_mean": 1024.0,
+				"loader_wait_fraction": 0.02910882904897047,
+				"num_workers": 0
+			},
+			"power": {
+				"mean_w": 89.94438775510204,
+				"max_w": 156.997,
+				"samples": 147
+			},
+			"checkpoint": {
+				"saves": 2,
+				"seconds_mean": 1.4984894514999993,
+				"bytes_mean": 1493855574
+			},
+			"extras": {
+				"params_total": 124475904.0,
+				"params_trainable": 124475904.0,
+				"tokens_per_step": 12288.0,
+				"samples_per_step": 12.0,
+				"micro_steps_per_step": 1.0,
+				"host_rss_peak_bytes": 8188223488.0,
+				"train_loader_batches": 176644.0,
+				"train_dataset_len": 2119719.0,
+				"dataset_max_tokens": 1024.0,
+				"dataset_p999_tokens": 1024.0,
+				"dataset_p50_tokens": 1024.0,
+				"dataset_mean_tokens": 1024.0,
+				"dataset_rows_scanned": 5260.0,
+				"dataset_rows_total": 2119719.0,
+				"checkpoint_saves_seen": 2.0,
+				"checkpoint_has_optimizer": 1.0,
+				"checkpoint_has_scheduler": 0.0,
+				"checkpoint_has_rng": 0.0,
+				"checkpoint_has_step": 1.0,
+				"gpu_wait_s": 2.3
+			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 1.4962447759999975,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 17730898944,
+					"peak_reserved_bytes": 17800626176,
+					"device_used_bytes": 18109104128,
+					"reserved_bytes": 17800626176
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.6563762900000043,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735225856,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20583743488,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 0.9745213623046876,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735226368,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20583743488,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.9494528198242187,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735227904,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20583743488,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.9497221069335937,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735229440,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20583743488,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 6,
+					"kind": "timed",
+					"wall_s": 0.9549240112304688,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735230976,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20583743488,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 7,
+					"kind": "timed",
+					"wall_s": 0.972486144390625,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735232512,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20583743488,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 8,
+					"kind": "phase",
+					"wall_s": 0.6490055780000006,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735233536,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20583743488,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 9,
+					"kind": "phase",
+					"wall_s": 0.6495276690000011,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735233536,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20583743488,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 10,
+					"kind": "profiled",
+					"wall_s": 0.6471760579999994,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735233536,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20583743488,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 11,
+					"kind": "profiled",
+					"wall_s": 0.6799450370000102,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735233536,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20598423552,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 12,
+					"kind": "profiled",
+					"wall_s": 0.6598114520000138,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735233536,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20598423552,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 13,
+					"kind": "profiled",
+					"wall_s": 0.6505140790000112,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735233536,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20598423552,
+					"reserved_bytes": 20275265536
+				},
+				{
+					"index": 14,
+					"kind": "profiled",
+					"wall_s": 0.6512259989999976,
+					"tokens": 12288,
+					"real_tokens": 12288,
+					"samples": 12,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 18735233536,
+					"peak_reserved_bytes": 20275265536,
+					"device_used_bytes": 20598423552,
+					"reserved_bytes": 20275265536
+				}
+			],
+			"kernels": {
+				"rows": [
+					{
+						"name": "aten::mm",
+						"kernel_class": "gemm",
+						"calls": 99.0,
+						"device_s": 0.4777414119999986,
+						"flops": 7023076835328.0,
+						"bytes": 23169466368.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::addmm",
+						"kernel_class": "gemm",
+						"calls": 48.0,
+						"device_s": 0.1689487703333344,
+						"flops": 2087354105856.0,
+						"bytes": 7587827712.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_efficient_attention_backward",
+						"kernel_class": "attention",
+						"calls": 12.0,
+						"device_s": 0.10771374566666626,
+						"flops": 1159641169920.0,
+						"bytes": 2724986880.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::copy_",
+						"kernel_class": "copy",
+						"calls": 168.0,
+						"device_s": 0.062349985666665546,
+						"bytes": 6109621248.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_efficient_attention_forward",
+						"kernel_class": "attention",
+						"calls": 12.0,
+						"device_s": 0.03747945100000004,
+						"flops": 463856467968.0,
+						"bytes": 1811939328.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_log_softmax_backward_data",
+						"kernel_class": "softmax",
+						"calls": 1.0,
+						"device_s": 0.019658599333333318,
+						"bytes": 7417626624.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_log_softmax",
+						"kernel_class": "softmax",
+						"calls": 1.0,
+						"device_s": 0.019521959333333342,
+						"bytes": 4945084416.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::native_layer_norm_backward",
+						"kernel_class": "norm",
+						"calls": 25.0,
+						"device_s": 0.012433919666666226,
+						"bytes": 2833766400.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::gelu_backward",
+						"kernel_class": "elementwise",
+						"calls": 12.0,
+						"device_s": 0.011040705333333928,
+						"bytes": 5435817984.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::sum",
+						"kernel_class": "reduction",
+						"calls": 61.0,
+						"device_s": 0.010821900666664044,
+						"bytes": 9135194112.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::gelu",
+						"kernel_class": "elementwise",
+						"calls": 12.0,
+						"device_s": 0.0074322326666668515,
+						"bytes": 3623878656.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::add",
+						"kernel_class": "elementwise",
+						"calls": 27.0,
+						"device_s": 0.0067780660000006515,
+						"flops": 274563073.0,
+						"bytes": 3260153856.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_mul_",
+						"kernel_class": "optimizer",
+						"calls": 3.0,
+						"device_s": 0.006446419999999305,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::fill_",
+						"kernel_class": "memset",
+						"calls": 18.0,
+						"device_s": 0.006222271333333415,
+						"bytes": 8889258368.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::cat",
+						"kernel_class": "copy",
+						"calls": 16.0,
+						"device_s": 0.0058280966666669895,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::add_",
+						"kernel_class": "elementwise",
+						"calls": 24.0,
+						"device_s": 0.005419124333334621,
+						"bytes": 2717908992.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::linalg_vector_norm",
+						"kernel_class": "reduction",
+						"calls": 11.0,
+						"device_s": 0.004991074000000799,
+						"bytes": 5096081728.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::native_layer_norm",
+						"kernel_class": "norm",
+						"calls": 25.0,
+						"device_s": 0.004669454333333454,
+						"bytes": 1887590400.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_addcdiv_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 0.00408388599999994,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_addcmul_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 0.0031751093333334045,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_lerp_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 0.0031647833333322776,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::mul",
+						"kernel_class": "elementwise",
+						"calls": 13.0,
+						"device_s": 0.0027189606666667386,
+						"flops": 113246209.0,
+						"bytes": 1358954496.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_div_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 0.002158087333333213,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_sqrt",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 0.0021497770000000796,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_add_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 0.0021445406666660374,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_norm",
+						"kernel_class": "optimizer",
+						"calls": 2.0,
+						"device_s": 0.0019978196666659786,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::embedding_dense_backward",
+						"kernel_class": "embedding",
+						"calls": 2.0,
+						"device_s": 0.0004921903333342634,
+						"bytes": 81842176.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::nll_loss_forward",
+						"kernel_class": "loss",
+						"calls": 1.0,
+						"device_s": 0.00044676166666687156,
+						"bytes": 4945133568.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::nll_loss_backward",
+						"kernel_class": "loss",
+						"calls": 1.0,
+						"device_s": 0.00024393533333359906,
+						"bytes": 4945133568.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::sub",
+						"kernel_class": "elementwise",
+						"calls": 4.0,
+						"device_s": 0.0002107619999999491,
+						"bytes": 113246208.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::index_select",
+						"kernel_class": "index",
+						"calls": 2.0,
+						"device_s": 0.00014903466666668343,
+						"bytes": 315412480.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::bmm",
+						"kernel_class": "gemm",
+						"calls": 2.0,
+						"device_s": 6.115200000000186e-05,
+						"flops": 402653184.0,
+						"bytes": 19660800.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::abs",
+						"kernel_class": "elementwise",
+						"calls": 2.0,
+						"device_s": 4.876799999984602e-05,
+						"bytes": 25165824.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::amax",
+						"kernel_class": "reduction",
+						"calls": 2.0,
+						"device_s": 3.6010666666474814e-05,
+						"bytes": 25165824.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_local_scalar_dense",
+						"kernel_class": "host",
+						"calls": 309.3333333333333,
+						"device_s": 1.956233333269506e-05,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::index",
+						"kernel_class": "index",
+						"calls": 2.0,
+						"device_s": 1.2853333333274349e-05,
+						"bytes": 12582912.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::div",
+						"kernel_class": "elementwise",
+						"calls": 4.0,
+						"device_s": 1.0635000000242144e-05,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::gt",
+						"kernel_class": "elementwise",
+						"calls": 4.0,
+						"device_s": 9.994333333801479e-06,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::mean",
+						"kernel_class": "reduction",
+						"calls": 1.0,
+						"device_s": 9.930666666477918e-06,
+						"bytes": 98304.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::arange",
+						"kernel_class": "memset",
+						"calls": 2.0,
+						"device_s": 3.999333333301668e-06,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::linspace",
+						"kernel_class": "memset",
+						"calls": 2.0,
+						"device_s": 3.8399999996957674e-06,
+						"bytes": 2048.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::clamp",
+						"kernel_class": "elementwise",
+						"calls": 1.0,
+						"device_s": 2.475000000093132e-06,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::reciprocal",
+						"kernel_class": "elementwise",
+						"calls": 1.0,
+						"device_s": 2.3569999999987583e-06,
+						"dtype": "fp32"
+					}
+				],
+				"steps": 3,
+				"backend": "cuda",
+				"allow_tf32": false,
+				"classified_by": "engine.steptime"
+			},
+			"cost": {
+				"gpu_seconds": 55.881,
+				"usd": 0.017075
+			},
+			"cache_key": "sha256:38f6ee47d953c887d40aab6f82fdea8c3364398fe9504c2cf1cf0488ff7c01cf"
+		},
+		{
+			"id": "p2",
+			"knobs": {
+				"batch_size": 6,
+				"seq_len": 1024
+			},
+			"status": "ok",
+			"steps": 9,
+			"started_at": "2026-11-02T22:53:33Z",
+			"duration_s": 27.091,
+			"memory": {
+				"peak_allocated_bytes": 10127849984,
+				"peak_reserved_bytes": 11651776512,
+				"by_term": {
+					"weights": 497903616,
+					"gradients": 497903616,
+					"optimizer": 995807824,
+					"logits": 1236271104,
+					"activations": 6899963824
+				},
+				"peak_step": 8
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.4826497009277344,
+				"p50_s": 0.47978289794921875,
+				"p95_s": 0.49171661376953124,
+				"first_step_s": 0.8547315980000008,
+				"by_phase": {
+					"data": 0.030767501381496275,
+					"forward": 0.3411962553695425,
+					"backward": 0.582985983791578,
+					"optimizer": 0.04505025945738324,
+					"other": 0.0
+				},
+				"unprofiled": true
+			},
+			"throughput": {
+				"tokens_per_s": 12729.729218085482,
+				"samples_per_s": 12.431376189536604,
+				"flops_per_step": 4588679725056.0,
+				"mfu": 0.3065408724225426
+			},
+			"stability": {
+				"series": {
+					"loss": [
+						10.984188079833984,
+						10.980158805847168,
+						10.968642234802246,
+						10.974788665771484,
+						10.945128440856934,
+						10.939175605773926,
+						10.922022819519043,
+						10.9030122756958,
+						10.871750831604004
+					],
+					"grad_norm": [
+						0.9999995231628418,
+						0.9999996423721313,
+						0.9999995827674866,
+						0.9999995827674866,
+						0.9999996423721313,
+						0.9999995827674866,
+						0.9999996423721313,
+						0.9999995827674866,
+						0.9999996423721313
+					],
+					"grad_norm_ma": [
+						0.9999995231628418,
+						0.9999995827674866,
+						0.9999995827674866,
+						0.9999995827674866,
+						0.9999995946884155,
+						0.999999592701594,
+						0.9999995997973851,
+						0.9999995976686478,
+						0.9999996026357015
+					],
+					"update_to_weight": [
+						2.1572663627011934e-05,
+						3.7734172110504005e-05,
+						null,
+						null,
+						null,
+						null,
+						null,
+						0.00013348284664971288,
+						0.0001495143678766908
+					],
+					"output_logit_norm": [
+						null,
+						129.4784698486328,
+						129.477294921875,
+						129.47686767578125,
+						129.474853515625,
+						129.47317504882812,
+						129.47171020507812,
+						129.47003173828125,
+						129.4681854248047
+					],
+					"lr": [
+						3e-07,
+						6e-07,
+						9e-07,
+						1.2e-06,
+						1.4999999999999998e-06,
+						1.8e-06,
+						2.1e-06,
+						2.4e-06,
+						2.6999999999999996e-06
+					],
+					"max_attn_logit": [
+						2.1343281269073486,
+						2.1315059661865234,
+						null,
+						null,
+						null,
+						null,
+						null,
+						2.1083452701568604,
+						2.1190314292907715
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"padding_fraction": 0.0,
+				"tokens_per_sample_mean": 1024.0,
+				"loader_wait_fraction": 0.030767501381496275,
+				"num_workers": 0
+			},
+			"power": {
+				"mean_w": 89.73113953488372,
+				"max_w": 158.263,
+				"samples": 43
+			},
+			"extras": {
+				"params_total": 124475904.0,
+				"params_trainable": 124475904.0,
+				"tokens_per_step": 6144.0,
+				"samples_per_step": 6.0,
+				"micro_steps_per_step": 1.0,
+				"host_rss_peak_bytes": 8028205056.0,
+				"train_loader_batches": 353287.0,
+				"train_dataset_len": 2119719.0,
+				"dataset_max_tokens": 1024.0,
+				"dataset_p999_tokens": 1024.0,
+				"dataset_p50_tokens": 1024.0,
+				"dataset_mean_tokens": 1024.0,
+				"dataset_rows_scanned": 5269.0,
+				"dataset_rows_total": 2119719.0
+			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 0.8547315980000008,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 6,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9123515392,
+					"peak_reserved_bytes": 9177137152,
+					"device_used_bytes": 9485615104,
+					"reserved_bytes": 9177137152
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.3459344479999942,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 6,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10127842304,
+					"peak_reserved_bytes": 11651776512,
+					"device_used_bytes": 11960254464,
+					"reserved_bytes": 11651776512
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 0.49171661376953124,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 6,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10127842816,
+					"peak_reserved_bytes": 11651776512,
+					"device_used_bytes": 11960254464,
+					"reserved_bytes": 11651776512
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.4784312438964844,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 6,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10127844352,
+					"peak_reserved_bytes": 11651776512,
+					"device_used_bytes": 11960254464,
+					"reserved_bytes": 11651776512
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.47978289794921875,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 6,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10127845888,
+					"peak_reserved_bytes": 11651776512,
+					"device_used_bytes": 11960254464,
+					"reserved_bytes": 11651776512
+				},
+				{
+					"index": 6,
+					"kind": "timed",
+					"wall_s": 0.47864422607421875,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 6,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10127847424,
+					"peak_reserved_bytes": 11651776512,
+					"device_used_bytes": 11960254464,
+					"reserved_bytes": 11651776512
+				},
+				{
+					"index": 7,
+					"kind": "timed",
+					"wall_s": 0.4846735229492187,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 6,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10127848960,
+					"peak_reserved_bytes": 11651776512,
+					"device_used_bytes": 11960254464,
+					"reserved_bytes": 11651776512
+				},
+				{
+					"index": 8,
+					"kind": "phase",
+					"wall_s": 0.3372193869999762,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 6,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10127849984,
+					"peak_reserved_bytes": 11651776512,
+					"device_used_bytes": 11960254464,
+					"reserved_bytes": 11651776512
+				},
+				{
+					"index": 9,
+					"kind": "phase",
+					"wall_s": 0.33847265799997217,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 6,
+					"padded_len": 1024,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10127849984,
+					"peak_reserved_bytes": 11651776512,
+					"device_used_bytes": 11960254464,
+					"reserved_bytes": 11651776512
+				}
+			],
+			"cost": {
+				"gpu_seconds": 27.091,
+				"usd": 0.008278
+			},
+			"cache_key": "sha256:fb04394ec0c4ae6eefe9b32af53abdbd0afbcad4b1410ab94ca500102c7c8095"
+		},
+		{
+			"id": "p3",
+			"knobs": {
+				"batch_size": 12,
+				"seq_len": 512
+			},
+			"status": "ok",
+			"steps": 9,
+			"started_at": "2026-11-02T22:54:01Z",
+			"duration_s": 26.448,
+			"memory": {
+				"peak_allocated_bytes": 10123520512,
+				"peak_reserved_bytes": 11647582208,
+				"by_term": {
+					"weights": 496330752,
+					"gradients": 496330752,
+					"optimizer": 992662096,
+					"logits": 1236271104,
+					"activations": 6901925808
+				},
+				"peak_step": 8
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.45275156250000004,
+				"p50_s": 0.45168743896484376,
+				"p95_s": 0.46440652465820315,
+				"first_step_s": 0.8334000419999796,
+				"by_phase": {
+					"data": 0.03237173454246994,
+					"forward": 0.34761387565539015,
+					"backward": 0.5721966012970117,
+					"optimizer": 0.047817788505128196,
+					"other": 0.0
+				},
+				"unprofiled": true
+			},
+			"throughput": {
+				"tokens_per_s": 13570.356259123897,
+				"samples_per_s": 26.50460206860136,
+				"flops_per_step": 4574184210432.0,
+				"mfu": 0.3245794672064988
+			},
+			"stability": {
+				"series": {
+					"loss": [
+						10.980143547058105,
+						10.975367546081543,
+						10.952728271484375,
+						10.94820785522461,
+						10.93923568725586,
+						10.93018627166748,
+						10.911945343017578,
+						10.895480155944824,
+						10.84991455078125
+					],
+					"grad_norm": [
+						0.9999996423721313,
+						0.9999996423721313,
+						0.9999996423721313,
+						0.9999996423721313,
+						0.9999995827674866,
+						0.9999996423721313,
+						0.9999995827674866,
+						0.9999995827674866,
+						0.9999995827674866
+					],
+					"grad_norm_ma": [
+						0.9999996423721313,
+						0.9999996423721313,
+						0.9999996423721313,
+						0.9999996423721313,
+						0.9999996304512024,
+						0.9999996324380239,
+						0.9999996253422329,
+						0.9999996200203896,
+						0.9999996158811781
+					],
+					"update_to_weight": [
+						2.157610038011626e-05,
+						3.8044392567826435e-05,
+						null,
+						null,
+						null,
+						null,
+						null,
+						0.0001384780425723875,
+						0.00015535364036622923
+					],
+					"output_logit_norm": [
+						null,
+						129.47695922851562,
+						129.47520446777344,
+						129.4739532470703,
+						129.47213745117188,
+						129.46987915039062,
+						129.4677276611328,
+						129.46633911132812,
+						129.46563720703125
+					],
+					"lr": [
+						3e-07,
+						6e-07,
+						9e-07,
+						1.2e-06,
+						1.4999999999999998e-06,
+						1.8e-06,
+						2.1e-06,
+						2.4e-06,
+						2.6999999999999996e-06
+					],
+					"max_attn_logit": [
+						1.8221336603164673,
+						1.8200773000717163,
+						null,
+						null,
+						null,
+						null,
+						null,
+						1.780946135520935,
+						1.803281545639038
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"padding_fraction": 0.0,
+				"tokens_per_sample_mean": 512.0,
+				"loader_wait_fraction": 0.03237173454246994,
+				"num_workers": 0
+			},
+			"power": {
+				"mean_w": 90.0195,
+				"max_w": 153.639,
+				"samples": 40
+			},
+			"extras": {
+				"params_total": 124082688.0,
+				"params_trainable": 124082688.0,
+				"tokens_per_step": 6144.0,
+				"samples_per_step": 12.0,
+				"micro_steps_per_step": 1.0,
+				"host_rss_peak_bytes": 6908399616.0,
+				"train_loader_batches": 176644.0,
+				"train_dataset_len": 2119719.0,
+				"dataset_max_tokens": 512.0,
+				"dataset_p999_tokens": 512.0,
+				"dataset_p50_tokens": 512.0,
+				"dataset_mean_tokens": 512.0,
+				"dataset_rows_scanned": 9276.0,
+				"dataset_rows_total": 2119719.0
+			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 0.8334000419999796,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 12,
+					"padded_len": 512,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 9121807360,
+					"peak_reserved_bytes": 9172942848,
+					"device_used_bytes": 9481420800,
+					"reserved_bytes": 9172942848
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.3181017050000321,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 12,
+					"padded_len": 512,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10123512832,
+					"peak_reserved_bytes": 11647582208,
+					"device_used_bytes": 11956060160,
+					"reserved_bytes": 11647582208
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 0.46440652465820315,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 12,
+					"padded_len": 512,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10123513344,
+					"peak_reserved_bytes": 11647582208,
+					"device_used_bytes": 11956060160,
+					"reserved_bytes": 11647582208
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.45168743896484376,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 12,
+					"padded_len": 512,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10123514880,
+					"peak_reserved_bytes": 11647582208,
+					"device_used_bytes": 11956060160,
+					"reserved_bytes": 11647582208
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.4458782653808594,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 12,
+					"padded_len": 512,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10123516416,
+					"peak_reserved_bytes": 11647582208,
+					"device_used_bytes": 11956060160,
+					"reserved_bytes": 11647582208
+				},
+				{
+					"index": 6,
+					"kind": "timed",
+					"wall_s": 0.455868408203125,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 12,
+					"padded_len": 512,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10123517952,
+					"peak_reserved_bytes": 11647582208,
+					"device_used_bytes": 11956060160,
+					"reserved_bytes": 11647582208
+				},
+				{
+					"index": 7,
+					"kind": "timed",
+					"wall_s": 0.44591717529296876,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 12,
+					"padded_len": 512,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10123519488,
+					"peak_reserved_bytes": 11647582208,
+					"device_used_bytes": 11956060160,
+					"reserved_bytes": 11647582208
+				},
+				{
+					"index": 8,
+					"kind": "phase",
+					"wall_s": 0.3162404949999882,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 12,
+					"padded_len": 512,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10123520512,
+					"peak_reserved_bytes": 11647582208,
+					"device_used_bytes": 11956060160,
+					"reserved_bytes": 11647582208
+				},
+				{
+					"index": 9,
+					"kind": "phase",
+					"wall_s": 0.3113788750000168,
+					"tokens": 6144,
+					"real_tokens": 6144,
+					"samples": 12,
+					"padded_len": 512,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 10123520512,
+					"peak_reserved_bytes": 11647582208,
+					"device_used_bytes": 11956060160,
+					"reserved_bytes": 11647582208
+				}
+			],
+			"cost": {
+				"gpu_seconds": 26.448,
+				"usd": 0.008081
+			},
+			"cache_key": "sha256:6f6904510eb1c48c61db897f64deb736c5366124c4b63e43654624725b549b4d"
+		}
+	],
+	"predictions": {
+		"targets": [
+			{
+				"id": "memory.peak",
+				"label_key": "target.memory.peak",
+				"unit": "bytes",
+				"readout": "memory"
+			},
+			{
+				"id": "time.total",
+				"label_key": "target.time.total",
+				"unit": "s",
+				"readout": "time"
+			},
+			{
+				"id": "cost.total",
+				"label_key": "target.cost.total",
+				"unit": "usd",
+				"readout": "cost"
+			},
+			{
+				"id": "cost.gpu_hours",
+				"label_key": "target.cost.gpu_hours",
+				"unit": "gpu_hours",
+				"readout": "cost"
+			},
+			{
+				"id": "risk.oom",
+				"label_key": "target.risk.oom",
+				"unit": "probability",
+				"readout": "risk"
+			},
+			{
+				"id": "time.step",
+				"label_key": "target.time.step",
+				"unit": "s"
+			},
+			{
+				"id": "memory.weights",
+				"label_key": "target.memory.weights",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.master_weights",
+				"label_key": "target.memory.master_weights",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.frozen_models",
+				"label_key": "target.memory.frozen_models",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.context",
+				"label_key": "target.memory.context",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.gradients",
+				"label_key": "target.memory.gradients",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.optimizer",
+				"label_key": "target.memory.optimizer",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.comm_buffers",
+				"label_key": "target.memory.comm_buffers",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.activations",
+				"label_key": "target.memory.activations",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.logits",
+				"label_key": "target.memory.logits",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.kv_cache",
+				"label_key": "target.memory.kv_cache",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.generation_engine",
+				"label_key": "target.memory.generation_engine",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.eval_spike",
+				"label_key": "target.memory.eval_spike",
+				"unit": "bytes"
+			},
+			{
+				"id": "time.phase.data",
+				"label_key": "target.time.phase.data",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.forward",
+				"label_key": "target.time.phase.forward",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.backward",
+				"label_key": "target.time.phase.backward",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.optimizer",
+				"label_key": "target.time.phase.optimizer",
+				"unit": "s"
+			}
+		],
+		"estimates": {
+			"memory.peak": {
+				"point": 20583743488.0,
+				"lo": 18495021970.21502,
+				"hi": 22908353213.210957,
+				"unit": "bytes",
+				"status": "measured",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "sized for rows of 1,024 tokens, the seq_len: the recorder scanned 5,260 of 2,119,719 training rows, so the set's longest row isn't known",
+				"level": 0.9
+			},
+			"time.total": {
+				"point": 57300.477462947405,
+				"lo": 50636.756813290514,
+				"hi": 64841.22091324123,
+				"unit": "s",
+				"status": "predicted",
+				"model_id": "time-total@0.1.0",
+				"source": "exact",
+				"reason": "batches vary in length: the run's median step follows the dataset's median padded length (1024 tokens a row here) and its total the mean (1024); band from held-out runs: A10, pretrain (n = 69)",
+				"level": 0.9
+			},
+			"cost.total": {
+				"point": 17.508479224789486,
+				"lo": 15.47234235961655,
+				"hi": 19.812595279045937,
+				"unit": "usd",
+				"status": "predicted",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"source": "exact",
+				"reason": "A10 at $1.10/h (modal, 2026-07)",
+				"level": 0.9,
+				"rate": {
+					"quantity": "cost.gpu_hours",
+					"usd_per_unit": 1.1,
+					"unit": "gpu_hours",
+					"price_row": "gpu/modal/A10/us/on_demand"
+				}
+			},
+			"cost.gpu_hours": {
+				"point": 15.916799295263168,
+				"lo": 14.065765781469587,
+				"hi": 18.01145025367812,
+				"unit": "gpu_hours",
+				"status": "predicted",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"source": "exact",
+				"reason": "1 GPU for the run's time",
+				"level": 0.9
+			},
+			"risk.oom": {
+				"point": 0.09285714285714286,
+				"lo": 0.05,
+				"hi": 0.95,
+				"unit": "probability",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "tight: P(OOM) between 5% and 95% (from 69 held-out runs); a chance in that range isn't verified on real outcomes yet; sized for rows of 1,024 tokens, the seq_len: the recorder scanned 5,260 of 2,119,719 training rows, so the set's longest row isn't known",
+				"level": 0.9
+			},
+			"time.step": {
+				"point": 0.9549240112304689,
+				"lo": 0.8434206224217463,
+				"hi": 1.0811685687814612,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"reason": "batches vary in length: the run's median step follows the dataset's median padded length (1024 tokens a row here) and its total the mean (1024)",
+				"level": 0.9
+			},
+			"memory.weights": {
+				"point": 494426112.0,
+				"lo": 444254555.02878016,
+				"hi": 550263756.3538316,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.master_weights": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.frozen_models": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.context": {
+				"point": 308477952.0,
+				"lo": 277175359.42347115,
+				"hi": 343315679.5324292,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.gradients": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.optimizer": {
+				"point": 988852224.0,
+				"lo": 888509110.0575603,
+				"hi": 1100527512.7076633,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.comm_buffers": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.activations": {
+				"point": 9340378216.349384,
+				"lo": 8392569622.82932,
+				"hi": 10395226866.767736,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.logits": {
+				"point": 9451608983.650616,
+				"lo": 8492513322.875887,
+				"hi": 10519019397.849295,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.kv_cache": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.generation_engine": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.eval_spike": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"time.phase.data": {
+				"point": 0.027796719797664876,
+				"lo": 0.024550986714450884,
+				"hi": 0.03147155104177963,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.phase.forward": {
+				"point": 0.3350452588487819,
+				"lo": 0.29592310742461125,
+				"hi": 0.37933950631295393,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.phase.backward": {
+				"point": 0.5701023604150265,
+				"lo": 0.5035333513561632,
+				"hi": 0.6454720436599072,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.phase.optimizer": {
+				"point": 0.021979672168995688,
+				"lo": 0.019413176926521062,
+				"hi": 0.024885467766820515,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			}
+		},
+		"grids": [
+			{
+				"id": "g.memory.peak.checkpoint_every",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000,
+							160000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "y2TLZMtky2TLZMtky2Q=",
+				"lo": "TmROZE5kTmROZE5kTmQ=",
+				"hi": "VWVVZVVlVWVVZVVlVWU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.checkpoint_every",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000,
+							160000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AGf/Zv9m/2b/Zv5m/mY=",
+				"lo": "L2YvZi9mLmYuZi5mLmY=",
+				"hi": "62frZ+pn6mfqZ+pn6mc=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 32.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.checkpoint_every",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000,
+							160000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "YUxhTGFMYUxgTGBMYEw=",
+				"lo": "vku9S71LvEu8S7xLvEs=",
+				"hi": "9Uz0TPRM9Ez0TPRM9Ew=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.checkpoint_every",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000,
+							160000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "9kv2S/ZL9Uv1S/VL9Us=",
+				"lo": "CksJSwlLCEsISwhLCEs=",
+				"hi": "gUyBTIFMgUyBTIFMgUw=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.checkpoint_every",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000,
+							160000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "8S3xLfEt8S3xLfEt8S0=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.gpu_type",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "y2Q=",
+				"lo": "TmQ=",
+				"hi": "VWU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.gpu_type",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "/2Y=",
+				"lo": "LmY=",
+				"hi": "6mc=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 32.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.gpu_type",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "YUw=",
+				"lo": "vEs=",
+				"hi": "9Ew=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.gpu_type",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "9Us=",
+				"lo": "CEs=",
+				"hi": "gUw=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.gpu_type",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "8S0=",
+				"lo": "Zio=",
+				"hi": "mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.max_steps",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "y2TLZMtky2TLZMtky2Q=",
+				"lo": "TmROZE5kTmROZE5kTmQ=",
+				"hi": "VWVVZVVlVWVVZVVlVWU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.max_steps",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "/07/Uv9W/1r/Xv9i/2Y=",
+				"lo": "Lk4uUi5WLlouXi5iLmY=",
+				"hi": "6k/qU+pX6lvqX+pj6mc=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 256.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.max_steps",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "YUBgRGFIYUxhUGFUYVg=",
+				"lo": "vD+8Q7xHvEu8T7xTvFc=",
+				"hi": "9ED0RPRI9Ez0UPRU9Fg=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.max_steps",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "9T/1Q/VH9Uv1T/VT9Vc=",
+				"lo": "CD8IQwhHCEsITwhTCFc=",
+				"hi": "gUCBRIFIgUyBUIFUgVg=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.max_steps",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "8S3xLfEt8S3xLfEt8S0=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.num_workers",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							6,
+							13,
+							19,
+							26,
+							32
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "y2TLZMtky2TLZMtk",
+				"lo": "TmQeZB5kHmQeZB5k",
+				"hi": "VWWUZZRllGWUZZRl",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.num_workers",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							6,
+							13,
+							19,
+							26,
+							32
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "/2LhYuFi4WLhYuFi",
+				"lo": "LmJfYV9hX2FfYV9h",
+				"hi": "6mNoZGhkaGRoZGhk",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 64.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.num_workers",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							6,
+							13,
+							19,
+							26,
+							32
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "YUxOTE5MTkxOTE5M",
+				"lo": "vEu5SrlKuUq5SrlK",
+				"hi": "9EyDTYNNg02DTYNN",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.num_workers",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							6,
+							13,
+							19,
+							26,
+							32
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "9UvUS9RL1EvUS9RL",
+				"lo": "CEsdSh1KHUodSh1K",
+				"hi": "gUwDTQNNA00DTQNN",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.num_workers",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							6,
+							13,
+							19,
+							26,
+							32
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "8S3xLfEt8S3xLfEt",
+				"lo": "ZipmKmYqZipmKmYq",
+				"hi": "mjuaO5o7mjuaO5o7",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.packing",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "packing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "y2TLZA==",
+				"lo": "TmQeZA==",
+				"hi": "VWWUZQ==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.packing",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "packing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "/2LhYg==",
+				"lo": "LmK/YA==",
+				"hi": "6mP9ZA==",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 64.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.packing",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "packing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "YUxOTA==",
+				"lo": "vEvxSQ==",
+				"hi": "9Ew+Tg==",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.packing",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "packing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "9UvUSw==",
+				"lo": "CEtmSQ==",
+				"hi": "gUysTQ==",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.packing",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "packing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "8S3xLQ==",
+				"lo": "ZipmKg==",
+				"hi": "mjuaOw==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.batch_size",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "yFkfW5Jdy2BoZAAAAAA=",
+				"lo": "rVjjWQFdTmCRYwAAAAA=",
+				"hi": "JltOXDNeVWEhZQAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 33554432.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.batch_size",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AABlVwhb/17LYgAAAAA=",
+				"lo": "AAA6VTZaLl5OYQAAAAA=",
+				"hi": "AAA7WfRb6l9aZAAAAAA=",
+				"abstain": "YQ==",
+				"model_id": "time-total@0.1.0",
+				"scale": 128.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.batch_size",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAChRGZIYUxAUAAAAAA=",
+				"lo": "AACKQsZHvEukTgAAAAA=",
+				"hi": "AACMRvpI9ExyUQAAAAA=",
+				"abstain": "YQ==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.batch_size",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAA1RP9H9Uu7TwAAAAA=",
+				"lo": "AADyQRFHCEsJTgAAAAA=",
+				"hi": "AAD0RYZIgUzzUAAAAAA=",
+				"abstain": "YQ==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.batch_size",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "UB9QH1Af8S3xOwAAAAA=",
+				"lo": "UB9QH1AfZipBOQAAAAA=",
+				"hi": "UB9QH1AfmjvxOwAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.gradient_checkpointing",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "y2SzYg==",
+				"lo": "TmTBYQ==",
+				"hi": "VWXNYw==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.gradient_checkpointing",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "/2KmZA==",
+				"lo": "LmJDYw==",
+				"hi": "6mP0ZQ==",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 64.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.gradient_checkpointing",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "YUzSTQ==",
+				"lo": "vEuLTA==",
+				"hi": "9Ex0Tw==",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.gradient_checkpointing",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "9UtKTQ==",
+				"lo": "CEsiTA==",
+				"hi": "gUzGTg==",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.gradient_checkpointing",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "8S1QHw==",
+				"lo": "ZipQHw==",
+				"hi": "mjtQHw==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.seq_len",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HVkfW5Jdy2BoZAAAAAA=",
+				"lo": "EljjWQFdTmCRYwAAAAA=",
+				"hi": "bFpOXDNeVWEhZQAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 33554432.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.seq_len",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AABlV55a/17LYgAAAAA=",
+				"lo": "AAA6VdlZLl5OYQAAAAA=",
+				"hi": "AAA7WX1b6l9aZAAAAAA=",
+				"abstain": "YQ==",
+				"model_id": "time-total@0.1.0",
+				"scale": 128.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.seq_len",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAChRCRIYUxAUAAAAAA=",
+				"lo": "AACKQlJHvEukTgAAAAA=",
+				"hi": "AACMRrBI9ExyUQAAAAA=",
+				"abstain": "YQ==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.seq_len",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAA1RIhH9Uu7TwAAAAA=",
+				"lo": "AADyQadGCEsJTgAAAAA=",
+				"hi": "AAD0RUNIgUzzUAAAAAA=",
+				"abstain": "YQ==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.seq_len",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "UB9QH1Af8S3xOwAAAAA=",
+				"lo": "UB9QH1AfZipBOQAAAAA=",
+				"hi": "UB9QH1AfmjvxOwAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.d_model",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "d_model",
+						"values": [
+							96,
+							192,
+							384,
+							768,
+							1536,
+							3072,
+							6144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "dVu/Wytcy1woXq5ga2Q=",
+				"lo": "Z1qnWipbTlxKXQVglmM=",
+				"hi": "V1yCXNtcVV0rX3NhJWU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 67108864.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.d_model",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "d_model",
+						"values": [
+							96,
+							192,
+							384,
+							768,
+							1536,
+							3072,
+							6144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "4WLhYuFi/2LhYuFi4WI=",
+				"lo": "X2FfYV9hLmJfYV9hX2E=",
+				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 64.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.d_model",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "d_model",
+						"values": [
+							96,
+							192,
+							384,
+							768,
+							1536,
+							3072,
+							6144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "TkxOTE5MYUxOTE5MTkw=",
+				"lo": "uUq5SrlKvEu5SrlKuUo=",
+				"hi": "g02DTYNN9EyDTYNNg00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.d_model",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "d_model",
+						"values": [
+							96,
+							192,
+							384,
+							768,
+							1536,
+							3072,
+							6144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "1EvUS9RL9UvUS9RL1Es=",
+				"lo": "HUodSh1KCEsdSh1KHUo=",
+				"hi": "A00DTQNNgUwDTQNNA00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.d_model",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "d_model",
+						"values": [
+							96,
+							192,
+							384,
+							768,
+							1536,
+							3072,
+							6144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "UB9QH1Af8S23O/E78Ts=",
+				"lo": "UB9QH1AfZipBOUE5QTk=",
+				"hi": "UB9QH1Afmju9O/E78Ts=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.grad_clip",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "grad_clip",
+						"values": [
+							0.125,
+							0.25,
+							0.5,
+							1.0,
+							2.0,
+							4.0,
+							8.0
+						],
+						"scale": "log"
+					}
+				],
+				"point": "y2TLZMtky2TLZMtky2Q=",
+				"lo": "HmQeZB5kTmQeZB5kHmQ=",
+				"hi": "lGWUZZRlVWWUZZRllGU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.grad_clip",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "grad_clip",
+						"values": [
+							0.125,
+							0.25,
+							0.5,
+							1.0,
+							2.0,
+							4.0,
+							8.0
+						],
+						"scale": "log"
+					}
+				],
+				"point": "4WLhYuFi/2LhYuFi4WI=",
+				"lo": "X2FfYV9hLmJfYV9hX2E=",
+				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 64.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.grad_clip",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "grad_clip",
+						"values": [
+							0.125,
+							0.25,
+							0.5,
+							1.0,
+							2.0,
+							4.0,
+							8.0
+						],
+						"scale": "log"
+					}
+				],
+				"point": "TkxOTE5MYUxOTE5MTkw=",
+				"lo": "uUq5SrlKvEu5SrlKuUo=",
+				"hi": "g02DTYNN9EyDTYNNg00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.grad_clip",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "grad_clip",
+						"values": [
+							0.125,
+							0.25,
+							0.5,
+							1.0,
+							2.0,
+							4.0,
+							8.0
+						],
+						"scale": "log"
+					}
+				],
+				"point": "1EvUS9RL9UvUS9RL1Es=",
+				"lo": "HUodSh1KCEsdSh1KHUo=",
+				"hi": "A00DTQNNgUwDTQNNA00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.grad_clip",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "grad_clip",
+						"values": [
+							0.125,
+							0.25,
+							0.5,
+							1.0,
+							2.0,
+							4.0,
+							8.0
+						],
+						"scale": "log"
+					}
+				],
+				"point": "8S3xLfEt8S3xLfEt8S0=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.lr",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "y2TLZMtky2TLZMtky2Q=",
+				"lo": "TmROZE5kTmROZE5kTmQ=",
+				"hi": "VWVVZVVlVWVVZVVlVWU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.lr",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "/2b/Zv9m/2b/Zv9m/2Y=",
+				"lo": "LmYuZi5mLmYuZi5mLmY=",
+				"hi": "6mfqZ+pn6mfqZ+pn6mc=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 32.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.lr",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "YUxhTGFMYUxhTGFMYUw=",
+				"lo": "vEu8S7xLvEu8S7xLvEs=",
+				"hi": "9Ez0TPRM9Ez0TPRM9Ew=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.lr",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "9Uv1S/VL9Uv1S/VL9Us=",
+				"lo": "CEsISwhLCEsISwhLCEs=",
+				"hi": "gUyBTIFMgUyBTIFMgUw=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.lr",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "8S3xLfEt8S3xLfEt8S0=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.n_head",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "n_head",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "C2aLZQtly2SrZJxklmQ=",
+				"lo": "MWXDZFVkTmQDZOtj4GM=",
+				"hi": "CWd0Zt9lVWVwZV5lV2U=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.n_head",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "n_head",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "4WLhYuFi/2LhYuFi4WI=",
+				"lo": "X2FfYV9hLmJfYV9hX2E=",
+				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 64.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.n_head",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "n_head",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "TkxOTE5MYUxOTE5MTkw=",
+				"lo": "uUq5SrlKvEu5SrlKuUo=",
+				"hi": "g02DTYNN9EyDTYNNg00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.n_head",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "n_head",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "1EvUS9RL9UvUS9RL1Es=",
+				"lo": "HUodSh1KCEsdSh1KHUo=",
+				"hi": "A00DTQNNgUwDTQNNA00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.n_head",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "n_head",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "fDvbOEIx8S0dLJIofCU=",
+				"lo": "ZipmKmYqZipmKpIofCU=",
+				"hi": "mjuaO5o7mjuaO5IofCU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.n_layer",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "n_layer",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "YFqyWqlby1y4XklhkmQ=",
+				"lo": "elnAWZRaTlzFXYpg2WM=",
+				"hi": "bFvMW3VcVV3TXyhiUmU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 67108864.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.n_layer",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "n_layer",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "4WLhYuFi/2LhYuFi4WI=",
+				"lo": "X2FfYV9hLmJfYV9hX2E=",
+				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 64.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.n_layer",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "n_layer",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "TkxOTE5MYUxOTE5MTkw=",
+				"lo": "uUq5SrlKvEu5SrlKuUo=",
+				"hi": "g02DTYNN9EyDTYNNg00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.n_layer",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "n_layer",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "1EvUS9RL9UvUS9RL1Es=",
+				"lo": "HUodSh1KCEsdSh1KHUo=",
+				"hi": "A00DTQNNgUwDTQNNA00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.n_layer",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "n_layer",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "UB9QH1Af8S23O/E78Ts=",
+				"lo": "UB9QH1AfZipBOUE5QTk=",
+				"hi": "UB9QH1Afmju9O/E78Ts=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.warmup_steps",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "warmup_steps",
+						"values": [
+							250,
+							500,
+							1000,
+							2000,
+							4000,
+							8000,
+							16000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "y2TLZMtky2TLZMtky2Q=",
+				"lo": "HmQeZB5kTmQeZB5kHmQ=",
+				"hi": "lGWUZZRlVWWUZZRllGU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.warmup_steps",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "warmup_steps",
+						"values": [
+							250,
+							500,
+							1000,
+							2000,
+							4000,
+							8000,
+							16000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "4WLhYuFi/2LhYuFi4WI=",
+				"lo": "X2FfYV9hLmJfYV9hX2E=",
+				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 64.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.warmup_steps",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "warmup_steps",
+						"values": [
+							250,
+							500,
+							1000,
+							2000,
+							4000,
+							8000,
+							16000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "TkxOTE5MYUxOTE5MTkw=",
+				"lo": "uUq5SrlKvEu5SrlKuUo=",
+				"hi": "g02DTYNN9EyDTYNNg00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.warmup_steps",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "warmup_steps",
+						"values": [
+							250,
+							500,
+							1000,
+							2000,
+							4000,
+							8000,
+							16000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "1EvUS9RL9UvUS9RL1Es=",
+				"lo": "HUodSh1KCEsdSh1KHUo=",
+				"hi": "A00DTQNNgUwDTQNNA00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.warmup_steps",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "warmup_steps",
+						"values": [
+							250,
+							500,
+							1000,
+							2000,
+							4000,
+							8000,
+							16000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "8S3xLfEt8S3xLfEt8S0=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"weight_decay": 0.1,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.weight_decay",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "weight_decay",
+						"values": [
+							0.0125,
+							0.025,
+							0.05,
+							0.1,
+							0.2,
+							0.4,
+							0.8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "y2TLZMtky2TLZMtky2Q=",
+				"lo": "HmQeZB5kTmQeZB5kHmQ=",
+				"hi": "lGWUZZRlVWWUZZRllGU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.time.total.weight_decay",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "weight_decay",
+						"values": [
+							0.0125,
+							0.025,
+							0.05,
+							0.1,
+							0.2,
+							0.4,
+							0.8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "4WLhYuFi/2LhYuFi4WI=",
+				"lo": "X2FfYV9hLmJfYV9hX2E=",
+				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 64.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.total.weight_decay",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "weight_decay",
+						"values": [
+							0.0125,
+							0.025,
+							0.05,
+							0.1,
+							0.2,
+							0.4,
+							0.8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "TkxOTE5MYUxOTE5MTkw=",
+				"lo": "uUq5SrlKvEu5SrlKuUo=",
+				"hi": "g02DTYNN9EyDTYNNg00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.weight_decay",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "weight_decay",
+						"values": [
+							0.0125,
+							0.025,
+							0.05,
+							0.1,
+							0.2,
+							0.4,
+							0.8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "1EvUS9RL9UvUS9RL1Es=",
+				"lo": "HUodSh1KCEsdSh1KHUo=",
+				"hi": "A00DTQNNgUwDTQNNA00=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.risk.oom.weight_decay",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "weight_decay",
+						"values": [
+							0.0125,
+							0.025,
+							0.05,
+							0.1,
+							0.2,
+							0.4,
+							0.8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "8S3xLfEt8S3xLfEt8S0=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"precision": "fp32"
+				}
+			},
+			{
+				"id": "g.memory.peak.precision",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "precision",
+						"values": [
+							"fp32",
+							"bf16",
+							"fp16"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "y2REZERk",
+				"lo": "TmRVY1Vj",
+				"hi": "VWX4ZPhk",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1
+				}
+			},
+			{
+				"id": "g.time.total.precision",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "precision",
+						"values": [
+							"fp32",
+							"bf16",
+							"fp16"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "/2Z4YHhg",
+				"lo": "LmaEXoRe",
+				"hi": "6mciYiJi",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 32.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1
+				}
+			},
+			{
+				"id": "g.cost.total.precision",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "precision",
+						"values": [
+							"fp32",
+							"bf16",
+							"fp16"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "YUyYRZhF",
+				"lo": "vEsURBRE",
+				"hi": "9EytR61H",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.precision",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "precision",
+						"values": [
+							"fp32",
+							"bf16",
+							"fp16"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "9UsWRRZF",
+				"lo": "CEtpQ2lD",
+				"hi": "gUz6RvpG",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1
+				}
+			},
+			{
+				"id": "g.risk.oom.precision",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "precision",
+						"values": [
+							"fp32",
+							"bf16",
+							"fp16"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "8S1QH1Af",
+				"lo": "ZipQH1Af",
+				"hi": "mjtQH1Af",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 20000,
+					"gpu_type": "A10",
+					"max_steps": 60000,
+					"num_workers": 0,
+					"packing": false,
+					"batch_size": 12,
+					"gradient_checkpointing": false,
+					"seq_len": 1024,
+					"d_model": 768,
+					"grad_clip": 1.0,
+					"lr": 0.0006,
+					"n_head": 12,
+					"n_layer": 12,
+					"warmup_steps": 2000,
+					"weight_decay": 0.1
+				}
+			}
+		]
+	},
+	"models": [
+		{
+			"id": "cost-gpu-hours@0.1.0",
+			"kind": "rule",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. GPU-hours x the dated price in engine/prices",
+			"fixture": false
+		},
+		{
+			"id": "memory-analytical@0.3.1",
+			"kind": "analytical",
+			"version": "0.3.1",
+			"training_data": "remote-runs b-topup-export-2 (Nov 1): L4, A10, L40S, T4, H100 (the Nov 1 top-up's seed 0 and 1 rows included); A100 held out, scored once on Oct 31, not re-scored (8463 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, A100-PCIe-40GB); table 50ea0fb14a",
+			"heldout_error": {},
+			"coverage": 0.9048672566371682,
+			"per_gpu_coverage": {
+				"A100-PCIe-80GB": 0.6666666666666666,
+				"A100-SXM-80GB": 0.875
+			},
+			"notes": "calibration: held_out. Korthikanti-style accounting, calibrated by the probes (E3); S1, S2a-d.  Own cells: H100-SXM-80GB, pretrain (n = 40); H100-SXM-80GB, retrieval (n = 40); H100-SXM-80GB, vision (n = 78); L40S, pretrain (n = 47); L40S, retrieval (n = 48); L40S, vision (n = 91); A10, finetune (n = 19); A10, pretrain (n = 69); A10, retrieval (n = 70); A10, vision (n = 130); L4, finetune (n = 19); L4, pretrain (n = 55); L4, retrieval (n = 53); L4, vision (n = 101); T4, pretrain (n = 11); T4, retrieval (n = 11); T4, vision (n = 22); merged across GPUs and job types (n = 904); finetune, merged across GPUs (n = 38); pretrain, merged across GPUs (n = 222); retrieval, merged across GPUs (n = 222); vision, merged across GPUs (n = 422). A GPU and job type with fewer than 9 held-out runs has no band of its own: it uses its job type merged across GPUs, then all runs. Leave-one-architecture-out coverage 818 of 904 (Wilson 95% 88% to 92%). Holdout, never tuned on: A100-PCIe-80GB 8 of 12 inside the band (Wilson 95% 39% to 86%). Holdout, never tuned on: A100-SXM-80GB 14 of 16 inside the band (Wilson 95% 64% to 97%)",
+			"fixture": false
+		},
+		{
+			"id": "run-cost@0.1.0",
+			"kind": "rule",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. run cost lines as quantity x a dated price-table rate, totals added line by line; money at risk is P(OOM) over its bin's edges x the cost up to the crash (S7)",
+			"fixture": false
+		},
+		{
+			"id": "steptime-phases@0.2.0",
+			"kind": "analytical",
+			"version": "0.2.0",
+			"training_data": "remote-runs b-topup-export-2 (Nov 1): L4, A10, L40S, T4, H100 (the Nov 1 top-up's seed 0 and 1 rows included); A100 held out, scored once on Oct 31, not re-scored (8463 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, A100-PCIe-40GB); table 50ea0fb14a",
+			"heldout_error": {},
+			"coverage": 0.9063583815028902,
+			"per_gpu_coverage": {
+				"A100-PCIe-80GB": 0.9166666666666666,
+				"A100-SXM-80GB": 0.9375
+			},
+			"notes": "calibration: held_out. per-phase linear fits on the probes; S4b below the smallest probe. Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2. Own cells: H100-SXM-80GB, pretrain (n = 40); H100-SXM-80GB, retrieval (n = 40); H100-SXM-80GB, vision (n = 77); L40S, pretrain (n = 47); L40S, retrieval (n = 48); L40S, vision (n = 91); A10, pretrain (n = 69); A10, retrieval (n = 70); A10, vision (n = 130); L4, pretrain (n = 55); L4, retrieval (n = 53); L4, vision (n = 101); T4, pretrain (n = 11); T4, retrieval (n = 11); T4, vision (n = 22); pretrain, merged across GPUs (n = 222); retrieval, merged across GPUs (n = 222); vision, merged across GPUs (n = 421). A GPU and job type with fewer than 9 held-out runs has no band of its own: it uses its job type merged across GPUs. A job type with no cell keeps the simulated band. Leave-one-architecture-out coverage 784 of 865 (Wilson 95% 89% to 92%). Holdout, never tuned on: A100-PCIe-80GB 11 of 12 inside the band (Wilson 95% 65% to 99%). Holdout, never tuned on: A100-SXM-80GB 15 of 16 inside the band (Wilson 95% 72% to 99%)",
+			"fixture": false
+		},
+		{
+			"id": "time-total@0.1.0",
+			"kind": "analytical",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. steps x step time plus measured checkpoint and eval overheads",
+			"fixture": false
+		}
+	],
+	"findings": [
+		{
+			"id": "read.data.num_workers_zero",
+			"severity": "warn",
+			"code": "data.num_workers_zero",
+			"title": "Data loader runs in the training process (num_workers=0)",
+			"node_id": "data",
+			"evidence": [
+				{
+					"metric": "num_workers",
+					"value": 0.0
+				}
+			],
+			"source": "rule",
+			"fix_template": "data.num_workers",
+			"knob_id": "num_workers",
+			"citations": []
+		},
+		{
+			"id": "read.precision.fp32",
+			"severity": "warn",
+			"code": "precision.fp32",
+			"title": "Trains in fp32",
+			"node_id": "model",
+			"evidence": [],
+			"source": "rule",
+			"fix_template": "precision.bf16_autocast",
+			"knob_id": "precision",
+			"citations": []
+		},
+		{
+			"id": "hygiene.resume_mismatch.p1",
+			"severity": "info",
+			"code": "hygiene.resume_mismatch",
+			"title": "A resume from this run's checkpoints won't match the run",
+			"detail": "its checkpoints hold the weights but not the LR schedule, RNG state [measured: what torch.save was given]; a resumed run restarts so its losses won't match an unbroken run's",
+			"evidence": [],
+			"source": "rule",
+			"fix_template": "hygiene.full_checkpoint",
+			"citations": []
+		}
+	],
+	"patches": [],
+	"provenance": [
+		{
+			"provider": "meta",
+			"model": "muse-spark-1.3",
+			"purpose": "script_map",
+			"input_tokens": 5640,
+			"output_tokens": 2639,
+			"cached_input_tokens": 0,
+			"cost_usd": 0.018266,
+			"request_id": "3e76ed95-d857-4c70-9652-8491dc033b4c",
+			"at": "2026-11-02T22:52:31Z",
+			"latency_s": 22.409,
+			"ok": true
+		},
+		{
+			"provider": "baseten",
+			"model": "meta-models/muse-spark-open-1026",
+			"purpose": "triage",
+			"input_tokens": 1450,
+			"output_tokens": 271,
+			"cached_input_tokens": 128,
+			"cost_usd": 0.002823,
+			"request_id": "chatcmpl-5b4c7ae7f8a343b3b528b2328e266eaa",
+			"at": "2026-11-02T22:54:28Z",
+			"latency_s": 1.315,
+			"ok": true
+		},
+		{
+			"provider": "baseten",
+			"model": "meta-models/muse-spark-open-1026",
+			"purpose": "triage",
+			"input_tokens": 483,
+			"output_tokens": 306,
+			"cached_input_tokens": 0,
+			"cost_usd": 0.001904,
+			"request_id": "chatcmpl-01d107ba8c384052b6703f296c4242f7",
+			"at": "2026-11-02T22:54:30Z",
+			"latency_s": 1.393,
+			"ok": true
+		},
+		{
+			"provider": "baseten",
+			"model": "meta-models/muse-spark-open-1026",
+			"purpose": "triage",
+			"input_tokens": 483,
+			"output_tokens": 1070,
+			"cached_input_tokens": 0,
+			"cost_usd": 0.005151,
+			"request_id": "chatcmpl-301ce078d1864ef6a48cf65f3ec2c5e1",
+			"at": "2026-11-02T22:54:34Z",
+			"latency_s": 4.076,
+			"ok": true
+		}
+	],
+	"costs": {
+		"gpu_usd": 0.034006,
+		"llm_usd": 0.028144,
+		"breakdown": {
+			"probes": 0.033434,
+			"sandbox_overhead": 0.000572,
+			"sandbox_cpu_memory_estimate": 0.028875,
+			"model_calls": 0.028144
+		}
+	},
+	"cost_basis": {
+		"price_table": "prices@2026-11-01",
+		"as_of": "2026-11-01",
+		"provider": "local",
+		"billing": "on_demand",
+		"currency": "USD",
+		"includes": [
+			"gpu",
+			"tokens"
+		]
+	},
+	"job_cost": {
+		"lines": [
+			{
+				"kind": "gpu",
+				"label_key": "cost.line.gpu",
+				"quantity": {
+					"point": 15.916799295263168,
+					"lo": 14.065765781469587,
+					"hi": 18.01145025367812,
+					"unit": "gpu_hours",
+					"status": "predicted",
+					"model_id": "run-cost@0.1.0",
+					"source": "exact",
+					"reason": "1 x A10; batches vary in length: the run's median step follows the dataset's median padded length (1024 tokens a row here) and its total the mean (1024)",
+					"level": 0.9
+				},
+				"rate_usd": 1.1,
+				"usd": {
+					"point": 17.508479224789486,
+					"lo": 15.472342359616547,
+					"hi": 19.812595279045933,
+					"unit": "usd",
+					"status": "predicted",
+					"model_id": "run-cost@0.1.0",
+					"source": "exact",
+					"reason": "A10 at $1.10/h (modal, 2026-07); no local rate for A10; the cheapest listed on-demand rate (modal, us) is used",
+					"level": 0.9,
+					"rate": {
+						"quantity": "line.quantity",
+						"usd_per_unit": 1.1,
+						"unit": "gpu_hours",
+						"price_row": "gpu/modal/A10/us/on_demand"
+					}
+				},
+				"price_row": "gpu/modal/A10/us/on_demand"
+			}
+		],
+		"total_usd": {
+			"point": 17.508479224789486,
+			"lo": 15.472342359616547,
+			"hi": 19.812595279045933,
+			"unit": "usd",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "A10 at $1.10/h (modal, 2026-07); no local rate for A10; the cheapest listed on-demand rate (modal, us) is used",
+			"level": 0.9,
+			"rate": {
+				"quantity": "job_cost.gpu_hours",
+				"usd_per_unit": 1.1,
+				"unit": "gpu_hours",
+				"price_row": "gpu/modal/A10/us/on_demand"
+			}
+		},
+		"gpu_hours": {
+			"point": 15.916799295263168,
+			"lo": 14.065765781469587,
+			"hi": 18.01145025367812,
+			"unit": "gpu_hours",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"level": 0.9
+		},
+		"at_risk_gpu_hours": {
+			"point": 3.859361525396819e-05,
+			"lo": 1.9232519266545488e-05,
+			"hi": 0.00013520744446258247,
+			"unit": "gpu_hours",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "tight: P(OOM) between 5% and 30% x the cost up to the first step; 1 x A10",
+			"level": 0.9
+		},
+		"at_risk_usd": {
+			"point": 4.245297677936502e-05,
+			"lo": 2.115577119320004e-05,
+			"hi": 0.00014872818890884076,
+			"unit": "usd",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "tight: P(OOM) between 5% and 30% x the cost up to the first step; A10 at $1.10/h (modal, 2026-07); no local rate for A10; the cheapest listed on-demand rate (modal, us) is used",
+			"level": 0.9,
+			"rate": {
+				"quantity": "job_cost.at_risk_gpu_hours",
+				"usd_per_unit": 1.1,
+				"unit": "gpu_hours",
+				"price_row": "gpu/modal/A10/us/on_demand"
+			}
+		}
+	}
+}

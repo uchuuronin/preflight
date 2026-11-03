@@ -57,7 +57,10 @@ try {
 			value: d.querySelector(".pf-dial__text b")?.textContent ?? "",
 		})),
 	);
-	check("four readouts", dials.length >= 4, { dials: dials.length });
+	// Memory, time, cost and risk: memory reads in the map's core, the rest on dials (the default sample,
+	// PF102, has no throughput dial; Nov 3).
+	const core = await page.locator(".pf-core").count();
+	check("four readouts", dials.length >= 3 && core > 0, { dials: dials.length, core });
 	check(
 		"every dial has a status word",
 		dials.every((d) => /Measured|Predicted|Extrapolated|Not measured here|Ran out of memory here|Sample probe/.test(d.status)),
@@ -170,7 +173,7 @@ try {
 
 	// ---------- a phone: nothing scrolls sideways
 	const phone = await browser.newPage({ viewport: PHONE, isMobile: true, hasTouch: true });
-	for (const path of ["/", "/#/new", "/#/cockpit/lora-7b"]) {
+	for (const path of ["/", "/#/new", "/#/cockpit/lora-qwen"]) {
 		await phone.goto(`${BASE}${path}`, { waitUntil: "load" });
 		await phone.waitForTimeout(800);
 		const over = await phone.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

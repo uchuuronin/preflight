@@ -81,9 +81,30 @@ describe("the watch command", () => {
 	});
 });
 
-describe("a step-time streak counts either side, as A's does", () => {
-	it("alerts after one window above and one below the band", () => {
-		const r = readLive(live(lora, [{ index: 20, wall_s: step.hi! * 1.5 }, { index: 40, wall_s: step.lo! * 0.5 }]))!;
-		expect(r.alerts.find((a) => a.kind === "step")).toMatchObject({ side: "below" });
+describe("faster than the band is a note, not an alert (B's preflight watch, Nov 2; D's shot 9b)", () => {
+	it("notes two fast windows in a row and raises nothing", () => {
+		const r = readLive(live(lora, [{ index: 20, wall_s: step.lo! * 0.5 }, { index: 40, wall_s: step.lo! * 0.5 }]))!;
+		expect(r.alerts.filter((a) => a.kind === "step")).toEqual([]);
+		expect(r.notes).toMatchObject([{ kind: "step_fast", step: 40 }]);
+	});
+	it("keeps each side's own streak: a fast window neither hastens nor blocks a slow alert", () => {
+		const mixed = readLive(live(lora, [{ index: 20, wall_s: step.hi! * 1.5 }, { index: 40, wall_s: step.lo! * 0.5 }]))!;
+		expect(mixed.alerts.filter((a) => a.kind === "step")).toEqual([]);
+		expect(mixed.notes).toEqual([]);
+		const slow = readLive(live(lora, [{ index: 20, wall_s: step.lo! * 0.5 }, { index: 40, wall_s: step.hi! * 1.5 }, { index: 60, wall_s: step.hi! * 1.5 }]))!;
+		expect(slow.alerts.filter((a) => a.kind === "step")).toMatchObject([{ kind: "step", side: "above", step: 60 }]);
+	});
+	it("still alerts on memory over its band and a total past its band while steps are fast", () => {
+		const retr = retrRaw as unknown as FlightRecord;
+		const est = retr.predictions!.estimates!;
+		const peakBand = est["memory.peak"]!;
+		const rStep = est["time.step"]!;
+		expect(peakBand.hi).not.toBeNull();
+		const r = readLive(live(retr, [{ index: 20, wall_s: rStep.lo! * 0.5 }, { index: 40, wall_s: rStep.lo! * 0.5, peak: peakBand.hi! * 2 }]))!;
+		expect(r.alerts.map((a) => a.kind)).toContain("peak");
+		expect(r.notes.map((n) => n.kind)).toEqual(["step_fast"]);
+		// A total past its band still alerts with fast steps: a run so long that even this pace runs over.
+		const long = live(lora, [{ index: 20, wall_s: step.lo! * 0.9 }, { index: 40, wall_s: step.lo! * 0.9 }], "running", 1e7);
+		expect(readLive(long)!.alerts.map((a) => a.kind)).toContain("total");
 	});
 });
