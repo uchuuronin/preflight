@@ -119,6 +119,66 @@ def _read_tree(root: Path) -> dict[str, str]:
 	return files
 
 
+# decorators that run or register the function they wrap (`@atexit.register`, `@app.command()`, `@hydra.main(...)`,
+# `@click.command()`); `@torch.no_grad()`, `@dataclass`, `@lru_cache` only wrap it (litgpt/pretrain.py has those)
+_RUNNING_DECORATORS = ("register", "main", "command", "entrypoint", "cli", "run", "group", "script")
+
+
+def _runs_at_definition(dec) -> bool:
+	import ast
+
+	node = dec.func if isinstance(dec, ast.Call) else dec
+	name = node.attr if isinstance(node, ast.Attribute) else node.id if isinstance(node, ast.Name) else ""
+	return name.lower().endswith(_RUNNING_DECORATORS)
+
+
+def runs_nothing(code: str) -> bool:
+	"""runner.entry_runs_nothing (off; D's walkthrough, Nov 3): the entry file only defines things when run with python:
+	no `if __name__ == "__main__":` and no top-level statement that calls or does anything (litgpt/pretrain.py, vLLM's
+	bench script, reached through their own CLIs). Imports, definitions, docstrings, assignments with no call, and
+	`try`/`if` blocks of those count as defining; anything else is taken as running something (never refuse a maybe)."""
+	import ast
+
+	try:
+		tree = ast.parse(code)
+	except (SyntaxError, ValueError, RecursionError, MemoryError):
+		return False  # the map says what's wrong with it
+
+	def inert(body) -> bool:
+		for st in body:
+			if isinstance(st, ast.ImportFrom) and any(a.name == "*" for a in st.names):
+				return False  # `from experiments.run import *`: that module may be what runs (review)
+			if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and any(
+				_runs_at_definition(d) for d in st.decorator_list
+			):
+				return False  # a decorator that runs or registers it (`@atexit.register`, a CLI's command): a maybe
+			if isinstance(
+				st,
+				(ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Pass),
+			):
+				continue
+			if isinstance(st, ast.Expr) and isinstance(st.value, ast.Constant):
+				continue  # a docstring
+			if isinstance(st, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+				value = st.value
+				if value is None or not any(isinstance(n, (ast.Call, ast.Await)) for n in ast.walk(value)):
+					continue
+				return False
+			if isinstance(st, ast.Try) and inert(st.body) and all(inert(h.body) for h in st.handlers) and inert(
+				st.orelse) and inert(st.finalbody):  # fmt: skip
+				continue
+			if isinstance(st, ast.If):
+				t = st.test
+				if any(isinstance(n, ast.Name) and n.id == "__name__" for n in ast.walk(t)):
+					return False  # the entry guard: it runs
+				if inert(st.body) and inert(st.orelse):
+					continue
+			return False
+		return True
+
+	return inert(tree.body)
+
+
 LOGIN_CALLS = {"notebook_login", "login", "interpreter_login"}  # huggingface_hub's own
 
 

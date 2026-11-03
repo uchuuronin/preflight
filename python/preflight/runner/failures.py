@@ -27,6 +27,11 @@ STEPS: dict[str, tuple[str, str]] = {
 		"what it imports); for an upload, upload only the folder that holds the script; or probe it on your "
 		"machine: `preflight run <your script>`",
 	),
+	"entry.runs_nothing": (
+		"reading the entry point",
+		"name the script you'd run with `python <file>` as the entry point, or check it in by its command "
+		"(Run a command) if it's a supported tool's",
+	),
 	"map.too_large": (
 		"mapping the script",
 		"check in again starting from the script you run (only that file and what it imports), or probe it "

@@ -1,8 +1,19 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Nov 3, 2:30 PM ET.
+Updated Tue Nov 3, 4:10 PM ET.
 
 **Production runner: deployed from ws-a 56e686de** (main b40012bb merged in, plus the PM's 11:23 list; `a-deploy-main-30`, GitHub 41690166435, Nov 3 18:05 UTC / 1:05 PM ET), after three startup checks passed (`a-startup-check-30` 41688982619, `a-startup-check-serving-16` 41689362694, `a-startup-torch-new-4` 41689764723); the limit check passed after it (`a-limit-check-11`, 41690460909). New in production with it: native Windows fixes (D's ten), B's must-fixes 3 to 5 on `runner.read_closure` and `runner.probe_without_map`, OGB's arxiv archive from the dataset volume (sha256-pinned), the retrieval, GNN and vision samples' Fix button, B's request-count logging under `probes.eval_units`, and `harness.spark_search` on (main's flags, Chiya's 11:25 yes). Off: `runner.entrypoint_path` (proposed on, for the PM), `probes.step_clock`, `probes.uv_install`, `probes.agent_single_task`. **Rollback: `modal deploy --env main` from c146cf11** (10:52 AM).
+
+## Decisions Nov 3, 2:38 PM list (the re-validation's six; freeze at 6 PM)
+
+| When (ET) | Decision | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- |
+| 2:50 PM | The entry point's requirements behind `probes.entry_requirements` (off), nearest file up from the entry point only (not merged with the top's) | it changes what installs; the nearest file is the one `pip install -r` instructions use; a monorepo's top file is often another project's | none | flag off; revert a408958d |
+| 3:05 PM | `harness.map_closure` maps the closure for every repo that fits, plus a passed API method counted (AST) and the agent loop placed there | smolagents read as eval without it once another example's call left the map | none; off | flag off; revert 2aaf1e13, 76811d13 |
+| 3:10 PM | The size refusal's way past names the entry point: wording and a label, no flag | the PM named it a message fix; nothing else changes | none | revert 0c5373dc |
+| 3:15 PM | Contract 0.6.6: `JobEvent.nothing_measured` on done with `error_code`, a `job.nothing_measured` finding, and `FlightRecord.made_by`; both behind flags (`runner.nothing_measured`, `runner.made_by`) | C's existing finding view shows the end state at once; a 0.6.5 API refuses 0.6.6 records, so `made_by` waits for C's deploy | none | flags off; revert b38e14e6 |
+| 3:20 PM | The rig's check-in sends no GPU constraint by default | no visitor sends one; it turned off the A10 fallback | none | `--gpus L4` |
+| 3:20 PM | Production reruns of 2, 7, 8, F1 with no constraint, so an OOM may climb the production ladder to its L40S ceiling | the PM asked for a visitor's run; the ceiling is Chiya's (Nov 1) | within the $1.50 budget [estimate] | none needed |
 
 ## Decisions Nov 3, 1:44 PM list (bug fixes before the 3 PM freeze)
 

@@ -24,6 +24,8 @@
     "n_tasks": 500,
     "temperature": 0.2
    },
+   "model_full": null,
+   "rl": null,
    "_where": {
     "concurrency": "run.py",
     "context_limit": "run.py",
@@ -55,6 +57,8 @@
     "n_tasks": 500,
     "temperature": 0.2
    },
+   "model_full": null,
+   "rl": null,
    "_where": {
     "concurrency": "run.py",
     "context_limit": "run.py",
@@ -90,6 +94,8 @@
     "max_new_tokens": 2048,
     "temperature": 0.6
    },
+   "model_full": null,
+   "rl": null,
    "_where": {
     "dump_hidden_states": "run.py",
     "eval_batch_size": "run.py",
@@ -97,7 +103,7 @@
     "temperature": "run.py"
    }
   },
-  "before_s": 0.01,
+  "before_s": 0.0,
   "after": {
    "lens": "eval",
    "framework": "hf_generate",
@@ -117,6 +123,8 @@
     "max_new_tokens": 2048,
     "temperature": 0.6
    },
+   "model_full": null,
+   "rl": null,
    "_where": {
     "dump_hidden_states": "run.py",
     "eval_batch_size": "run.py",
@@ -163,6 +171,44 @@
     "seq_len": 1024,
     "warmup_steps": 50
    },
+   "model_full": {
+    "name": "Qwen2.5-1.5B",
+    "hf_id": "Qwen/Qwen2.5-1.5B",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": "bfloat16",
+    "quantization": null,
+    "shape_source": null,
+    "lora": {
+     "r": 16,
+     "alpha": 32.0,
+     "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+     ],
+     "dropout": 0.05
+    }
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "checkpoint_every": "train.py",
@@ -213,6 +259,44 @@
     "seq_len": 1024,
     "warmup_steps": 50
    },
+   "model_full": {
+    "name": "Qwen2.5-1.5B",
+    "hf_id": "Qwen/Qwen2.5-1.5B",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": "bfloat16",
+    "quantization": null,
+    "shape_source": null,
+    "lora": {
+     "r": 16,
+     "alpha": 32.0,
+     "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+     ],
+     "dropout": 0.05
+    }
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "checkpoint_every": "train.py",
@@ -261,6 +345,31 @@
     "fanout.hop3": 25,
     "lr": 0.003
    },
+   "model_full": {
+    "name": "SAGEConv",
+    "hf_id": null,
+    "family": "gnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "epochs": "train.py",
@@ -295,6 +404,31 @@
     "fanout.hop3": 25,
     "lr": 0.003
    },
+   "model_full": {
+    "name": "SAGEConv",
+    "hf_id": null,
+    "family": "gnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "epochs": "train.py",
@@ -340,6 +474,41 @@
     "max_prompt_len": 256,
     "optimizer": "adafactor"
    },
+   "model_full": {
+    "name": "Qwen2.5-0.5B-Instruct",
+    "hf_id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": {
+    "algorithm": "grpo",
+    "group_size": 8,
+    "max_completion_len": 512,
+    "reward_functions": [
+     "correct",
+     "formatted"
+    ],
+    "reference_model": null,
+    "generation_backend": "hf"
+   },
    "_where": {
     "batch_size": "train.py",
     "checkpoint_every": "train.py",
@@ -384,6 +553,41 @@
     "max_prompt_len": 256,
     "optimizer": "adafactor"
    },
+   "model_full": {
+    "name": "Qwen2.5-0.5B-Instruct",
+    "hf_id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": {
+    "algorithm": "grpo",
+    "group_size": 8,
+    "max_completion_len": 512,
+    "reward_functions": [
+     "correct",
+     "formatted"
+    ],
+    "reference_model": null,
+    "generation_backend": "hf"
+   },
    "_where": {
     "batch_size": "train.py",
     "checkpoint_every": "train.py",
@@ -424,6 +628,8 @@
     "lr": 0.003,
     "max_steps": 200
    },
+   "model_full": null,
+   "rl": null,
    "_where": {
     "batch_size": "tiny_train.py",
     "lr": "tiny_train.py",
@@ -450,6 +656,8 @@
     "lr": 0.003,
     "max_steps": 200
    },
+   "model_full": null,
+   "rl": null,
    "_where": {
     "batch_size": "tiny_train.py",
     "lr": "tiny_train.py",
@@ -494,6 +702,31 @@
     "warmup_steps": 2000,
     "weight_decay": 0.1
    },
+   "model_full": {
+    "name": "GPT",
+    "hf_id": null,
+    "family": "decoder",
+    "param_count": 123568128,
+    "n_layers": 12,
+    "d_model": 768,
+    "n_heads": 12,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": 50304,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "checkpoint_every": "train.py",
@@ -542,6 +775,31 @@
     "warmup_steps": 2000,
     "weight_decay": 0.1
    },
+   "model_full": {
+    "name": "GPT",
+    "hf_id": null,
+    "family": "decoder",
+    "param_count": 123568128,
+    "n_layers": 12,
+    "d_model": 768,
+    "n_heads": 12,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": 50304,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "checkpoint_every": "train.py",
@@ -589,6 +847,31 @@
     "lr": 2e-05,
     "precision": "bf16"
    },
+   "model_full": {
+    "name": "all-MiniLM-L6-v2",
+    "hf_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "family": "encoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "encode_batch_size": "train.py",
@@ -623,6 +906,31 @@
     "lr": 2e-05,
     "precision": "bf16"
    },
+   "model_full": {
+    "name": "all-MiniLM-L6-v2",
+    "hf_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "family": "encoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "encode_batch_size": "train.py",
@@ -632,7 +940,7 @@
     "precision": "train.py"
    }
   },
-  "after_s": 0.0,
+  "after_s": 0.03,
   "same": true
  },
  {
@@ -663,6 +971,31 @@
     "max_num_seqs": 256,
     "temperature": 0.7
    },
+   "model_full": {
+    "name": "Qwen2.5-7B-Instruct",
+    "hf_id": "Qwen/Qwen2.5-7B-Instruct",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": "bfloat16",
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "gpu_memory_utilization": "serve.py",
     "max_batched_tokens": "serve.py",
@@ -697,6 +1030,31 @@
     "max_num_seqs": 256,
     "temperature": 0.7
    },
+   "model_full": {
+    "name": "Qwen2.5-7B-Instruct",
+    "hf_id": "Qwen/Qwen2.5-7B-Instruct",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": "bfloat16",
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "gpu_memory_utilization": "serve.py",
     "max_batched_tokens": "serve.py",
@@ -719,6 +1077,8 @@
    "model": {},
    "loop": {},
    "knobs": {},
+   "model_full": null,
+   "rl": null,
    "_where": {}
   },
   "before_s": 0.0,
@@ -728,6 +1088,8 @@
    "model": {},
    "loop": {},
    "knobs": {},
+   "model_full": null,
+   "rl": null,
    "_where": {}
   },
   "after_s": 0.0,
@@ -760,6 +1122,31 @@
     "lr": 0.001,
     "num_workers": 2
    },
+   "model_full": {
+    "name": "resnet50.a1_in1k",
+    "hf_id": null,
+    "family": "cnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "epochs": "train.py",
@@ -768,7 +1155,7 @@
     "num_workers": "train.py"
    }
   },
-  "before_s": 0.04,
+  "before_s": 0.0,
   "after": {
    "lens": "vision",
    "framework": "timm",
@@ -792,6 +1179,31 @@
     "lr": 0.001,
     "num_workers": 2
    },
+   "model_full": {
+    "name": "resnet50.a1_in1k",
+    "hf_id": null,
+    "family": "cnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "train.py",
     "epochs": "train.py",
@@ -827,12 +1239,37 @@
     "gpus": 2,
     "temperature": 1.0
    },
+   "model_full": {
+    "name": "Qwen3Attention",
+    "hf_id": null,
+    "family": "cnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "gpus": "recipes/configs/dev/11B_lora_multi_dataset.yaml",
     "temperature": "torchtune/rlhf/sequence_processing.py"
    }
   },
-  "before_s": 1.39,
+  "before_s": 1.22,
   "after": {
    "lens": "finetune",
    "framework": "plain_pytorch",
@@ -853,12 +1290,37 @@
     "gpus": 2,
     "temperature": 1.0
    },
+   "model_full": {
+    "name": "Qwen3Attention",
+    "hf_id": null,
+    "family": "cnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "gpus": "recipes/configs/dev/11B_lora_multi_dataset.yaml",
     "temperature": "torchtune/rlhf/sequence_processing.py"
    }
   },
-  "after_s": 1.68,
+  "after_s": 1.53,
   "same": true
  },
  {
@@ -903,6 +1365,31 @@
     "tensor_parallel": 1,
     "weight_decay": 0.02
    },
+   "model_full": {
+    "name": "stablelm-zephyr-3b",
+    "hf_id": "stabilityai/stablelm-zephyr-3b",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "attn": "tests/convert/test_lit_checkpoint.py",
     "batch_size": "extensions/xla/finetune/adapter.py",
@@ -926,12 +1413,13 @@
     "weight_decay": "extensions/xla/finetune/adapter.py"
    }
   },
-  "before_s": 1.07,
+  "before_s": 0.98,
   "after": {
    "lens": "pretrain",
    "framework": "lightning",
    "model": {
-    "name": "LoRALayer"
+    "name": "stablelm-zephyr-3b",
+    "hf_id": "stabilityai/stablelm-zephyr-3b"
    },
    "loop": {
     "kind": "plain",
@@ -957,6 +1445,31 @@
     "pin_memory": true,
     "seq_len": 4096
    },
+   "model_full": {
+    "name": "stablelm-zephyr-3b",
+    "hf_id": "stabilityai/stablelm-zephyr-3b",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "litgpt/args.py",
     "checkpoint_every": "litgpt/args.py",
@@ -972,7 +1485,7 @@
     "seq_len": "litgpt/config.py"
    }
   },
-  "after_s": 0.8,
+  "after_s": 1.96,
   "same": false
  },
  {
@@ -999,6 +1512,15 @@
     "max_new_tokens": 16384,
     "temperature": 0.6
    },
+   "model_full": null,
+   "rl": {
+    "algorithm": "grpo",
+    "group_size": 4,
+    "max_completion_len": null,
+    "reward_functions": [],
+    "reference_model": null,
+    "generation_backend": "vllm"
+   },
    "_where": {
     "batch_size": "scripts/pass_rate_filtering/compute_pass_rate.py",
     "gpus": "slurm/compute_pass_rate.slurm",
@@ -1007,7 +1529,7 @@
     "temperature": "scripts/generate_reasoning.py"
    }
   },
-  "before_s": 0.09,
+  "before_s": 0.1,
   "after": {
    "lens": "rl",
    "framework": "trl",
@@ -1024,11 +1546,20 @@
    "knobs": {
     "gpus": 1
    },
+   "model_full": null,
+   "rl": {
+    "algorithm": "grpo",
+    "group_size": 4,
+    "max_completion_len": null,
+    "reward_functions": [],
+    "reference_model": null,
+    "generation_backend": "vllm"
+   },
    "_where": {
     "gpus": "slurm/compute_pass_rate.slurm"
    }
   },
-  "after_s": 0.14,
+  "after_s": 0.28,
   "same": false
  },
  {
@@ -1053,13 +1584,15 @@
     "max_new_tokens": 1000,
     "temperature": 0.5
    },
+   "model_full": null,
+   "rl": null,
    "_where": {
     "concurrency": "examples/open_deep_research/run_gaia.py",
     "max_new_tokens": "examples/agent_from_any_llm.py",
     "temperature": "tests/test_agents.py"
    }
   },
-  "before_s": 0.81,
+  "before_s": 0.88,
   "after": {
    "lens": "agent",
    "framework": "openai_client",
@@ -1076,11 +1609,13 @@
    "knobs": {
     "max_new_tokens": 1000
    },
+   "model_full": null,
+   "rl": null,
    "_where": {
     "max_new_tokens": "examples/agent_from_any_llm.py"
    }
   },
-  "after_s": 0.74,
+  "after_s": 1.36,
   "same": false
  },
  {
@@ -1093,18 +1628,22 @@
    "model": {},
    "loop": {},
    "knobs": {},
+   "model_full": null,
+   "rl": null,
    "_where": {}
   },
-  "before_s": 0.26,
+  "before_s": 0.25,
   "after": {
    "lens": "eval",
    "framework": "other",
    "model": {},
    "loop": {},
    "knobs": {},
+   "model_full": null,
+   "rl": null,
    "_where": {}
   },
-  "after_s": 0.65,
+  "after_s": 0.64,
   "same": true
  },
  {
@@ -1133,6 +1672,31 @@
     "precision": "auto",
     "temperature": 1.0
    },
+   "model_full": {
+    "name": "Qwen3-0.6B",
+    "hf_id": "Qwen/Qwen3-0.6B",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": "auto",
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "max_new_tokens": "vllm/sampling_params.py",
     "pin_memory": "vllm/utils/torch_utils.py",
@@ -1140,7 +1704,7 @@
     "temperature": "vllm/sampling_params.py"
    }
   },
-  "before_s": 1.4,
+  "before_s": 1.17,
   "after": {
    "lens": "serving",
    "framework": "vllm",
@@ -1163,6 +1727,31 @@
     "precision": "auto",
     "temperature": 1.0
    },
+   "model_full": {
+    "name": "Qwen3-0.6B",
+    "hf_id": "Qwen/Qwen3-0.6B",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": "auto",
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "max_new_tokens": "vllm/sampling_params.py",
     "pin_memory": "vllm/utils/torch_utils.py",
@@ -1170,7 +1759,7 @@
     "temperature": "vllm/sampling_params.py"
    }
   },
-  "after_s": 2.53,
+  "after_s": 4.41,
   "same": true
  },
  {
@@ -1202,6 +1791,31 @@
     "temperature": 1,
     "warmup_steps": 1000
    },
+   "model_full": {
+    "name": "unicoil-d2q-msmarco-passage",
+    "hf_id": "castorini/unicoil-d2q-msmarco-passage",
+    "family": "encoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "attn": "examples/retrieval/evaluation/dense/evaluate_huggingface.py",
     "batch_size": "examples/retrieval/evaluation/sparse/evaluate_anserini_docT5query.py",
@@ -1212,12 +1826,13 @@
     "warmup_steps": "examples/retrieval/training/train_msmarco_v3_margin_MSE.py"
    }
   },
-  "before_s": 0.32,
+  "before_s": 0.35,
   "after": {
    "lens": "retrieval",
    "framework": "sentence_transformers",
    "model": {
-    "name": "SpladeNaver"
+    "name": "unicoil-d2q-msmarco-passage",
+    "hf_id": "castorini/unicoil-d2q-msmarco-passage"
    },
    "loop": {
     "kind": "other",
@@ -1232,12 +1847,37 @@
     "batch_size": 128,
     "seq_len": 512
    },
+   "model_full": {
+    "name": "unicoil-d2q-msmarco-passage",
+    "hf_id": "castorini/unicoil-d2q-msmarco-passage",
+    "family": "encoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "examples/retrieval/evaluation/dense/evaluate_sbert.py",
     "seq_len": "examples/retrieval/evaluation/dense/evaluate_sbert.py"
    }
   },
-  "after_s": 0.32,
+  "after_s": 0.75,
   "same": false
  },
  {
@@ -1270,6 +1910,31 @@
     "num_workers": 0,
     "seq_len": 5
    },
+   "model_full": {
+    "name": "GCNConv",
+    "hf_id": null,
+    "family": "gnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "examples/graphproppred/code2/main_pyg.py",
     "epochs": "examples/graphproppred/code2/main_pyg.py",
@@ -1282,7 +1947,7 @@
     "seq_len": "examples/graphproppred/code2/main_pyg.py"
    }
   },
-  "before_s": 1.15,
+  "before_s": 1.45,
   "after": {
    "lens": "gnn",
    "framework": "pyg",
@@ -1304,13 +1969,38 @@
     "lr": 0.01,
     "n_layer": 3
    },
+   "model_full": {
+    "name": "GCNConv",
+    "hf_id": null,
+    "family": "gnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "epochs": "examples/nodeproppred/arxiv/gnn.py",
     "lr": "examples/nodeproppred/arxiv/gnn.py",
     "n_layer": "examples/nodeproppred/arxiv/gnn.py"
    }
   },
-  "after_s": 0.3,
+  "after_s": 2.07,
   "same": false
  },
  {
@@ -1337,12 +2027,37 @@
     "batch_size": 2000,
     "lr": 0.24
    },
+   "model_full": {
+    "name": "CifarNet",
+    "hf_id": null,
+    "family": "cnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "airbench/utils.py",
     "lr": "airbench94_muon.py"
    }
   },
-  "before_s": 0.14,
+  "before_s": 0.12,
   "after": {
    "lens": "vision",
    "framework": "plain_pytorch",
@@ -1363,12 +2078,37 @@
     "batch_size": 2000,
     "lr": 0.24
    },
+   "model_full": {
+    "name": "CifarNet",
+    "hf_id": null,
+    "family": "cnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "airbench94_muon.py",
     "lr": "airbench94_muon.py"
    }
   },
-  "after_s": 0.04,
+  "after_s": 0.16,
   "same": false
  },
  {
@@ -1409,6 +2149,31 @@
     "temperature": 1.0,
     "weight_decay": 0.0
    },
+   "model_full": {
+    "name": "t5-base",
+    "hf_id": "t5-base",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "distributed/tensor_parallelism/fsdp_tp_example.py",
     "checkpoint_every": "fast_neural_style/neural_style/neural_style.py",
@@ -1428,12 +2193,13 @@
     "weight_decay": "distributed/FSDP/configs/training.py"
    }
   },
-  "before_s": 0.26,
+  "before_s": 0.39,
   "after": {
    "lens": "pretrain",
    "framework": "plain_pytorch",
    "model": {
-    "name": "PositionalEncoding"
+    "name": "t5-base",
+    "hf_id": "t5-base"
    },
    "loop": {
     "kind": "plain",
@@ -1452,6 +2218,31 @@
     "gpus": 1,
     "lr": 20
    },
+   "model_full": {
+    "name": "t5-base",
+    "hf_id": "t5-base",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "word_language_model/main.py",
     "epochs": "word_language_model/main.py",
@@ -1460,7 +2251,7 @@
     "lr": "word_language_model/main.py"
    }
   },
-  "after_s": 0.06,
+  "after_s": 0.35,
   "same": false
  },
  {
@@ -1488,13 +2279,38 @@
     "lr": 0.1,
     "num_workers": 2
    },
+   "model_full": {
+    "name": "VGG",
+    "hf_id": null,
+    "family": "cnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "main.py",
     "lr": "main.py",
     "num_workers": "main.py"
    }
   },
-  "before_s": 0.09,
+  "before_s": 0.06,
   "after": {
    "lens": "vision",
    "framework": "plain_pytorch",
@@ -1516,13 +2332,38 @@
     "lr": 0.1,
     "num_workers": 2
    },
+   "model_full": {
+    "name": "VGG",
+    "hf_id": null,
+    "family": "cnn",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "main.py",
     "lr": "main.py",
     "num_workers": "main.py"
    }
   },
-  "after_s": 0.25,
+  "after_s": 0.23,
   "same": true
  },
  {
@@ -1552,6 +2393,31 @@
     "lr": 2e-05,
     "weight_decay": 0.01
    },
+   "model_full": {
+    "name": "distilbert-base-uncased",
+    "hf_id": "distilbert-base-uncased",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "text_classification.py",
     "epochs": "text_classification.py",
@@ -1584,6 +2450,31 @@
     "lr": 2e-05,
     "weight_decay": 0.01
    },
+   "model_full": {
+    "name": "distilbert-base-uncased",
+    "hf_id": "distilbert-base-uncased",
+    "family": "decoder",
+    "param_count": null,
+    "n_layers": null,
+    "d_model": null,
+    "n_heads": null,
+    "n_kv_heads": null,
+    "d_ff": null,
+    "vocab_size": null,
+    "head_dim": null,
+    "n_experts": null,
+    "experts_per_token": null,
+    "max_positions": null,
+    "gated_mlp": null,
+    "tie_embeddings": null,
+    "norm": null,
+    "attn_impl": null,
+    "dtype": null,
+    "quantization": null,
+    "shape_source": null,
+    "lora": null
+   },
+   "rl": null,
    "_where": {
     "batch_size": "text_classification.py",
     "epochs": "text_classification.py",
