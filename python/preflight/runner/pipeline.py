@@ -290,7 +290,8 @@ def _uses_vllm(sm: ScriptMap, files: dict[str, str]) -> bool:
 	return sm.lens == "eval" and any(_VLLM_IMPORT.search(t) for n, t in files.items() if n.endswith(".py"))
 
 
-_TORCHVISION = re.compile(r"^\s*(?:from|import)\s+torchvision\b", re.M)
+# the libraries whose downloads the dataset volume serves (recorder/dataset_cache.py): torchvision's, OGB's
+_TORCHVISION = re.compile(r"^\s*(?:from|import)\s+(?:torchvision|ogb)\b", re.M)
 
 
 def _uses_torchvision(files: dict[str, str]) -> bool:

@@ -46,13 +46,14 @@ ops = modal.App(APP_NAME + "-ops")
 FILL_DEADLINE_S = 3300.0  # the container's downloads, inside the function's hour (from its start)
 
 
-def _fetch_archive(url: str, dst: Path, md5: str, started: float) -> dict:
-	"""One archive from one URL into dst, kept only when its md5 matches; what happened."""
+def _fetch_archive(url: str, dst: Path, md5: str | None, started: float) -> dict:
+	"""One archive from one URL into dst, kept only when its md5 matches (no md5: kept, with its sha256); what
+	happened."""
 	import hashlib as hl
 	import time
 	import urllib.request
 
-	t0, h, n = time.monotonic(), hl.md5(), 0
+	t0, h, sha, n = time.monotonic(), hl.md5(), hl.sha256(), 0
 	tmp = dst.with_suffix(".part")
 	try:
 		req = urllib.request.Request(url, headers={"User-Agent": "preflight-dataset-cache"})
@@ -60,6 +61,7 @@ def _fetch_archive(url: str, dst: Path, md5: str, started: float) -> dict:
 			while chunk := r.read(1 << 20):
 				f.write(chunk)
 				h.update(chunk)
+				sha.update(chunk)
 				n += len(chunk)
 				if (
 					time.monotonic() - started > FILL_DEADLINE_S
@@ -71,11 +73,12 @@ def _fetch_archive(url: str, dst: Path, md5: str, started: float) -> dict:
 		tmp.unlink(missing_ok=True)
 		return {"status": f"failed: {type(exc).__name__}: {exc}"[:300]}
 	s = time.monotonic() - t0
-	if h.hexdigest() != md5:
+	if md5 and h.hexdigest() != md5:
 		tmp.unlink(missing_ok=True)
 		return {"status": "md5 mismatch: not kept", "bytes": n}
 	tmp.rename(dst)
-	return {"status": "kept", "bytes": n, "seconds": round(s, 1), "kB_per_s": round(n / 1024 / max(s, 1e-3))}
+	out = {"status": "kept", "bytes": n, "seconds": round(s, 1), "kB_per_s": round(n / 1024 / max(s, 1e-3))}
+	return out if md5 else {**out, "sha256": sha.hexdigest()}
 
 
 @ops.function(image=probe_image, volumes={DATASETS_DIR: datasets_vol}, timeout=3600)  # CPU
@@ -95,7 +98,11 @@ def fill_dataset_cache(only: str = "") -> list[dict]:
 	for name, urls, md5 in resources():
 		if want and name not in want:
 			continue
-		dst = root / md5
+		from preflight.recorder.dataset_cache import url_key
+
+		# an md5 torchvision names, else (OGB's archives) the URL's own key, kept without a checksum to check
+		dst = root / md5 if md5 else Path(DATASETS_DIR) / "by-url" / url_key(urls[0])
+		dst.parent.mkdir(parents=True, exist_ok=True)
 		if dst.is_file():
 			out.append(
 				{"dataset": name, "url": urls[0], "status": "already there", "bytes": dst.stat().st_size}

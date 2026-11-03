@@ -260,6 +260,9 @@ def main(spec_path: str) -> int:
 
 		if os.path.isdir(CACHE_DIR):
 			rec._importer.on("torchvision.datasets.utils", lambda mod: patch(mod, CACHE_DIR))
+			from .dataset_cache import patch_ogb
+
+			rec._importer.on("ogb.utils.url", lambda mod: patch_ogb(mod, CACHE_DIR))
 
 	status, code, error = "ok", None, None
 	too_few = "script finished after {n} optimizer steps; a probe needs at least 2"
