@@ -1,0 +1,38 @@
+{
+  "pkg_root": "/opt/preflight",
+  "reachable_by_probe_uid": true,
+  "euid": 0,
+  "probe_uid": "61000",
+  "status": "ok",
+  "error": null,
+  "error_code": null,
+  "steps": 9,
+  "backend": "cpu",
+  "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n/opt/preflight/preflight/recorder/runtime.py:1495: FutureWarning: `torch.distributed.reduce_op` is deprecated, please use `torch.distributed.ReduceOp` instead\n  mods = [o for o in gc.get_objects() if isinstance(o, nn.Module)]\n",
+  "versions": {
+    "torch": "2.7.1",
+    "torchvision": "0.22.1",
+    "transformers": "4.52.3",
+    "trl": "0.18.0",
+    "accelerate": "1.7.0",
+    "peft": "0.15.2"
+  },
+  "probe_user": {
+    "exit": 0,
+    "probe_uid": 61000,
+    "uid": 61000,
+    "gid": 61000,
+    "user": "preflight-probe",
+    "groups": [
+      44
+    ],
+    "passwd": "preflight-probe",
+    "group": "preflight-probe",
+    "compiled": 7.274379253387451,
+    "imported": [
+      "transformers",
+      "trl"
+    ]
+  },
+  "ok": true
+}
