@@ -878,7 +878,9 @@ def test_the_amd_measurement_on_every_engine_surface(ft):
 	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
 	assert amd.status == "abstain" and api.AMD_CROSS in amd.reason
 	other = api.predict(ft, {"gpu_type": "MI355X"}).root["time.step"]  # measured only on the MI300X
-	assert other.status == "abstain" and "isn't measured" in other.reason and api.AMD_CROSS not in other.reason
+	assert (
+		other.status == "abstain" and "isn't measured" in other.reason and api.AMD_CROSS not in other.reason
+	)
 
 
 def test_one_fit_uses_one_estimator():
