@@ -376,6 +376,7 @@ class Recorder:
 		generate_sample: int = 0,
 		generate_calls: int = 0,
 		lr_range: dict | None = None,
+		eval_units: int = 0,
 	):
 		if warmup + timed < 2:
 			raise ValueError("a probe runs at least 2 optimizer steps; optimizer state appears at the first")
@@ -386,6 +387,12 @@ class Recorder:
 		self.generate_sample = generate_sample  # a serving probe: prompts kept per generate call
 		self.generate_calls = generate_calls  # an eval probe: generate calls measured before it ends
 		self._gen_calls_done = 0
+		# probes.eval_units (off): an eval probe's scoring batches, a model forward under no_grad outside any
+		# generate call (lm_eval's loglikelihood tasks: arc_easy, hellaswag, piqa make no generate call), measured
+		# as units like generate calls; the probe ends as the next one starts after this many
+		self.eval_units = eval_units
+		self._fwd: list[dict] = []
+		self._fwd_depth = 0
 		self.target = warmup + timed + (0 if alternate_sync else PHASE_STEPS)
 		# the learning-rate range test (D, Nov 2; probes/lr_range.py, behind probes.lr_range): before
 		# each optimizer step the rate is set on an exponential ramp; the run ends at the ramp's end,
@@ -774,6 +781,8 @@ class Recorder:
 		sys.meta_path.insert(0, self._importer)
 		self._importer.on("safetensors.torch", self._hook_safetensors)
 		self._importer.on("transformers.generation.utils", self._hook_hf_generate)
+		if self.eval_units:
+			self._importer.on("transformers.modeling_utils", self._hook_hf_forward)
 		self._importer.on("transformers.trainer", self._hook_trainer)
 		self._importer.on("trl.trainer.grpo_trainer", self._hook_grpo)
 		for name in ("lightning.pytorch.trainer.trainer", "pytorch_lightning.trainer.trainer"):
@@ -954,6 +963,55 @@ class Recorder:
 			return generate
 
 		self._patch(gm, "generate", factory)
+
+	def _hook_hf_forward(self, mod):
+		"""probes.eval_units: the outermost forward of a transformers model under no_grad, outside generate, is a
+		scoring batch: timed with its tokens; past eval_units of them, the probe ends as the next one starts."""
+		rec = self
+		base = getattr(mod, "PreTrainedModel", None)
+		if base is None:
+			return
+
+		def factory(orig):
+			def call(model, *args, **kwargs):
+				if rec._fwd_depth or rec._generating or torch.is_grad_enabled():
+					return orig(model, *args, **kwargs)
+				rec._maybe_stop()
+				if len(rec._fwd) >= rec.eval_units:
+					raise StopProbe
+				rec._fwd_depth += 1
+				try:
+					rec._sync()
+					t0 = rec._now()
+					out = orig(model, *args, **kwargs)
+					rec._sync()
+					dt = rec._now() - t0
+				finally:
+					rec._fwd_depth -= 1
+				ids = kwargs.get("input_ids", args[0] if args else None)
+				tokens = int(ids.numel()) if isinstance(ids, torch.Tensor) else None
+				rows = int(ids.shape[0]) if isinstance(ids, torch.Tensor) and ids.dim() > 1 else None
+				rec._fwd.append({"seconds": dt, "tokens": tokens, "rows": rows})
+				return out
+
+			return call
+
+		self._patch(base, "__call__", factory)
+
+	def _fwd_summary(self) -> dict:
+		"""The scoring batches' counts and times (probes.eval_units), as extras B can read by name."""
+		if not self._fwd:
+			return {}
+		secs = [f["seconds"] for f in self._fwd]
+		toks = [f["tokens"] for f in self._fwd if f["tokens"]]
+		rows = [f["rows"] for f in self._fwd if f["rows"]]
+		out = {"eval_forward_batches": float(len(secs)), "eval_forward_s_p50": statistics.median(secs),
+			"eval_forward_s_total": sum(secs)}  # fmt: skip
+		if toks:
+			out["eval_forward_tokens_mean"] = statistics.fmean(toks)
+		if rows:
+			out["eval_forward_rows_mean"] = statistics.fmean(rows)
+		return out
 
 	def _record_hf_generation(self, model, args, kwargs, out, dt):
 		seqs = getattr(out, "sequences", out)
@@ -1921,6 +1979,7 @@ class Recorder:
 			}
 		out.update(self._eval_summary())
 		out.update(self._gen_summary())
+		out.update(self._fwd_summary())
 		out.update(self._rl_summary())
 		saves = [s for s in steps if s["io"] > 0]
 		if saves:

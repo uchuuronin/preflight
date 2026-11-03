@@ -241,6 +241,7 @@ def measure(
 			install_requirements=install_requirements, install_repo=install_repo, generate_sample=generate_sample,
 			install_uv=bool((install_opts or {}).get("uv")), install_pyg=bool((install_opts or {}).get("pyg")),
 			install_sdists=tuple((install_opts or {}).get("sdists", ())),
+			eval_units=int((install_opts or {}).get("eval_units") or 0),
 			generate_calls=generate_calls))  # fmt: skip
 		_say(f"recorder run ended ({r.probe.status}) after {r.probe.steps} steps")
 	finally:

@@ -153,6 +153,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
 		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
+		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
@@ -260,6 +261,9 @@ SERVING_PROBE_PROMPTS = 32
 # and the bytes a batch writes; the Nov 1 eval smoke ran batch after batch to its 600 s timeout and
 # kept nothing [guess: two]
 EVAL_PROBE_CALLS = 2
+# probes.eval_units: an eval probe's scoring batches (a forward under no_grad, no generate): a few give a per-batch
+# time and the peak; lm_eval's loglikelihood tasks score thousands of them [guess: eight]
+EVAL_FORWARD_UNITS = 8
 GENERATION_PROBE_TIMEOUT_S = 10 * 60
 
 
@@ -311,6 +315,7 @@ def _spec(
 		install_uv=deps.install_requirements and _flag("probes.uv_install"),
 		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
+		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,

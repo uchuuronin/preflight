@@ -573,6 +573,8 @@ def ground_truth(
 	command_hex: str = "",
 	uv: bool = False,
 	pyg: bool = False,
+	eval_units: bool = False,
+	sdists: str = "",
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -645,6 +647,12 @@ def ground_truth(
 		p = {"entrypoint": entrypoint_of(files, entrypoint or None), "lens": None, "image": "probe",
 			"generate_sample": 0, "generate_calls": 0}  # fmt: skip
 	opts = {k: v for k, v in (("uv", uv), ("pyg", pyg)) if v}
+	if sdists:  # names of source-only packages allowed to build (commas, as the workflow allows)
+		opts["sdists"] = tuple(n for n in sdists.split(",") if n)
+	if eval_units:  # probes.eval_units in this process only: the recorder probe's scoring batches
+		from preflight.runner.pipeline import EVAL_FORWARD_UNITS
+
+		opts["eval_units"] = EVAL_FORWARD_UNITS
 	if command_hex:  # the tool's lens and source-only dependencies, as the pipeline gives them
 		from preflight.runner.sources import COMMANDS
 
