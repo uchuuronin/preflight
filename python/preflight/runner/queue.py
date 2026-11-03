@@ -306,6 +306,8 @@ class InMemoryJobStore:
 		self.job_budget_usd = job_budget_usd
 		self.free_resend = free_resend  # None: runner.free_resend's flag, read at each submit
 		self._import_stops: set[str] = set()  # live jobs whose probes all stopped at an import (this attempt)
+		# runner.nothing_measured: live jobs where no probe reached its first step (this attempt), and the first cause
+		self._nothing: dict[str, str | None] = {}
 		# per ET day: {"spent": reported GPU dollars, "jobs": {visitor: probe jobs submitted}}
 		self._daily: dict[str, dict] = {}
 		self._lock = threading.RLock()
@@ -402,6 +404,8 @@ class InMemoryJobStore:
 		ev = JobEvent(job_id=job.job_id, seq=job.next_seq, at=self._iso(), stage=stage, **fields)
 		if ev.import_stop:  # held beside the job, not on it: a snapshot stays one an older build restores
 			self._import_stops.add(job.job_id)
+		if ev.nothing_measured and stage != "done":  # the pipeline's marker; said again on done (complete)
+			self._nothing[job.job_id] = ev.error_code
 		if ev.share_token:  # the latest attempt's record: a retry writes a fresh one
 			job.share_token = ev.share_token
 		if ev.record_id:
@@ -429,6 +433,8 @@ class InMemoryJobStore:
 		self._done[job.job_id] = job
 		stopped = job.job_id in self._import_stops
 		self._import_stops.discard(job.job_id)
+		nothing = job.job_id in self._nothing
+		self._nothing.pop(job.job_id, None)
 		while len(self._done) > RECENT_DONE:
 			self._done.popitem(last=False)
 		self._index[job.job_id] = {
@@ -446,6 +452,7 @@ class InMemoryJobStore:
 			"import_stop": stopped
 			or (job.error_code or "").startswith("missing_package")
 			or job.error_code == "missing_module.local",
+			"nothing_measured": nothing,  # runner.nothing_measured: a free resend whatever the cause
 			"source_key": source_key(job.request),
 			"submitted_at": job.submitted_at,
 			"last_event": job.events[-1] if job.events else None,
@@ -465,6 +472,7 @@ class InMemoryJobStore:
 			job.status = "queued"
 			job.error = error
 			self._import_stops.discard(job.job_id)  # the next attempt may get past the import: its own marker
+			self._nothing.pop(job.job_id, None)
 			self._order.append(job.job_id)
 			self._emit(job, "queued", message=error, level="warn", queue_position=self._position(job.job_id))
 		else:
@@ -559,11 +567,18 @@ class InMemoryJobStore:
 			return False
 		prev_id = request.get("resend_of") if isinstance(request, dict) else None
 		prev = self._index.get(prev_id) if isinstance(prev_id, str) else None
-		if not prev or prev.get("visitor") != visitor or not prev.get("import_stop"):
+		if not prev or prev.get("visitor") != visitor:
+			return False
+		if not (prev.get("import_stop") or (prev.get("nothing_measured") and self._nothing_on())):
 			return False
 		if prev.get("source_key") != source_key(request):  # the same code sent again, not another script
 			return False
 		return today.get("free", {}).get(visitor, 0) < FREE_RESENDS_PER_DAY
+
+	def _nothing_on(self) -> bool:
+		from .flags import flag
+
+		return flag("runner.nothing_measured")
 
 	def _free_resend_on(self) -> bool:
 		if self.free_resend is not None:
@@ -635,7 +650,14 @@ class InMemoryJobStore:
 				job.worker = None
 				job.lease_expires_at = None
 				job.token += 1
-				self._emit(job, "done", record_id=record_id, progress=1.0)
+				if (
+					job.job_id in self._nothing
+				):  # runner.nothing_measured: an end state C can show, with its cause
+					code = self._nothing[job.job_id]
+					self._emit(job, "done", record_id=record_id, progress=1.0, nothing_measured=True,
+						**({"error_code": code} if code else {}))  # fmt: skip
+				else:
+					self._emit(job, "done", record_id=record_id, progress=1.0)
 				self._finish(job)
 
 			self._txn(do)

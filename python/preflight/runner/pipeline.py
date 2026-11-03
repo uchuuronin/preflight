@@ -33,6 +33,7 @@ import contextlib
 import hashlib
 import json
 import logging
+import os
 import re
 import threading
 import time
@@ -227,6 +228,50 @@ def _emit(ctx, stage: str, rec: FlightRecord | None = None, rev: int | None = No
 # ---------------------------------------------------------------- stages
 
 
+NOTHING_MEASURED = "job.nothing_measured"
+
+
+def _nothing_measured(probes: list) -> Probe | None:
+	"""runner.nothing_measured (off; the re-validation, Nov 3): the first stopped probe when no probe of this job
+	reached its first step (every readout then abstains), else None."""
+	if not _flag("runner.nothing_measured") or not probes:
+		return None
+	if any(q.steps > 0 or q.status in ("ok", "cached") for q in probes):
+		return None
+	return next((q for q in probes if q.error_code), probes[0])
+
+
+def _nothing_finding(first: Probe | None, fetched: Fetched) -> list:
+	if first is None:
+		return []
+	from preflight.schema import Evidence, Finding
+
+	from .failures import describe
+
+	step, by_hand = describe(first.error_code)
+	if fetched.entrypoint and fetched.entrypoint != "train.py":
+		by_hand = by_hand.replace("train.py", fetched.entrypoint)
+	resend = " Check in again once it's fixed: today's next check-in of this code is free." if _flag(
+		"runner.free_resend") else ""  # fmt: skip
+	return [Finding(id=NOTHING_MEASURED, severity="error", code=NOTHING_MEASURED, source="rule", title="Nothing measured",
+		detail=(f"No probe reached its first step, so there are no measurements: every readout abstains. The first "
+			f"stopped while {step} ({first.error_code or 'an error'}). The way past it: {by_hand}.{resend}"),
+		evidence=[Evidence(metric="probes.reached_first_step", value=0.0, probe_id=first.id)])]  # fmt: skip
+
+
+def _made_by():
+	"""runner.made_by (off until the API reads 0.6.6): the runner's commit (PREFLIGHT_RUNNER_COMMIT, baked into the worker image at deploy) and every flag on."""
+	import re as _re
+
+	from preflight.schema import MadeBy
+
+	from .flags import _resolved
+
+	sha = (os.environ.get("PREFLIGHT_RUNNER_COMMIT") or "").strip().lower()
+	return MadeBy(runner_commit=sha if _re.fullmatch(r"[0-9a-f]{7,40}", sha) else None,
+		flags_on=sorted(k for k, v in _resolved().items() if v))  # fmt: skip
+
+
 def _skeleton(
 	fetched: Fetched, sm: ScriptMap, request: dict, base: FlightRecord | None = None
 ) -> FlightRecord:
@@ -242,7 +287,7 @@ def _skeleton(
 				"created_at": base.created_at,
 			}
 		)
-	return rec
+	return rec.model_copy(update={"made_by": _made_by()}) if _flag("runner.made_by") else rec
 
 
 def _skipped(p: PlannedProbe, why: str) -> Probe:
@@ -536,6 +581,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	if followup and origin.parent is not None:
 		# the parent's map and knobs carry over (no Muse Spark call): a new record, same script
 		rec = record_jobs.derive(origin.parent, ids)
+		if _flag("runner.made_by"):  # this job's runner, not the parent's
+			rec = rec.model_copy(update={"made_by": _made_by()})
 		if fetched.source.extra_packages != rec.job.source.extra_packages:  # this job added packages
 			src = rec.job.source.model_copy(update={"extra_packages": fetched.source.extra_packages})
 			rec = rec.model_copy(update={"job": rec.job.model_copy(update={"source": src})})
@@ -709,6 +756,12 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			import_stop=True,
 			message="every probe stopped at an import before its first step",
 		)
+	nothing = _nothing_measured(probes)
+	if (
+		nothing is not None
+	):  # runner.nothing_measured: the done event says so, with the cause (queue.complete)
+		_emit(ctx, "probing", rec, rev, nothing_measured=True, error_code=nothing.error_code,
+			message="no probe reached its first step: nothing was measured")  # fmt: skip
 	probes = [_with_step(q, fetched.entrypoint) for q in probes]
 	if patched_for:
 		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
@@ -744,8 +797,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		for f in keep
 		if not f.id.startswith(afresh)
 		and f.id != "source.login_skipped"  # said afresh: every job fetches its source
+		and f.id != NOTHING_MEASURED  # said afresh from this job's probes
 	]
-	read = [*_reading_findings(fetched), *_image_findings(sm, fetched)]
+	read = [*_reading_findings(fetched), *_image_findings(sm, fetched), *_nothing_finding(nothing, fetched)]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *read]})
 	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
 	# or Baseten for a diagnosis (private mode, contract 0.6.2)
