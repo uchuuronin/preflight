@@ -73,6 +73,22 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 22:36 UTC | none (Meta API) | about 1 | 0.148 of Muse Spark [derived: tokens at the list and cached rates plus the search fee, second-hand] | `d-spark-search-validate-3` (41538652971): Meta's documented format; results on every search, the known issue kept 2 sources |
 | Nov 2, 22:43 UTC | none (Meta API) | about 1 | 0.169 of Muse Spark [derived: as above] | `d-spark-search-first-shape` (41539601183): the first run's request again; citations back on the known issue (2) |
 | Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
+| Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
+
+## Mon Nov 2, 20:40 ET (search fixes pushed; the cap test)
+
+Pushed `4be42a8` (CI green): B's three must-fixes, after four rounds of read-only review. The
+reviews found, in turn: the scrub still read the whole error (quadratic on `_KEY` runs); cutting
+long runs let an address through; cutting before scrubbing could send part of a secret (a long URL
+query shrinks); and dropping one run still split names from values ("Bearer", "password ="). Now
+the cut line is dropped whole, an unscannable error isn't searched, and a sweep of every cut position
+leaks nothing. Full suite: 1,805 passed. Search spend tonight: US$0.150 (the cap test); today's
+total about US$0.77 [derived, fee second-hand].
+
+The cap test (all 8 cases at `max_tool_calls` 10): the known issue cited inline with 3 tool calls,
+under the old cap of 4, so the cap doesn't explain the two runs without citations. The cap stays at 4.
+
+This push sends: `docs/decisions/spark-search.md` (the cap test), `docs/requests/from-d.md`, this file.
 
 ## Mon Nov 2, 20:20 ET (Chiya's 8:12 list)
 

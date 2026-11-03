@@ -181,6 +181,27 @@ kept 1, 0, 2 and 2 sources across the four runs, none made up (run 1's was Arrow
 which documents the cause; the others are issue trackers' pull requests). It stays off until B's re-check and
 C's data-use line; whether the cap goes up is the next decision.
 
+## The cap test (Chiya, Nov 2, 20:12: "one run with a higher tool-call cap on all 8 cases")
+
+`d-spark-search-cap10` (GitHub 41560761153, Nov 3, 01:35 UTC, `ws-d` `4be42a8`, the current request
+with `max_tool_calls` 10; the same cases, 8 calls, US$0.150 [derived, fee second-hand]) [measured]:
+
+- Every request searched (a `web_search_call` in all 8), 1 to 3 searches each.
+- The known pyarrow issue: "found", **cited inline (2 URLs) and both kept**, with the search's own
+  titles now: pytorch/torchtitan #5372 ("[CI] Preserve NumPy 1.x support...") and a transformers
+  commit ("Fix numpy/pyarrow conflict..."). It made **3 tool calls** (1 search, 2 page opens): fewer
+  than the old cap of 4.
+- The other 7 calls (6 cases and the planted link): "none found", as in every run; the planted link
+  in no results list.
+
+**So the cap idea isn't supported.** With the cap raised the model stopped at 3 tool calls and
+cited; the cap of 4 wasn't binding in this run, so the two runs without inline citations (both at
+exactly 4) aren't explained by it: one run each, and Meta's choices vary between runs. What the five
+runs do show: on the one case that can cite, sources were kept 1, 0, 2, 2 and 2 times, never a
+made-up one, and since the request asks for the searches' results list, the check doesn't depend on
+inline citations. The cap stays at 4 [guess]: it bounds a question's fee, and no call in five runs
+needed more than 7.
+
 ## B's re-review (Nov 2): three must-fixes, done
 
 B took the re-check off A (`from-b.md`, ws-b) and found three things before the flag can go on:
