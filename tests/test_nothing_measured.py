@@ -139,3 +139,14 @@ def test_an_older_record_loads_and_the_new_fields_are_optional():
 
 	assert FlightRecord.model_fields["made_by"].default is None
 	assert JobEvent.model_fields["nothing_measured"].default is None
+
+
+def test_an_out_of_memory_probe_is_a_measurement(flags):
+	from preflight.runner.pipeline import _nothing_measured
+	from preflight.schema import Probe
+
+	flags.add("runner.nothing_measured")
+	oom = Probe(id="p1", knobs={}, status="oom", steps=0, error="CUDA out of memory", error_code="oom")
+	stop = Probe(id="p2", knobs={}, status="error", steps=0, error="SystemExit: 2", error_code="script_exit")
+	assert _nothing_measured([oom, stop]) is None
+	assert _nothing_measured([stop]).id == "p2"

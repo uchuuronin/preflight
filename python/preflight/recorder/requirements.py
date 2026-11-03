@@ -138,7 +138,16 @@ def _code_lines(files: dict[str, str], req: str = "requirements.txt") -> list[st
 	if req in files:
 		for raw in files[req].splitlines():
 			m = re.fullmatch(r"\s*(?:-r|--requirement)[\s=]+(\S+)\s*", raw.split(" #", 1)[0])
-			inc = posixpath.normpath(posixpath.join(posixpath.dirname(req), m[1])) if m else None
+			# the top's file as before (`-r base.txt` only, review); the entry point's own resolves beside it
+			inc = (
+				(
+					m[1]
+					if req == "requirements.txt"
+					else posixpath.normpath(posixpath.join(posixpath.dirname(req), m[1]))
+				)
+				if m
+				else None
+			)
 			if m and inc in files and inc != req:  # one level: base.txt beside it (B's review)
 				lines += files[inc].splitlines()
 			else:

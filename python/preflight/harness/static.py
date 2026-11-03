@@ -793,11 +793,25 @@ def _short_calls(f: Facts) -> set[str]:
 
 # an API client's method passed, not called (smolagents' models.py: `self.retryer(self.client.chat.completions.create,
 # **kwargs)`): seen only from the job's own files (harness.map_closure), where another example's call no longer answers
-_API_REF = re.compile(r"\.(?:chat\.completions|responses|messages)\.create\b")
+_API_REFS = ("chat.completions.create", "responses.create", "messages.create")
+
+
+def _api_ref(f: Facts) -> tuple[str, int, str] | None:
+	"""(file, line, name) of the first API client method named in the job's code, called or not: an attribute in the
+	AST, so a comment or docstring that mentions one doesn't count (review, Nov 3). Only with harness.map_closure."""
+	if not _map_closure():
+		return None
+	for path, tree in f.trees.items():
+		for node in ast.walk(tree):
+			if isinstance(node, ast.Attribute) and node.attr == "create":
+				name = dotted(node)
+				if name.endswith(_API_REFS):
+					return path, node.lineno, name
+	return None
 
 
 def _api_refs(f: Facts) -> bool:
-	return _map_closure() and any(_API_REF.search(s.text) for s in f.sources.values())
+	return _api_ref(f) is not None
 
 
 def _framework(f: Facts) -> str:
@@ -1078,15 +1092,9 @@ def _loop(f: Facts, framework: str) -> LoopInfo | None:
 			return LoopInfo(
 				kind="agent_loop", location=CodeLocation(file=path, line=call.lineno), step_call=fn
 			)
-	if framework == "openai_client" and _map_closure():  # an API method passed, not called (_api_refs)
-		for path, src in f.sources.items():
-			m = _API_REF.search(src.text)
-			if m:
-				line = src.text.count("\n", 0, m.start()) + 1
-				name = re.search(r"[\w.]*$", src.text[: m.start()]).group(0) + m.group(0)
-				return LoopInfo(
-					kind="agent_loop", location=CodeLocation(file=path, line=line), step_call=name
-				)
+	ref = _api_ref(f) if framework == "openai_client" else None
+	if ref is not None:  # an API method passed, not called (harness.map_closure)
+		return LoopInfo(kind="agent_loop", location=CodeLocation(file=ref[0], line=ref[1]), step_call=ref[2])
 	for fn, call, path in f.calls:
 		if fn.endswith(".generate"):
 			return LoopInfo(

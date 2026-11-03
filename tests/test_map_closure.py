@@ -80,3 +80,14 @@ def test_an_api_method_passed_not_called_is_an_agent_loop(closure):
 def test_the_flag_is_off_by_default():
 	assert json.loads((ROOT / "flags.json").read_text())["harness.map_closure"] is False
 	assert "harness.map_closure" not in os.environ.get("PREFLIGHT_FLAGS", "")
+
+
+def test_a_docstring_that_mentions_an_api_call_changes_nothing(closure):
+	files = {"train.py": "import timm, torch\nfrom utils import helper\nm = timm.create_model('resnet18')\n"
+		"opt = torch.optim.SGD(m.parameters(), lr=0.1)\nfor x in range(3):\n    m(x).sum().backward()\n    opt.step()\n",
+		"utils.py": '"""Unlike client.chat.completions.create(...), this helper is local."""\ndef helper():\n    pass\n'}  # fmt: skip
+	closure(False)
+	before = map_static(files, entrypoint="train.py")
+	closure(True)
+	after = map_static(files, entrypoint="train.py")
+	assert after.framework == before.framework == "timm" and after.loop.kind == before.loop.kind

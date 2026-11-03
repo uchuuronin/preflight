@@ -8,8 +8,8 @@ big repos already arrive as their closure under `runner.read_closure`). `compare
 
 With the flag on, a repo whose Python fits the 2 MB budget is mapped from the entry point and the Python files it
 imports (`harness/closure.py`), not every file; the other text files stay. Two changes go with it, both only with the
-flag on: an API client's method passed rather than called (`retryer(self.client.chat.completions.create, ...)`)
-counts as an API call, and the agent loop is placed there. Without it, smolagents read as an eval job once
+flag on: an API client's method passed rather than called (`retryer(self.client.chat.completions.create, ...)`,
+read from the code's syntax tree, so a comment or docstring that mentions one doesn't count) counts as an API call, and the agent loop is placed there. Without it, smolagents read as an eval job once
 another example's API call was no longer in the map.
 
 **Zoo: all 11 map the same** (job type, framework, model, loop, knobs). **Held out: the job type is the same on all
@@ -47,4 +47,4 @@ example, then `PositionalEncoding`, a class in its own model.py). lm-eval and to
 | unseen-9 airbench | differs | vision → vision | plain at `airbench/utils.py:317` → plain at `airbench94_muon.py:405` | CifarNet → CifarNet | 2 → 2 |
 | F1 word_language_model | differs | finetune → pretrain | hf_trainer at `distributed/ddp-tutorial-series/multigpu.py:91` → plain at `word_language_model/main.py:191` | t5-base → PositionalEncoding | 16 → 5; dropped checkpoint_every, d_model, eval_every, image_size, max_steps, n_head, n_layer, pin_memory, seq_len, temperature, weight_decay; now from the job's own file: batch_size 2→20, epochs 2→40, lr 0.25→20 |
 | F3 pytorch-cifar | same | vision → vision | plain at `main.py:154` → plain at `main.py:154` | VGG → VGG | 3 → 3 |
-| F2 text_classification (notebook) | same | finetune → finetune | hf_trainer at `text_classification.py:134` → hf_trainer at `text_classification.py:134` | distilbert-base-uncased → distilbert-base-uncased | 5 → 5 |
+| F2 text_classification (notebook) | same | finetune → finetune | hf_trainer at `text_classification.py:135` → hf_trainer at `text_classification.py:135` | distilbert-base-uncased → distilbert-base-uncased | 5 → 5 |

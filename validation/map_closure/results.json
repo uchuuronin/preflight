@@ -97,7 +97,7 @@
     "temperature": "run.py"
    }
   },
-  "before_s": 0.0,
+  "before_s": 0.01,
   "after": {
    "lens": "eval",
    "framework": "hf_generate",
@@ -304,7 +304,7 @@
     "lr": "train.py"
    }
   },
-  "after_s": 0.0,
+  "after_s": 0.01,
   "same": true
  },
  {
@@ -768,7 +768,7 @@
     "num_workers": "train.py"
    }
   },
-  "before_s": 0.02,
+  "before_s": 0.04,
   "after": {
    "lens": "vision",
    "framework": "timm",
@@ -832,7 +832,7 @@
     "temperature": "torchtune/rlhf/sequence_processing.py"
    }
   },
-  "before_s": 1.2,
+  "before_s": 1.39,
   "after": {
    "lens": "finetune",
    "framework": "plain_pytorch",
@@ -858,7 +858,7 @@
     "temperature": "torchtune/rlhf/sequence_processing.py"
    }
   },
-  "after_s": 1.39,
+  "after_s": 1.68,
   "same": true
  },
  {
@@ -926,7 +926,7 @@
     "weight_decay": "extensions/xla/finetune/adapter.py"
    }
   },
-  "before_s": 1.12,
+  "before_s": 1.07,
   "after": {
    "lens": "pretrain",
    "framework": "lightning",
@@ -1028,7 +1028,7 @@
     "gpus": "slurm/compute_pass_rate.slurm"
    }
   },
-  "after_s": 0.16,
+  "after_s": 0.14,
   "same": false
  },
  {
@@ -1059,7 +1059,7 @@
     "temperature": "tests/test_agents.py"
    }
   },
-  "before_s": 0.85,
+  "before_s": 0.81,
   "after": {
    "lens": "agent",
    "framework": "openai_client",
@@ -1080,7 +1080,7 @@
     "max_new_tokens": "examples/agent_from_any_llm.py"
    }
   },
-  "after_s": 0.68,
+  "after_s": 0.74,
   "same": false
  },
  {
@@ -1095,7 +1095,7 @@
    "knobs": {},
    "_where": {}
   },
-  "before_s": 0.24,
+  "before_s": 0.26,
   "after": {
    "lens": "eval",
    "framework": "other",
@@ -1104,7 +1104,7 @@
    "knobs": {},
    "_where": {}
   },
-  "after_s": 0.5,
+  "after_s": 0.65,
   "same": true
  },
  {
@@ -1140,7 +1140,7 @@
     "temperature": "vllm/sampling_params.py"
    }
   },
-  "before_s": 1.27,
+  "before_s": 1.4,
   "after": {
    "lens": "serving",
    "framework": "vllm",
@@ -1170,7 +1170,7 @@
     "temperature": "vllm/sampling_params.py"
    }
   },
-  "after_s": 2.33,
+  "after_s": 2.53,
   "same": true
  },
  {
@@ -1212,7 +1212,7 @@
     "warmup_steps": "examples/retrieval/training/train_msmarco_v3_margin_MSE.py"
    }
   },
-  "before_s": 0.24,
+  "before_s": 0.32,
   "after": {
    "lens": "retrieval",
    "framework": "sentence_transformers",
@@ -1237,7 +1237,7 @@
     "seq_len": "examples/retrieval/evaluation/dense/evaluate_sbert.py"
    }
   },
-  "after_s": 0.19,
+  "after_s": 0.32,
   "same": false
  },
  {
@@ -1282,7 +1282,7 @@
     "seq_len": "examples/graphproppred/code2/main_pyg.py"
    }
   },
-  "before_s": 1.41,
+  "before_s": 1.15,
   "after": {
    "lens": "gnn",
    "framework": "pyg",
@@ -1310,7 +1310,7 @@
     "n_layer": "examples/nodeproppred/arxiv/gnn.py"
    }
   },
-  "after_s": 0.38,
+  "after_s": 0.3,
   "same": false
  },
  {
@@ -1342,7 +1342,7 @@
     "lr": "airbench94_muon.py"
    }
   },
-  "before_s": 0.12,
+  "before_s": 0.14,
   "after": {
    "lens": "vision",
    "framework": "plain_pytorch",
@@ -1494,7 +1494,7 @@
     "num_workers": "main.py"
    }
   },
-  "before_s": 0.06,
+  "before_s": 0.09,
   "after": {
    "lens": "vision",
    "framework": "plain_pytorch",
@@ -1522,7 +1522,7 @@
     "num_workers": "main.py"
    }
   },
-  "after_s": 0.2,
+  "after_s": 0.25,
   "same": true
  },
  {
@@ -1540,7 +1540,7 @@
     "kind": "hf_trainer",
     "location": {
      "file": "text_classification.py",
-     "line": 134,
+     "line": 135,
      "expr": "trainer.train()"
     },
     "step_call": "trainer.train()"
@@ -1572,7 +1572,7 @@
     "kind": "hf_trainer",
     "location": {
      "file": "text_classification.py",
-     "line": 134,
+     "line": 135,
      "expr": "trainer.train()"
     },
     "step_call": "trainer.train()"
@@ -1592,7 +1592,7 @@
     "weight_decay": "text_classification.py"
    }
   },
-  "after_s": 0.01,
+  "after_s": 0.0,
   "same": true
  }
 ]

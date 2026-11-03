@@ -71,3 +71,12 @@ def test_the_flag_is_off_by_default():
 	import json
 
 	assert json.loads(Path("flags.json").read_text())["probes.entry_requirements"] is False
+
+
+def test_the_tops_requirements_resolve_includes_as_before():
+	files = {"requirements.txt": "-r ./requirements/base.txt\n", "requirements/base.txt": "torch>=2.6\n"}
+	assert (
+		R.torch_asks(files) == []
+	)  # unchanged with the flag off (review, Nov 3): `./` includes weren't followed
+	files = {"requirements.txt": "-r base.txt\n", "base.txt": "torch>=2.6\n"}
+	assert R.torch_asks(files) == ["torch>=2.6"]

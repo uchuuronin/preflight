@@ -236,7 +236,9 @@ def _nothing_measured(probes: list) -> Probe | None:
 	reached its first step (every readout then abstains), else None."""
 	if not _flag("runner.nothing_measured") or not probes:
 		return None
-	if any(q.steps > 0 or q.status in ("ok", "cached") for q in probes):
+	if any(
+		q.steps > 0 or q.status in ("ok", "cached", "oom") for q in probes
+	):  # an OOM is a measurement (review)
 		return None
 	return next((q for q in probes if q.error_code), probes[0])
 
@@ -246,16 +248,17 @@ def _nothing_finding(first: Probe | None, fetched: Fetched) -> list:
 		return []
 	from preflight.schema import Evidence, Finding
 
-	from .failures import describe
+	from .failures import with_step
 
-	step, by_hand = describe(first.error_code)
-	if fetched.entrypoint and fetched.entrypoint != "train.py":
-		by_hand = by_hand.replace("train.py", fetched.entrypoint)
-	resend = " Check in again once it's fixed: today's next check-in of this code is free." if _flag(
-		"runner.free_resend") else ""  # fmt: skip
+	how = with_step(
+		f"The first stopped ({first.error_code or 'an error'})",
+		first.error_code,
+		entrypoint=fetched.entrypoint,
+	)
+	resend = (" Once it's fixed, check this code in again: one such resend a day is free (the daily GPU budget "
+		"still applies)." if _flag("runner.free_resend") else "")  # fmt: skip
 	return [Finding(id=NOTHING_MEASURED, severity="error", code=NOTHING_MEASURED, source="rule", title="Nothing measured",
-		detail=(f"No probe reached its first step, so there are no measurements: every readout abstains. The first "
-			f"stopped while {step} ({first.error_code or 'an error'}). The way past it: {by_hand}.{resend}"),
+		detail=f"No probe reached its first step, so there are no measurements: every readout abstains. {how}{resend}",
 		evidence=[Evidence(metric="probes.reached_first_step", value=0.0, probe_id=first.id)])]  # fmt: skip
 
 
@@ -559,7 +562,14 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		had = source.get("extra_packages") or []
 		source = {**source, "extra_packages": list(dict.fromkeys([*had, *req.extra_packages]))}
 	_emit(ctx, "fetching")
-	fetched = fetch(source, blobs=deps.blobs)
+	try:
+		fetched = fetch(source, blobs=deps.blobs)
+	except Exception as exc:  # a size refusal's way past names the script the job runs (review, Nov 3)
+		entry = source.get("entrypoint") if isinstance(source, dict) else None
+		if isinstance(entry, str) and getattr(exc, "entrypoint", None) is None:
+			with contextlib.suppress(AttributeError):
+				exc.entrypoint = entry
+		raise
 	if origin is not None and origin.parent is not None:
 		was = origin.parent.job.source.content_hash
 		# a record read before the closure read data files (B's must-fix 3, Nov 3) hashed its imports alone: the same
