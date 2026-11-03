@@ -1,0 +1,98 @@
+{
+  "script": "text_classification",
+  "entrypoint": "text_classification.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ImportError",
+    "error": "ImportError: cannot import name 'load_metric' from 'datasets' (/usr/local/lib/python3.11/site-packages/datasets/__init__.py)\n",
+    "seconds": 2.3191409950000015,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10G",
+    "timing": "cuda_events",
+    "wall_s": 17.2
+  },
+  "recorder": {
+    "status": "error",
+    "error": "ImportError: cannot import name 'load_metric' from 'datasets' (/usr/local/lib/python3.11/site-packages/datasets/__init__.py). ImportError: cannot import name 'load_metric' from 'datasets' (/usr/local/lib/python3.11/site-packages/datasets/__init__.py) at text_classification.py:20, before the first optimizer step (stage: running script)",
+    "error_code": "user_error",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 15.95,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 3608702976.0
+    },
+    "step_log": [],
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n[preflight] requirements: installing optuna, ray[tune]\nThe cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.\n\r0it [00:00, ?it/s]\r0it [00:00, ?it/s]\n4.46.3\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T19:14:28Z",
+      "duration_s": 15.95,
+      "error": "ImportError: cannot import name 'load_metric' from 'datasets' (/usr/local/lib/python3.11/site-packages/datasets/__init__.py). ImportError: cannot import name 'load_metric' from 'datasets' (/usr/local/lib/python3.11/site-packages/datasets/__init__.py) at text_classification.py:20, before the first optimizer step (stage: running script)",
+      "error_code": "user_error",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 11.751666666666667,
+        "max_w": 11.821,
+        "samples": 3
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 3608702976.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 15.95,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "finetune",
+  "image": "probe"
+}

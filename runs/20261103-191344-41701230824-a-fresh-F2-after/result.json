@@ -1,0 +1,11 @@
+{
+	"name": "20261103-191344-41701230824-a-fresh-F2-after",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41701230824",
+	"ref": "8529dcfb85a87c9eda0d8f4d0626eb3feecf8d45",
+	"sha": "8529dcfb85a87c9eda0d8f4d0626eb3feecf8d45",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --notebook validation/fresh/f2/text_classification.ipynb --bare-steps 1000000 --recorder-steps 60 --budget-min 25 --first-gpu A10 --install-requirements --flags probes.skip_login_cells",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T19:15:41Z"
+}
