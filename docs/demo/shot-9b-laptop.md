@@ -8,21 +8,20 @@ its live record beside it, and an alert appears in both when the run leaves its 
 **The rules:** every path is on E:, nothing on C:; every command is typed in one PowerShell window,
 one after another, no `.ps1`, `.bat` or `.sh` scripts.
 
-## Before Wednesday: does native Windows work yet?
+## Native Windows: yes (decided Nov 3)
 
-On Tue Nov 3, `preflight run` **didn't work on native Windows**: D's checks on a GitHub Windows
-runner stopped at `os.geteuid`, then the time-zone database, then `os.killpg`; with those and four
-more stubbed, it finished but every probe failed with `WinError 10106`, because the probe's
-cleaned-up environment drops Windows' own variables. Nine gaps in all (the list is in
-`docs/requests/from-d.md`). A fixed them behind guards on `ws-a` (`a315c1f2`, `77c56899`), and on
-the same runner, with nothing stubbed, A's fixes measured all three probes, wrote a record with
-its memory range (a CPU gives no step-time range), and `preflight watch` followed the script for
-2,000 steps (GitHub run 41684996973) [measured]. So once A's fix is on `main`, these steps should
-work as written; CUDA on Windows is the part no one has run yet.
+On Tue Nov 3 morning, `preflight run` **didn't work on native Windows**: D's checks on a GitHub
+Windows runner stopped at `os.geteuid`, then the time-zone database, then `os.killpg`; with those
+and four more stubbed, every probe failed with `WinError 10106`, because the probe's cleaned-up
+environment dropped Windows' own variables. Nine gaps in all (the list is in
+`docs/requests/from-d.md`). A fixed them behind guards, and **with A's fix on `main` (`6d40cd40`),
+the same runner with nothing stubbed measured all three probes, wrote a record with its memory range
+(a CPU gives no step-time range), and `preflight watch` followed the script for 2,000 steps, then
+400 with step 11's change (GitHub run 41696495753) [measured]. So native Windows it is.** CUDA on
+Windows is the part no one has run yet.
 
-Step 4 installs whatever is on `main`. If A's fix isn't on `main` on Wednesday morning, step 9
-fails (see its failure cases); then use the WSL2 route at the end of this page, which keeps
-everything on E: too.
+Step 4 installs whatever is on `main`, so it gets the fix. If step 9 still fails on Wednesday (see
+its failure cases), the WSL2 route at the end of this page keeps everything on E: too.
 
 ## What D checked, and where it differs from your laptop
 
