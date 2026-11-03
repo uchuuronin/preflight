@@ -1,0 +1,1330 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-SHqpGJwRZCpKY4xVxM7qMO
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function ground_truth_serving_on_a100.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_probe_new.
+├── ✓ Created Function probe_user_check_probe_new_image.
+├── ✓ Created Function ground_truth_torch27_on_l4.
+├── ✓ Created Function ground_truth_torch27_on_a10.
+├── ✓ Created Function fill_dataset_cache.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function ground_truth_on_a100.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function _install_check.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+├── ✓ Created Function private_triage_check_hosted.
+├── ✓ Created Function triage_agreement_hosted.
+└── ✓ Created Function _meta_variants.
+[ground truth] flags on here: runner.read_closure,harness.lens_by_entry,runner.probe_without_map,probes.repo_install,probes.extra_hosts,probes.eval_units
+[ground truth] read it whole
+[ground truth] https://github.com/KellerJordan/cifar10-airbench at 4c1b6d1e3889b037efadcfd5c0ea65b246592362: 15 files
+[ground truth] torch asks []: probe image
+[ground truth] cifar10-airbench: airbench94_muon.py, lens vision, probe image, 15 files; waiting for an A10, else the L4 (Modal queues it)
+[ground truth] container up on the A10G; 15 files of cifar10-airbench
+[ground truth 14:26:38] bare run of cifar10-airbench: 100000 optimizer steps, at most 600 s
+[bare] running /tmp/gt-sewrdua_/airbench94_muon.py for 100000 optimizer steps
+[preflight] dataset cache: cifar-10-python.tar.gz from Preflight's copy, not downloaded
+/tmp/gt-sewrdua_/airbench94_muon.py:128: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  data = torch.load(data_path, map_location=torch.device("cuda"))
+AUTOTUNE mm(2000x256, 256x10)
+  triton_mm_49 0.0082 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=128, BLOCK_M=32, BLOCK_N=16, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=2
+  triton_mm_50 0.0082 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=32, BLOCK_N=16, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=5, num_warps=2
+  triton_mm_52 0.0082 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=128, BLOCK_M=64, BLOCK_N=16, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=5, num_warps=4
+  triton_mm_55 0.0082 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=64, BLOCK_N=16, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_56 0.0082 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=16, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_58 0.0082 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=128, BLOCK_M=64, BLOCK_N=16, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=4
+  triton_mm_62 0.0082 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=128, BLOCK_N=16, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_51 0.0083 ms 99.2% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=16, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=5, num_warps=4
+  triton_mm_60 0.0091 ms 89.8% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=16, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  mm 0.0092 ms 88.9% 
+SingleProcess AUTOTUNE benchmarking takes 1.7766 seconds and 0.0038 seconds precompiling
+AUTOTUNE convolution(2000x3x32x32, 24x3x2x2)
+  convolution 0.2263 ms 100.0% 
+  triton_convolution2d_4 0.3502 ms 64.6% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=64, BLOCK_N=32, GROUPS=1, KERNEL_H=2, KERNEL_W=2, PADDING_H=0, PADDING_W=0, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_0 0.4321 ms 52.4% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=64, BLOCK_N=32, GROUPS=1, KERNEL_H=2, KERNEL_W=2, PADDING_H=0, PADDING_W=0, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_3 0.4454 ms 50.8% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=128, BLOCK_N=32, GROUPS=1, KERNEL_H=2, KERNEL_W=2, PADDING_H=0, PADDING_W=0, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_5 0.6656 ms 34.0% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=256, BLOCK_N=32, GROUPS=1, KERNEL_H=2, KERNEL_W=2, PADDING_H=0, PADDING_W=0, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_2 0.7424 ms 30.5% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=1024, BLOCK_N=16, GROUPS=1, KERNEL_H=2, KERNEL_W=2, PADDING_H=0, PADDING_W=0, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=1, num_warps=8
+  triton_convolution2d_1 1.9845 ms 11.4% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=256, BLOCK_N=32, GROUPS=1, KERNEL_H=2, KERNEL_W=2, PADDING_H=0, PADDING_W=0, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+SingleProcess AUTOTUNE benchmarking takes 1.3222 seconds and 0.0014 seconds precompiling
+AUTOTUNE convolution(2000x24x31x31, 64x24x3x3)
+  convolution 1.1346 ms 100.0% 
+  triton_convolution2d_9 1.3537 ms 83.8% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_10 1.5647 ms 72.5% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_11 1.5780 ms 71.9% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_6 1.6589 ms 68.4% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=64, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_7 1.6855 ms 67.3% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_12 1.7572 ms 64.6% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_8 3.9895 ms 28.4% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=1024, BLOCK_N=16, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=1, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 1.1153 seconds and 0.0011 seconds precompiling
+AUTOTUNE convolution(2000x64x15x15, 64x64x3x3)
+  convolution 0.5120 ms 100.0% 
+  triton_convolution2d_17 0.5489 ms 93.3% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_18 0.5612 ms 91.2% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_13 0.5898 ms 86.8% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=64, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_16 0.6216 ms 82.4% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_14 0.7997 ms 64.0% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_19 0.8376 ms 61.1% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_15 4.7944 ms 10.7% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=1024, BLOCK_N=16, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=1, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 1.0231 seconds and 0.0014 seconds precompiling
+AUTOTUNE convolution(2000x64x15x15, 256x64x3x3)
+  convolution 1.9610 ms 100.0% 
+  triton_convolution2d_25 2.1996 ms 89.2% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=256, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_24 2.2129 ms 88.6% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_20 2.6143 ms 75.0% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=64, BLOCK_N=256, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_23 3.0218 ms 64.9% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_21 3.2102 ms 61.1% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_26 3.4038 ms 57.6% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_22 19.4683 ms 10.1% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=1024, BLOCK_N=16, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=1, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 1.2832 seconds and 0.0013 seconds precompiling
+AUTOTUNE convolution(2000x256x7x7, 256x256x3x3)
+  convolution 1.7500 ms 100.0% 
+  triton_convolution2d_27 2.1197 ms 82.6% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=64, BLOCK_N=256, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_32 2.3286 ms 75.2% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=256, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_30 2.4136 ms 72.5% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_33 3.2850 ms 53.3% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_31 3.3055 ms 52.9% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_28 4.7391 ms 36.9% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_29 18.5354 ms 9.4% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=1024, BLOCK_N=16, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=1, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 1.2611 seconds and 0.0012 seconds precompiling
+AUTOTUNE convolution(2000x256x3x3, 256x256x3x3)
+  convolution 0.3584 ms 100.0% 
+  triton_convolution2d_45 0.3758 ms 95.4% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_41 0.3922 ms 91.4% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=64, BLOCK_N=256, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_42 0.4219 ms 85.0% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=4
+  triton_convolution2d_46 0.4628 ms 77.4% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=256, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_44 0.4833 ms 74.2% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_47 0.5181 ms 69.2% ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=256, BLOCK_N=64, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=2, num_warps=8
+  triton_convolution2d_43 1.2759 ms 28.1% ALLOW_TF32=True, BLOCK_K=16, BLOCK_M=1024, BLOCK_N=16, GROUPS=1, KERNEL_H=3, KERNEL_W=3, PADDING_H=1, PADDING_W=1, STRIDE_H=1, STRIDE_W=1, UNROLL=False, num_stages=1, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 0.9667 seconds and 0.0013 seconds precompiling
+E1103 14:27:50.039000 5 site-packages/torch/_inductor/select_algorithm.py:1300] [0/0] Exception out of resource: shared memory, Required: 110592, Hardware limit: 101376. Reducing block sizes or `num_stages` may help. for benchmark choice TritonTemplateCaller(/tmp/torchinductor_root/kn/ckng76wawcwakpicmj2cpmedcpx5syiswp2rgybjvem2gwu7u54o.py, ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=128, BLOCK_M=16, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=4, num_warps=4)
+W1103 14:27:51.411000 5 site-packages/torch/_inductor/select_algorithm.py:1517] [0/0] out of resource: shared memory, Required: 110592, Hardware limit: 101376. Reducing block sizes or `num_stages` may help.
+AUTOTUNE mm(10x2000, 2000x256)
+  mm 0.0123 ms 100.0% 
+  triton_mm_72 0.0133 ms 92.3% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=128, BLOCK_M=16, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=5, num_warps=4
+  triton_mm_66 0.0143 ms 85.7% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=16, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=5, num_warps=4
+  triton_mm_68 0.0143 ms 85.7% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=128, BLOCK_M=16, BLOCK_N=32, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=5, num_warps=2
+  triton_mm_67 0.0154 ms 80.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=16, BLOCK_N=32, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=5, num_warps=2
+  triton_mm_71 0.0164 ms 75.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=16, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_78 0.0174 ms 70.6% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=16, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=4, num_warps=4
+  triton_mm_80 0.0184 ms 66.7% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=16, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=5, num_warps=8
+  triton_mm_74 0.0205 ms 60.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=16, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_65 0.0215 ms 57.1% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=128, BLOCK_M=16, BLOCK_N=32, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=2, num_warps=2
+SingleProcess AUTOTUNE benchmarking takes 1.7896 seconds and 0.0038 seconds precompiling
+AUTOTUNE mm(2000x10, 10x256)
+  triton_mm_81 0.0061 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=32, BLOCK_N=32, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=1, num_warps=2
+  triton_mm_82 0.0061 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=32, BLOCK_N=32, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=2, num_warps=4
+  triton_mm_83 0.0061 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=32, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=5, num_warps=8
+  triton_mm_86 0.0061 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=2, num_warps=4
+  triton_mm_87 0.0061 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=3, num_warps=8
+  triton_mm_88 0.0061 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=5, num_warps=4
+  triton_mm_89 0.0061 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_91 0.0061 ms 100.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=4, num_warps=4
+  mm 0.0072 ms 85.7% 
+  triton_mm_84 0.0072 ms 85.7% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=32, B_PROLOGUE_CAST_TYPE=None, EVEN_K=False, GROUP_M=8, num_stages=5, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 1.7764 seconds and 0.0032 seconds precompiling
+[bare] step 50 at 84 s
+[bare] step 100 at 90 s
+[bare] step 150 at 91 s
+[bare] step 200 at 104 s
+[bare] step 250 at 105 s
+[bare] step 300 at 106 s
+[bare] step 350 at 107 s
+[bare] step 400 at 108 s
+/tmp/gt-sewrdua_/airbench94_muon.py:128: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  data = torch.load(data_path, map_location=torch.device("cuda"))
+[bare] step 450 at 119 s
+[bare] step 500 at 120 s
+[bare] step 550 at 121 s
+[bare] step 600 at 122 s
+[bare] step 650 at 123 s
+[bare] step 700 at 124 s
+[bare] step 750 at 125 s
+[bare] step 800 at 126 s
+[bare] step 850 at 127 s
+[bare] step 900 at 128 s
+[bare] step 950 at 129 s
+[bare] step 1000 at 130 s
+[bare] step 1050 at 131 s
+[bare] step 1100 at 132 s
+[bare] step 1150 at 132 s
+[bare] step 1200 at 133 s
+[bare] step 1250 at 135 s
+[bare] step 1300 at 136 s
+[bare] step 1350 at 137 s
+[bare] step 1400 at 137 s
+[bare] step 1450 at 138 s
+[bare] step 1500 at 139 s
+[bare] step 1550 at 140 s
+[bare] step 1600 at 141 s
+[bare] step 1650 at 142 s
+[bare] step 1700 at 143 s
+[bare] step 1750 at 144 s
+[bare] step 1800 at 145 s
+[bare] step 1850 at 146 s
+[bare] step 1900 at 147 s
+[bare] step 1950 at 148 s
+[bare] step 2000 at 149 s
+[bare] step 2050 at 150 s
+[bare] step 2100 at 151 s
+[bare] step 2150 at 152 s
+[bare] step 2200 at 153 s
+[bare] step 2250 at 154 s
+[bare] step 2300 at 155 s
+[bare] step 2350 at 156 s
+[bare] step 2400 at 157 s
+[bare] step 2450 at 158 s
+[bare] step 2500 at 159 s
+[bare] step 2550 at 160 s
+[bare] step 2600 at 161 s
+[bare] step 2650 at 162 s
+[bare] step 2700 at 163 s
+[bare] step 2750 at 163 s
+[bare] step 2800 at 164 s
+[bare] step 2850 at 166 s
+[bare] step 2900 at 167 s
+[bare] step 2950 at 168 s
+[bare] step 3000 at 169 s
+[bare] step 3050 at 169 s
+[bare] step 3100 at 170 s
+[bare] step 3150 at 171 s
+[bare] step 3200 at 172 s
+[bare] step 3250 at 174 s
+[bare] step 3300 at 174 s
+[bare] step 3350 at 175 s
+[bare] step 3400 at 176 s
+[bare] step 3450 at 177 s
+[bare] step 3500 at 178 s
+[bare] step 3550 at 179 s
+[bare] step 3600 at 180 s
+[bare] step 3650 at 181 s
+[bare] step 3700 at 182 s
+[bare] step 3750 at 183 s
+[bare] step 3800 at 184 s
+[bare] step 3850 at 185 s
+[bare] step 3900 at 186 s
+---------------------------------------------------------------------------------
+|  run     |  epoch  |  train_acc  |  val_acc  |  tta_val_acc  |  time_seconds  |
+---------------------------------------------------------------------------------
+Extracting cifar10/cifar-10-python.tar.gz to cifar10
+Files already downloaded and verified
+|  warmup  |      0  |     0.1005  |   0.0561  |               |       78.4274  |
+|          |      1  |     0.0930  |   0.0991  |               |       79.3333  |
+|          |      2  |     0.1020  |   0.1005  |               |       80.2374  |
+|          |      3  |     0.1020  |   0.0927  |               |       93.2822  |
+|          |      4  |     0.0980  |   0.0872  |               |       94.1362  |
+|          |      5  |     0.0940  |   0.1429  |               |       94.9921  |
+|          |      6  |     0.0995  |   0.1189  |               |       95.8465  |
+|          |      7  |     0.0985  |   0.1061  |               |       96.7018  |
+|          |   eval  |     0.0985  |   0.1061  |       0.1060  |      106.7841  |
+---------------------------------------------------------------------------------
+|       0  |      0  |     0.7345  |   0.6164  |               |        0.9175  |
+|          |      1  |     0.8225  |   0.5972  |               |        1.8234  |
+|          |      2  |     0.8525  |   0.7342  |               |        2.7276  |
+|          |      3  |     0.8590  |   0.8560  |               |        3.5828  |
+|          |      4  |     0.9075  |   0.8541  |               |        4.4366  |
+|          |      5  |     0.9165  |   0.9071  |               |        5.2919  |
+|          |      6  |     0.9605  |   0.9270  |               |        6.1464  |
+|          |      7  |     0.9740  |   0.9315  |               |        7.0017  |
+|          |   eval  |     0.9740  |   0.9315  |       0.9414  |        7.2994  |
+---------------------------------------------------------------------------------
+|       1  |      0  |     0.7370  |   0.6396  |               |        0.9175  |
+|          |      1  |     0.8320  |   0.6644  |               |        1.8227  |
+|          |      2  |     0.8565  |   0.8218  |               |        2.7271  |
+|          |      3  |     0.8775  |   0.8482  |               |        3.5825  |
+|          |      4  |     0.9040  |   0.8401  |               |        4.4376  |
+|          |      5  |     0.9285  |   0.9006  |               |        5.2931  |
+|          |      6  |     0.9555  |   0.9234  |               |        6.1479  |
+|          |      7  |     0.9770  |   0.9321  |               |        7.0034  |
+|          |   eval  |     0.9770  |   0.9321  |       0.9392  |        7.3013  |
+---------------------------------------------------------------------------------
+|       2  |      0  |     0.7200  |   0.6300  |               |        0.9175  |
+|          |      1  |     0.8015  |   0.7222  |               |        1.8228  |
+|          |      2  |     0.8550  |   0.7722  |               |        2.7269  |
+|          |      3  |     0.8840  |   0.8240  |               |        3.5822  |
+|          |      4  |     0.9165  |   0.8846  |               |        4.4362  |
+|          |      5  |     0.9355  |   0.9053  |               |        5.2917  |
+|          |      6  |     0.9590  |   0.9241  |               |        6.1458  |
+|          |      7  |     0.9770  |   0.9347  |               |        7.0011  |
+|          |   eval  |     0.9770  |   0.9347  |       0.9393  |        7.2989  |
+---------------------------------------------------------------------------------
+|       3  |      0  |     0.7470  |   0.6567  |               |        0.9174  |
+|          |      1  |     0.8105  |   0.6557  |               |        1.8227  |
+|          |      2  |     0.8620  |   0.8283  |               |        2.7269  |
+|          |      3  |     0.8915  |   0.8088  |               |        3.5821  |
+|          |      4  |     0.8920  |   0.8682  |               |        4.4362  |
+|          |      5  |     0.9350  |   0.9058  |               |        5.2916  |
+|          |      6  |     0.9550  |   0.9191  |               |        6.1461  |
+|          |      7  |     0.9710  |   0.9275  |               |        7.0014  |
+|          |   eval  |     0.9710  |   0.9275  |       0.9397  |        7.2995  |
+---------------------------------------------------------------------------------
+|       4  |      0  |     0.7105  |   0.5845  |               |        0.9177  |
+|          |      1  |     0.8205  |   0.7755  |               |        1.8228  |
+|          |      2  |     0.8590  |   0.8265  |               |        2.7270  |
+|          |      3  |     0.8780  |   0.8573  |               |        3.5824  |
+|          |      4  |     0.8960  |   0.8306  |               |        4.4364  |
+|          |      5  |     0.9325  |   0.8964  |               |        5.2916  |
+|          |      6  |     0.9530  |   0.9268  |               |        6.1458  |
+|          |      7  |     0.9720  |   0.9345  |               |        7.0011  |
+|          |   eval  |     0.9720  |   0.9345  |       0.9407  |        7.2991  |
+---------------------------------------------------------------------------------
+|       5  |      0  |     0.7310  |   0.6065  |               |        0.9175  |
+|          |      1  |     0.8250  |   0.7369  |               |        1.8227  |
+|          |      2  |     0.8360  |   0.7946  |               |        2.7277  |
+|          |      3  |     0.8715  |   0.7697  |               |        3.5828  |
+|          |      4  |     0.9035  |   0.8554  |               |        4.4369  |
+|          |      5  |     0.9325  |   0.9103  |               |        5.2923  |
+|          |      6  |     0.9520  |   0.9197  |               |        6.1464  |
+|          |      7  |     0.9775  |   0.9320  |               |        7.0014  |
+|          |   eval  |     0.9775  |   0.9320  |       0.9403  |        7.2994  |
+---------------------------------------------------------------------------------
+|       6  |      0  |     0.7155  |   0.6750  |               |        0.9176  |
+|          |      1  |     0.8255  |   0.6859  |               |        1.8226  |
+|          |      2  |     0.8480  |   0.8042  |               |        2.7269  |
+|          |      3  |     0.8830  |   0.8121  |               |        3.5823  |
+|          |      4  |     0.9095  |   0.8787  |               |        4.4367  |
+|          |      5  |     0.9370  |   0.8929  |               |        5.2919  |
+|          |      6  |     0.9595  |   0.9221  |               |        6.1460  |
+|          |      7  |     0.9720  |   0.9326  |               |        7.0013  |
+|          |   eval  |     0.9720  |   0.9326  |       0.9415  |        7.2992  |
+---------------------------------------------------------------------------------
+|       7  |      0  |     0.7170  |   0.6155  |               |        0.9176  |
+|          |      1  |     0.8270  |   0.7198  |               |        1.8229  |
+|          |      2  |     0.8400  |   0.7954  |               |        2.7273  |
+|          |      3  |     0.8720  |   0.7846  |               |        3.5824  |
+|          |      4  |     0.8990  |   0.8506  |               |        4.4368  |
+|          |      5  |     0.9310  |   0.9079  |               |        5.2919  |
+|          |      6  |     0.9560  |   0.9178  |               |        6.1461  |
+|          |      7  |     0.9720  |   0.9304  |               |        7.0013  |
+|          |   eval  |     0.9720  |   0.9304  |       0.9392  |        7.2993  |
+---------------------------------------------------------------------------------
+|       8  |      0  |     0.7010  |   0.5316  |               |        0.9181  |
+|          |      1  |     0.8080  |   0.7063  |               |        1.8233  |
+|          |      2  |     0.8550  |   0.8127  |               |        2.7277  |
+|          |      3  |     0.8760  |   0.8416  |               |        3.5828  |
+|          |      4  |     0.9070  |   0.8641  |               |        4.4368  |
+|          |      5  |     0.9325  |   0.9142  |               |        5.2918  |[bare] step 3950 at 187 s
+[bare] step 4000 at 188 s
+[bare] step 4050 at 189 s
+[bare] step 4100 at 190 s
+[bare] step 4150 at 191 s
+[bare] step 4200 at 192 s
+[bare] step 4250 at 193 s
+[bare] step 4300 at 194 s
+[bare] step 4350 at 195 s
+[bare] step 4400 at 195 s
+[bare] step 4450 at 197 s
+[bare] step 4500 at 198 s
+[bare] step 4550 at 199 s
+[bare] step 4600 at 200 s
+[bare] step 4650 at 201 s
+[bare] step 4700 at 201 s
+[bare] step 4750 at 202 s
+[bare] step 4800 at 203 s
+[bare] step 4850 at 205 s
+[bare] step 4900 at 206 s
+[bare] step 4950 at 206 s
+[bare] step 5000 at 207 s
+[bare] step 5050 at 208 s
+[bare] step 5100 at 209 s
+[bare] step 5150 at 210 s
+[bare] step 5200 at 211 s
+[bare] step 5250 at 212 s
+[bare] step 5300 at 213 s
+[bare] step 5350 at 214 s
+[bare] step 5400 at 215 s
+[bare] step 5450 at 216 s
+[bare] step 5500 at 217 s
+[bare] step 5550 at 218 s
+[bare] step 5600 at 219 s
+[bare] step 5650 at 220 s
+[bare] step 5700 at 221 s
+[bare] step 5750 at 222 s
+[bare] step 5800 at 223 s
+[bare] step 5850 at 224 s
+[bare] step 5900 at 225 s
+[bare] step 5950 at 226 s
+[bare] step 6000 at 227 s
+[bare] step 6050 at 228 s
+[bare] step 6100 at 229 s
+[bare] step 6150 at 230 s
+[bare] step 6200 at 231 s
+[bare] step 6250 at 232 s
+[bare] step 6300 at 233 s
+[bare] step 6350 at 233 s
+[bare] step 6400 at 234 s
+[bare] step 6450 at 236 s
+[bare] step 6500 at 237 s
+[bare] step 6550 at 238 s
+[bare] step 6600 at 238 s
+[bare] step 6650 at 239 s
+[bare] step 6700 at 240 s
+[bare] step 6750 at 241 s
+[bare] step 6800 at 242 s
+[bare] step 6850 at 243 s
+[bare] step 6900 at 244 s
+[bare] step 6950 at 245 s
+[bare] step 7000 at 246 s
+[bare] step 7050 at 247 s
+[bare] step 7100 at 248 s
+[bare] step 7150 at 249 s
+[bare] step 7200 at 250 s
+[bare] step 7250 at 251 s
+[bare] step 7300 at 252 s
+[bare] step 7350 at 253 s
+[bare] step 7400 at 254 s
+[bare] step 7450 at 255 s
+[bare] step 7500 at 256 s
+[bare] step 7550 at 257 s
+[bare] step 7600 at 258 s
+[bare] step 7650 at 259 s
+[bare] step 7700 at 260 s
+[bare] step 7750 at 261 s
+[bare] step 7800 at 262 s
+[bare] step 7850 at 263 s
+[bare] step 7900 at 264 s
+
+|          |      6  |     0.9570  |   0.9202  |               |        6.1458  |
+|          |      7  |     0.9715  |   0.9302  |               |        7.0008  |
+|          |   eval  |     0.9715  |   0.9302  |       0.9384  |        7.2988  |
+---------------------------------------------------------------------------------
+|       9  |      0  |     0.7300  |   0.6711  |               |        0.9173  |
+|          |      1  |     0.8105  |   0.7124  |               |        1.8223  |
+|          |      2  |     0.8450  |   0.6498  |               |        2.7266  |
+|          |      3  |     0.8700  |   0.8051  |               |        3.5817  |
+|          |      4  |     0.9045  |   0.8938  |               |        4.4359  |
+|          |      5  |     0.9145  |   0.9092  |               |        5.2910  |
+|          |      6  |     0.9535  |   0.9248  |               |        6.1452  |
+|          |      7  |     0.9760  |   0.9348  |               |        7.0003  |
+|          |   eval  |     0.9760  |   0.9348  |       0.9416  |        7.2983  |
+---------------------------------------------------------------------------------
+|      10  |      0  |     0.7285  |   0.6120  |               |        0.9172  |
+|          |      1  |     0.8085  |   0.6972  |               |        1.8224  |
+|          |      2  |     0.8555  |   0.6966  |               |        2.7263  |
+|          |      3  |     0.8805  |   0.7733  |               |        3.5816  |
+|          |      4  |     0.9040  |   0.8634  |               |        4.4361  |
+|          |      5  |     0.9245  |   0.9012  |               |        5.2914  |
+|          |      6  |     0.9480  |   0.9246  |               |        6.1465  |
+|          |      7  |     0.9755  |   0.9324  |               |        7.0019  |
+|          |   eval  |     0.9755  |   0.9324  |       0.9419  |        7.2997  |
+---------------------------------------------------------------------------------
+|      11  |      0  |     0.6985  |   0.6472  |               |        0.9177  |
+|          |      1  |     0.8280  |   0.7354  |               |        1.8228  |
+|          |      2  |     0.8500  |   0.8049  |               |        2.7273  |
+|          |      3  |     0.8730  |   0.8325  |               |        3.5827  |
+|          |      4  |     0.8940  |   0.8435  |               |        4.4369  |
+|          |      5  |     0.9285  |   0.9041  |               |        5.2921  |
+|          |      6  |     0.9640  |   0.9282  |               |        6.1462  |
+|          |      7  |     0.9770  |   0.9340  |               |        7.0016  |
+|          |   eval  |     0.9770  |   0.9340  |       0.9426  |        7.2993  |
+---------------------------------------------------------------------------------
+|      12  |      0  |     0.7270  |   0.3815  |               |        0.9173  |
+|          |      1  |     0.8165  |   0.7563  |               |        1.8224  |
+|          |      2  |     0.8555  |   0.8205  |               |        2.7267  |
+|          |      3  |     0.8860  |   0.8427  |               |        3.5820  |
+|          |      4  |     0.9065  |   0.8587  |               |        4.4365  |
+|          |      5  |     0.9370  |   0.9095  |               |        5.2916  |
+|          |      6  |     0.9490  |   0.9243  |               |        6.1456  |
+|          |      7  |     0.9770  |   0.9306  |               |        7.0008  |
+|          |   eval  |     0.9770  |   0.9306  |       0.9410  |        7.2989  |
+---------------------------------------------------------------------------------
+|      13  |      0  |     0.7300  |   0.6505  |               |        0.9174  |
+|          |      1  |     0.8125  |   0.6754  |               |        1.8228  |
+|          |      2  |     0.8345  |   0.8194  |               |        2.7271  |
+|          |      3  |     0.8840  |   0.7750  |               |        3.5823  |
+|          |      4  |     0.9060  |   0.8765  |               |        4.4369  |
+|          |      5  |     0.9295  |   0.8873  |               |        5.2922  |
+|          |      6  |     0.9505  |   0.9199  |               |        6.1464  |
+|          |      7  |     0.9765  |   0.9318  |               |        7.0015  |
+|          |   eval  |     0.9765  |   0.9318  |       0.9403  |        7.2994  |
+---------------------------------------------------------------------------------
+|      14  |      0  |     0.7345  |   0.7016  |               |        0.9177  |
+|          |      1  |     0.8015  |   0.7265  |               |        1.8232  |
+|          |      2  |     0.8450  |   0.7498  |               |        2.7277  |
+|          |      3  |     0.8615  |   0.8698  |               |        3.5830  |
+|          |      4  |     0.9000  |   0.8748  |               |        4.4375  |
+|          |      5  |     0.9315  |   0.9026  |               |        5.2929  |
+|          |      6  |     0.9535  |   0.9249  |               |        6.1481  |
+|          |      7  |     0.9755  |   0.9302  |               |        7.0037  |
+|          |   eval  |     0.9755  |   0.9302  |       0.9403  |        7.3018  |
+---------------------------------------------------------------------------------
+|      15  |      0  |     0.7270  |   0.5786  |               |        0.9176  |
+|          |      1  |     0.7955  |   0.6656  |               |        1.8229  |
+|          |      2  |     0.8355  |   0.7187  |               |        2.7273  |
+|          |      3  |     0.8780  |   0.8236  |               |        3.5826  |
+|          |      4  |     0.9110  |   0.8767  |               |        4.4369  |
+|          |      5  |     0.9255  |   0.9081  |               |        5.2921  |
+|          |      6  |     0.9560  |   0.9239  |               |        6.1466  |
+|          |      7  |     0.9715  |   0.9301  |               |        7.0018  |
+|          |   eval  |     0.9715  |   0.9301  |       0.9377  |        7.3000  |
+---------------------------------------------------------------------------------
+|      16  |      0  |     0.7360  |   0.4366  |               |        0.9180  |
+|          |      1  |     0.8165  |   0.6226  |               |        1.8233  |
+|          |      2  |     0.8600  |   0.7296  |               |        2.7278  |
+|          |      3  |     0.8780  |   0.8396  |               |        3.5831  |
+|          |      4  |     0.9035  |   0.8566  |               |        4.4377  |
+|          |      5  |     0.9225  |   0.9021  |               |        5.2929  |
+|          |      6  |     0.9480  |   0.9232  |               |        6.1474  |
+|          |      7  |     0.9800  |   0.9291  |               |        7.0026  |
+|          |   eval  |     0.9800  |   0.9291  |       0.9360  |        7.3006  |
+---------------------------------------------------------------------------------
+|      17  |      0  |     0.7360  |   0.6994  |               |        0.9178  |
+|          |      1  |     0.7915  |   0.7294  |               |        1.8233  |
+|          |      2  |     0.8385  |   0.7985  |               |        2.7282  |
+|          |      3  |     0.8870  |   0.8650  |               |        3.5837  |
+|          |      4  |     0.9090  |   0.8626  |               |        4.4382  |
+|          |      5  |     0.9245  |   0.8963  |               |        5.2936  |
+|          |      6  |     0.9610  |   0.9249  |               |        6.1478  |
+|          |      7  |     0.9760  |   0.9324  |               |        7.0030  |
+|          |   eval  |     0.9760  |   0.9324  |       0.9404  |        7.3010  |
+---------------------------------------------------------------------------------
+|      18  |      0  |     0.7150  |   0.6012  |               |        0.9181  |
+|          |      1  |     0.8265  |   0.7699  |               |        1.8233  |
+|          |      2  |     0.8400  |   0.8128  |               |        2.7275  |
+|          |      3  |     0.8820  |   0.8349  |               |        3.5831  |
+|          |      4  |     0.8985  |   0.8376  |               |        4.4376  |
+|          |      5  |     0.9220  |   0.9050  |               |        5.2928  |[bare] step 7950 at 265 s
+[bare] step 8000 at 265 s
+[bare] step 8050 at 267 s
+[bare] step 8100 at 268 s
+[bare] step 8150 at 269 s
+[bare] step 8200 at 270 s
+[bare] step 8250 at 270 s
+[bare] step 8300 at 271 s
+[bare] step 8350 at 272 s
+[bare] step 8400 at 273 s
+[bare] step 8450 at 275 s
+[bare] step 8500 at 275 s
+[bare] step 8550 at 276 s
+[bare] step 8600 at 277 s
+[bare] step 8650 at 278 s
+[bare] step 8700 at 279 s
+[bare] step 8750 at 280 s
+[bare] step 8800 at 281 s
+[bare] step 8850 at 282 s
+[bare] step 8900 at 283 s
+[bare] step 8950 at 284 s
+[bare] step 9000 at 285 s
+[bare] step 9050 at 286 s
+[bare] step 9100 at 287 s
+[bare] step 9150 at 288 s
+[bare] step 9200 at 289 s
+[bare] step 9250 at 290 s
+[bare] step 9300 at 291 s
+[bare] step 9350 at 292 s
+[bare] step 9400 at 293 s
+[bare] step 9450 at 294 s
+[bare] step 9500 at 295 s
+[bare] step 9550 at 296 s
+[bare] step 9600 at 297 s
+[bare] step 9650 at 298 s
+[bare] step 9700 at 299 s
+[bare] step 9750 at 300 s
+[bare] step 9800 at 301 s
+[bare] step 9850 at 302 s
+[bare] step 9900 at 302 s
+[bare] step 9950 at 303 s
+[bare] step 10000 at 304 s
+[bare] step 10050 at 306 s
+[bare] step 10100 at 307 s
+[bare] step 10150 at 308 s
+[bare] step 10200 at 308 s
+[bare] step 10250 at 309 s
+[bare] step 10300 at 310 s
+[bare] step 10350 at 311 s
+[bare] step 10400 at 312 s
+[bare] step 10450 at 313 s
+[bare] step 10500 at 314 s
+[bare] step 10550 at 315 s
+[bare] step 10600 at 316 s
+[bare] step 10650 at 317 s
+[bare] step 10700 at 318 s
+[bare] step 10750 at 319 s
+[bare] step 10800 at 320 s
+[bare] step 10850 at 321 s
+[bare] step 10900 at 322 s
+[bare] step 10950 at 323 s
+[bare] step 11000 at 324 s
+[bare] step 11050 at 325 s
+[bare] step 11100 at 326 s
+[bare] step 11150 at 327 s
+[bare] step 11200 at 328 s
+[bare] step 11250 at 329 s
+[bare] step 11300 at 330 s
+[bare] step 11350 at 331 s
+[bare] step 11400 at 332 s
+[bare] step 11450 at 333 s
+[bare] step 11500 at 334 s
+[bare] step 11550 at 334 s
+[bare] step 11600 at 335 s
+[bare] step 11650 at 337 s
+[bare] step 11700 at 338 s
+[bare] step 11750 at 339 s
+[bare] step 11800 at 340 s
+[bare] step 11850 at 340 s
+[bare] step 11900 at 341 s
+
+|          |      6  |     0.9640  |   0.9217  |               |        6.1472  |
+|          |      7  |     0.9740  |   0.9301  |               |        7.0026  |
+|          |   eval  |     0.9740  |   0.9301  |       0.9390  |        7.3005  |
+---------------------------------------------------------------------------------
+|      19  |      0  |     0.7200  |   0.5252  |               |        0.9174  |
+|          |      1  |     0.8220  |   0.6900  |               |        1.8224  |
+|          |      2  |     0.8445  |   0.7329  |               |        2.7266  |
+|          |      3  |     0.8930  |   0.8133  |               |        3.5818  |
+|          |      4  |     0.9150  |   0.8779  |               |        4.4361  |
+|          |      5  |     0.9335  |   0.9038  |               |        5.2915  |
+|          |      6  |     0.9550  |   0.9240  |               |        6.1460  |
+|          |      7  |     0.9750  |   0.9308  |               |        7.0012  |
+|          |   eval  |     0.9750  |   0.9308  |       0.9389  |        7.2991  |
+---------------------------------------------------------------------------------
+|      20  |      0  |     0.7065  |   0.6057  |               |        0.9176  |
+|          |      1  |     0.8045  |   0.6498  |               |        1.8229  |
+|          |      2  |     0.8510  |   0.7821  |               |        2.7272  |
+|          |      3  |     0.8750  |   0.8244  |               |        3.5824  |
+|          |      4  |     0.9050  |   0.8652  |               |        4.4369  |
+|          |      5  |     0.9360  |   0.9061  |               |        5.2923  |
+|          |      6  |     0.9500  |   0.9232  |               |        6.1467  |
+|          |      7  |     0.9805  |   0.9309  |               |        7.0020  |
+|          |   eval  |     0.9805  |   0.9309  |       0.9432  |        7.3001  |
+---------------------------------------------------------------------------------
+|      21  |      0  |     0.7190  |   0.4650  |               |        0.9176  |
+|          |      1  |     0.8035  |   0.8048  |               |        1.8227  |
+|          |      2  |     0.8580  |   0.8038  |               |        2.7267  |
+|          |      3  |     0.8855  |   0.8352  |               |        3.5824  |
+|          |      4  |     0.9060  |   0.8851  |               |        4.4370  |
+|          |      5  |     0.9190  |   0.8879  |               |        5.2921  |
+|          |      6  |     0.9530  |   0.9234  |               |        6.1466  |
+|          |      7  |     0.9710  |   0.9315  |               |        7.0017  |
+|          |   eval  |     0.9710  |   0.9315  |       0.9389  |        7.2998  |
+---------------------------------------------------------------------------------
+|      22  |      0  |     0.7285  |   0.5361  |               |        0.9176  |
+|          |      1  |     0.8340  |   0.6421  |               |        1.8227  |
+|          |      2  |     0.8625  |   0.7747  |               |        2.7271  |
+|          |      3  |     0.8670  |   0.8334  |               |        3.5824  |
+|          |      4  |     0.9055  |   0.8642  |               |        4.4368  |
+|          |      5  |     0.9265  |   0.9035  |               |        5.2920  |
+|          |      6  |     0.9475  |   0.9193  |               |        6.1461  |
+|          |      7  |     0.9720  |   0.9308  |               |        7.0014  |
+|          |   eval  |     0.9720  |   0.9308  |       0.9391  |        7.2993  |
+---------------------------------------------------------------------------------
+|      23  |      0  |     0.7125  |   0.5804  |               |        0.9173  |
+|          |      1  |     0.8065  |   0.7234  |               |        1.8222  |
+|          |      2  |     0.8445  |   0.7934  |               |        2.7266  |
+|          |      3  |     0.8845  |   0.8537  |               |        3.5817  |
+|          |      4  |     0.9100  |   0.8708  |               |        4.4361  |
+|          |      5  |     0.9395  |   0.9030  |               |        5.2914  |
+|          |      6  |     0.9585  |   0.9248  |               |        6.1457  |
+|          |      7  |     0.9780  |   0.9323  |               |        7.0009  |
+|          |   eval  |     0.9780  |   0.9323  |       0.9391  |        7.2991  |
+---------------------------------------------------------------------------------
+|      24  |      0  |     0.7055  |   0.6860  |               |        0.9173  |
+|          |      1  |     0.8145  |   0.7486  |               |        1.8227  |
+|          |      2  |     0.8465  |   0.8015  |               |        2.7272  |
+|          |      3  |     0.8830  |   0.7877  |               |        3.5824  |
+|          |      4  |     0.8955  |   0.8709  |               |        4.4373  |
+|          |      5  |     0.9375  |   0.9103  |               |        5.2924  |
+|          |      6  |     0.9570  |   0.9225  |               |        6.1469  |
+|          |      7  |     0.9775  |   0.9360  |               |        7.0021  |
+|          |   eval  |     0.9775  |   0.9360  |       0.9421  |        7.3000  |
+---------------------------------------------------------------------------------
+|      25  |      0  |     0.7390  |   0.5806  |               |        0.9173  |
+|          |      1  |     0.8130  |   0.6728  |               |        1.8226  |
+|          |      2  |     0.8400  |   0.8125  |               |        2.7267  |
+|          |      3  |     0.8735  |   0.8263  |               |        3.5818  |
+|          |      4  |     0.8995  |   0.8735  |               |        4.4365  |
+|          |      5  |     0.9315  |   0.9095  |               |        5.2915  |
+|          |      6  |     0.9495  |   0.9253  |               |        6.1459  |
+|          |      7  |     0.9740  |   0.9319  |               |        7.0011  |
+|          |   eval  |     0.9740  |   0.9319  |       0.9379  |        7.2992  |
+---------------------------------------------------------------------------------
+|      26  |      0  |     0.7130  |   0.6334  |               |        0.9175  |
+|          |      1  |     0.8285  |   0.7392  |               |        1.8227  |
+|          |      2  |     0.8595  |   0.8163  |               |        2.7268  |
+|          |      3  |     0.8845  |   0.8566  |               |        3.5820  |
+|          |      4  |     0.9075  |   0.8626  |               |        4.4361  |
+|          |      5  |     0.9350  |   0.9099  |               |        5.2917  |
+|          |      6  |     0.9500  |   0.9225  |               |        6.1458  |
+|          |      7  |     0.9700  |   0.9300  |               |        7.0009  |
+|          |   eval  |     0.9700  |   0.9300  |       0.9404  |        7.2989  |
+---------------------------------------------------------------------------------
+|      27  |      0  |     0.7125  |   0.6548  |               |        0.9173  |
+|          |      1  |     0.7970  |   0.7833  |               |        1.8226  |
+|          |      2  |     0.8615  |   0.8076  |               |        2.7269  |
+|          |      3  |     0.8895  |   0.8238  |               |        3.5821  |
+|          |      4  |     0.9070  |   0.8787  |               |        4.4362  |
+|          |      5  |     0.9190  |   0.8993  |               |        5.2914  |
+|          |      6  |     0.9515  |   0.9235  |               |        6.1459  |
+|          |      7  |     0.9830  |   0.9320  |               |        7.0010  |
+|          |   eval  |     0.9830  |   0.9320  |       0.9387  |        7.2990  |
+---------------------------------------------------------------------------------
+|      28  |      0  |     0.7270  |   0.7172  |               |        0.9175  |
+|          |      1  |     0.8110  |   0.7758  |               |        1.8226  |
+|          |      2  |     0.8210  |   0.8030  |               |        2.7272  |
+|          |      3  |     0.8720  |   0.8453  |               |        3.5822  |
+|          |      4  |     0.8995  |   0.8475  |               |        4.4363  |
+|          |      5  |     0.9260  |   0.9056  |               |        5.2917  |[bare] step 11950 at 342 s
+[bare] step 12000 at 343 s
+[bare] step 12050 at 344 s
+[bare] step 12100 at 345 s
+[bare] step 12150 at 346 s
+[bare] step 12200 at 347 s
+[bare] step 12250 at 348 s
+[bare] step 12300 at 349 s
+[bare] step 12350 at 350 s
+[bare] step 12400 at 351 s
+[bare] step 12450 at 352 s
+[bare] step 12500 at 353 s
+[bare] step 12550 at 354 s
+[bare] step 12600 at 355 s
+[bare] step 12650 at 356 s
+[bare] step 12700 at 357 s
+[bare] step 12750 at 358 s
+[bare] step 12800 at 359 s
+[bare] step 12850 at 360 s
+[bare] step 12900 at 361 s
+[bare] step 12950 at 362 s
+[bare] step 13000 at 363 s
+[bare] step 13050 at 364 s
+[bare] step 13100 at 365 s
+[bare] step 13150 at 366 s
+[bare] step 13200 at 366 s
+[bare] step 13250 at 368 s
+[bare] step 13300 at 369 s
+[bare] step 13350 at 370 s
+[bare] step 13400 at 371 s
+[bare] step 13450 at 372 s
+[bare] step 13500 at 372 s
+[bare] step 13550 at 373 s
+[bare] step 13600 at 374 s
+[bare] step 13650 at 376 s
+[bare] step 13700 at 377 s
+[bare] step 13750 at 377 s
+[bare] step 13800 at 378 s
+[bare] step 13850 at 379 s
+[bare] step 13900 at 380 s
+[bare] step 13950 at 381 s
+[bare] step 14000 at 382 s
+[bare] step 14050 at 383 s
+[bare] step 14100 at 384 s
+[bare] step 14150 at 385 s
+[bare] step 14200 at 386 s
+[bare] step 14250 at 387 s
+[bare] step 14300 at 388 s
+[bare] step 14350 at 389 s
+[bare] step 14400 at 390 s
+[bare] step 14450 at 391 s
+[bare] step 14500 at 392 s
+[bare] step 14550 at 393 s
+[bare] step 14600 at 394 s
+[bare] step 14650 at 395 s
+[bare] step 14700 at 396 s
+[bare] step 14750 at 397 s
+[bare] step 14800 at 398 s
+[bare] step 14850 at 399 s
+[bare] step 14900 at 400 s
+[bare] step 14950 at 401 s
+[bare] step 15000 at 402 s
+[bare] step 15050 at 403 s
+[bare] step 15100 at 404 s
+[bare] step 15150 at 404 s
+[bare] step 15200 at 405 s
+[bare] step 15250 at 407 s
+[bare] step 15300 at 408 s
+[bare] step 15350 at 409 s
+[bare] step 15400 at 409 s
+[bare] step 15450 at 410 s
+[bare] step 15500 at 411 s
+[bare] step 15550 at 412 s
+[bare] step 15600 at 413 s
+[bare] step 15650 at 414 s
+[bare] step 15700 at 415 s
+[bare] step 15750 at 416 s
+[bare] step 15800 at 417 s
+[bare] step 15850 at 418 s
+[bare] step 15900 at 419 s
+
+|          |      6  |     0.9575  |   0.9257  |               |        6.1459  |
+|          |      7  |     0.9725  |   0.9339  |               |        7.0009  |
+|          |   eval  |     0.9725  |   0.9339  |       0.9424  |        7.2987  |
+---------------------------------------------------------------------------------
+|      29  |      0  |     0.7215  |   0.5953  |               |        0.9174  |
+|          |      1  |     0.8235  |   0.7393  |               |        1.8225  |
+|          |      2  |     0.8500  |   0.7487  |               |        2.7267  |
+|          |      3  |     0.8820  |   0.8661  |               |        3.5818  |
+|          |      4  |     0.9105  |   0.8773  |               |        4.4363  |
+|          |      5  |     0.9310  |   0.9009  |               |        5.2914  |
+|          |      6  |     0.9565  |   0.9232  |               |        6.1456  |
+|          |      7  |     0.9770  |   0.9338  |               |        7.0011  |
+|          |   eval  |     0.9770  |   0.9338  |       0.9419  |        7.2988  |
+---------------------------------------------------------------------------------
+|      30  |      0  |     0.7290  |   0.6282  |               |        0.9173  |
+|          |      1  |     0.8040  |   0.5812  |               |        1.8225  |
+|          |      2  |     0.8550  |   0.8027  |               |        2.7269  |
+|          |      3  |     0.8795  |   0.8267  |               |        3.5821  |
+|          |      4  |     0.9020  |   0.8540  |               |        4.4364  |
+|          |      5  |     0.9345  |   0.9063  |               |        5.2917  |
+|          |      6  |     0.9560  |   0.9147  |               |        6.1460  |
+|          |      7  |     0.9740  |   0.9313  |               |        7.0011  |
+|          |   eval  |     0.9740  |   0.9313  |       0.9396  |        7.2990  |
+---------------------------------------------------------------------------------
+|      31  |      0  |     0.7480  |   0.6420  |               |        0.9179  |
+|          |      1  |     0.7955  |   0.7291  |               |        1.8229  |
+|          |      2  |     0.8515  |   0.7624  |               |        2.7268  |
+|          |      3  |     0.8805  |   0.8190  |               |        3.5823  |
+|          |      4  |     0.9000  |   0.8756  |               |        4.4367  |
+|          |      5  |     0.9265  |   0.9055  |               |        5.2919  |
+|          |      6  |     0.9525  |   0.9222  |               |        6.1461  |
+|          |      7  |     0.9765  |   0.9328  |               |        7.0012  |
+|          |   eval  |     0.9765  |   0.9328  |       0.9394  |        7.2991  |
+---------------------------------------------------------------------------------
+|      32  |      0  |     0.7470  |   0.6695  |               |        0.9177  |
+|          |      1  |     0.8145  |   0.7329  |               |        1.8228  |
+|          |      2  |     0.8435  |   0.8036  |               |        2.7268  |
+|          |      3  |     0.8815  |   0.8533  |               |        3.5822  |
+|          |      4  |     0.9145  |   0.8406  |               |        4.4365  |
+|          |      5  |     0.9235  |   0.9032  |               |        5.2919  |
+|          |      6  |     0.9575  |   0.9221  |               |        6.1463  |
+|          |      7  |     0.9750  |   0.9336  |               |        7.0017  |
+|          |   eval  |     0.9750  |   0.9336  |       0.9388  |        7.2998  |
+---------------------------------------------------------------------------------
+|      33  |      0  |     0.7325  |   0.5422  |               |        0.9176  |
+|          |      1  |     0.8175  |   0.7360  |               |        1.8229  |
+|          |      2  |     0.8495  |   0.7636  |               |        2.7270  |
+|          |      3  |     0.8910  |   0.8418  |               |        3.5825  |
+|          |      4  |     0.8975  |   0.8471  |               |        4.4372  |
+|          |      5  |     0.9365  |   0.9052  |               |        5.2925  |
+|          |      6  |     0.9540  |   0.9214  |               |        6.1464  |
+|          |      7  |     0.9765  |   0.9321  |               |        7.0015  |
+|          |   eval  |     0.9765  |   0.9321  |       0.9391  |        7.2994  |
+---------------------------------------------------------------------------------
+|      34  |      0  |     0.7240  |   0.6430  |               |        0.9173  |
+|          |      1  |     0.8475  |   0.7823  |               |        1.8225  |
+|          |      2  |     0.8545  |   0.7618  |               |        2.7269  |
+|          |      3  |     0.8775  |   0.8198  |               |        3.5823  |
+|          |      4  |     0.9030  |   0.8900  |               |        4.4365  |
+|          |      5  |     0.9415  |   0.8973  |               |        5.2917  |
+|          |      6  |     0.9555  |   0.9228  |               |        6.1459  |
+|          |      7  |     0.9790  |   0.9323  |               |        7.0009  |
+|          |   eval  |     0.9790  |   0.9323  |       0.9412  |        7.2987  |
+---------------------------------------------------------------------------------
+|      35  |      0  |     0.7375  |   0.5811  |               |        0.9174  |
+|          |      1  |     0.8255  |   0.7120  |               |        1.8224  |
+|          |      2  |     0.8515  |   0.8134  |               |        2.7270  |
+|          |      3  |     0.8825  |   0.8323  |               |        3.5821  |
+|          |      4  |     0.9085  |   0.8723  |               |        4.4363  |
+|          |      5  |     0.9275  |   0.9065  |               |        5.2915  |
+|          |      6  |     0.9500  |   0.9240  |               |        6.1456  |
+|          |      7  |     0.9790  |   0.9321  |               |        7.0007  |
+|          |   eval  |     0.9790  |   0.9321  |       0.9395  |        7.2986  |
+---------------------------------------------------------------------------------
+|      36  |      0  |     0.7525  |   0.6758  |               |        0.9174  |
+|          |      1  |     0.8170  |   0.7222  |               |        1.8227  |
+|          |      2  |     0.8610  |   0.7252  |               |        2.7266  |
+|          |      3  |     0.8780  |   0.8064  |               |        3.5817  |
+|          |      4  |     0.9045  |   0.8814  |               |        4.4362  |
+|          |      5  |     0.9350  |   0.9031  |               |        5.2915  |
+|          |      6  |     0.9620  |   0.9162  |               |        6.1457  |
+|          |      7  |     0.9815  |   0.9278  |               |        7.0009  |
+|          |   eval  |     0.9815  |   0.9278  |       0.9381  |        7.2989  |
+---------------------------------------------------------------------------------
+|      37  |      0  |     0.7430  |   0.6264  |               |        0.9179  |
+|          |      1  |     0.8160  |   0.5910  |               |        1.8229  |
+|          |      2  |     0.8360  |   0.8023  |               |        2.7269  |
+|          |      3  |     0.8745  |   0.8495  |               |        3.5820  |
+|          |      4  |     0.8995  |   0.8661  |               |        4.4360  |
+|          |      5  |     0.9295  |   0.9023  |               |        5.2912  |
+|          |      6  |     0.9500  |   0.9221  |               |        6.1457  |
+|          |      7  |     0.9710  |   0.9328  |               |        7.0008  |
+|          |   eval  |     0.9710  |   0.9328  |       0.9393  |        7.2986  |
+---------------------------------------------------------------------------------
+|      38  |      0  |     0.7220  |   0.7132  |               |        0.9172  |
+|          |      1  |     0.8055  |   0.6804  |               |        1.8225  |
+|          |      2  |     0.8580  |   0.7983  |               |        2.7265  |
+|          |      3  |     0.8930  |   0.8665  |               |        3.5817  |
+|          |      4  |     0.9015  |   0.8610  |               |        4.4363  |
+|          |      5  |     0.9340  |   0.9073  |               |        5.2916  |[bare] step 15950 at 420 s
+[bare] step 16000 at 421 s
+[bare] step 16050 at 422 s
+[bare] step 16100 at 423 s
+[bare] step 16150 at 424 s
+[bare] step 16200 at 425 s
+[bare] step 16250 at 426 s
+[bare] step 16300 at 427 s
+[bare] step 16350 at 428 s
+[bare] step 16400 at 429 s
+[bare] step 16450 at 430 s
+[bare] step 16500 at 431 s
+[bare] step 16550 at 432 s
+[bare] step 16600 at 433 s
+[bare] step 16650 at 434 s
+[bare] step 16700 at 435 s
+[bare] step 16750 at 435 s
+[bare] step 16800 at 436 s
+[bare] step 16850 at 438 s
+[bare] step 16900 at 439 s
+[bare] step 16950 at 440 s
+[bare] step 17000 at 441 s
+[bare] step 17050 at 441 s
+[bare] step 17100 at 442 s
+[bare] step 17150 at 443 s
+[bare] step 17200 at 444 s
+[bare] step 17250 at 445 s
+[bare] step 17300 at 446 s
+[bare] step 17350 at 447 s
+[bare] step 17400 at 448 s
+[bare] step 17450 at 449 s
+[bare] step 17500 at 450 s
+[bare] step 17550 at 451 s
+[bare] step 17600 at 452 s
+[bare] step 17650 at 453 s
+[bare] step 17700 at 454 s
+[bare] step 17750 at 455 s
+[bare] step 17800 at 456 s
+[bare] step 17850 at 457 s
+[bare] step 17900 at 458 s
+[bare] step 17950 at 459 s
+[bare] step 18000 at 460 s
+[bare] step 18050 at 461 s
+[bare] step 18100 at 462 s
+[bare] step 18150 at 463 s
+[bare] step 18200 at 464 s
+[bare] step 18250 at 465 s
+[bare] step 18300 at 466 s
+[bare] step 18350 at 467 s
+[bare] step 18400 at 468 s
+[bare] step 18450 at 469 s
+[bare] step 18500 at 470 s
+[bare] step 18550 at 471 s
+[bare] step 18600 at 472 s
+[bare] step 18650 at 473 s
+[bare] step 18700 at 473 s
+[bare] step 18750 at 474 s
+[bare] step 18800 at 475 s
+[bare] step 18850 at 477 s
+[bare] step 18900 at 478 s
+[bare] step 18950 at 479 s
+[bare] step 19000 at 479 s
+[bare] step 19050 at 480 s
+[bare] step 19100 at 481 s
+[bare] step 19150 at 482 s
+[bare] step 19200 at 483 s
+[bare] step 19250 at 484 s
+[bare] step 19300 at 485 s
+[bare] step 19350 at 486 s
+[bare] step 19400 at 487 s
+[bare] step 19450 at 488 s
+[bare] step 19500 at 489 s
+[bare] step 19550 at 490 s
+[bare] step 19600 at 491 s
+[bare] step 19650 at 492 s
+[bare] step 19700 at 493 s
+[bare] step 19750 at 494 s
+[bare] step 19800 at 495 s
+[bare] step 19850 at 496 s
+[bare] step 19900 at 497 s
+
+|          |      6  |     0.9600  |   0.9235  |               |        6.1460  |
+|          |      7  |     0.9780  |   0.9317  |               |        7.0014  |
+|          |   eval  |     0.9780  |   0.9317  |       0.9398  |        7.2993  |
+---------------------------------------------------------------------------------
+|      39  |      0  |     0.7310  |   0.7108  |               |        0.9176  |
+|          |      1  |     0.8165  |   0.6912  |               |        1.8226  |
+|          |      2  |     0.8375  |   0.7682  |               |        2.7270  |
+|          |      3  |     0.8605  |   0.7941  |               |        3.5823  |
+|          |      4  |     0.9060  |   0.8653  |               |        4.4365  |
+|          |      5  |     0.9310  |   0.9034  |               |        5.2917  |
+|          |      6  |     0.9600  |   0.9157  |               |        6.1461  |
+|          |      7  |     0.9760  |   0.9295  |               |        7.0014  |
+|          |   eval  |     0.9760  |   0.9295  |       0.9405  |        7.2992  |
+---------------------------------------------------------------------------------
+|      40  |      0  |     0.7435  |   0.6013  |               |        0.9176  |
+|          |      1  |     0.8170  |   0.7376  |               |        1.8227  |
+|          |      2  |     0.8555  |   0.8036  |               |        2.7269  |
+|          |      3  |     0.8730  |   0.8017  |               |        3.5822  |
+|          |      4  |     0.9065  |   0.8779  |               |        4.4363  |
+|          |      5  |     0.9355  |   0.8964  |               |        5.2915  |
+|          |      6  |     0.9565  |   0.9234  |               |        6.1457  |
+|          |      7  |     0.9740  |   0.9318  |               |        7.0009  |
+|          |   eval  |     0.9740  |   0.9318  |       0.9415  |        7.2987  |
+---------------------------------------------------------------------------------
+|      41  |      0  |     0.7485  |   0.6277  |               |        0.9174  |
+|          |      1  |     0.8030  |   0.7522  |               |        1.8225  |
+|          |      2  |     0.8590  |   0.7623  |               |        2.7265  |
+|          |      3  |     0.8825  |   0.8256  |               |        3.5817  |
+|          |      4  |     0.9090  |   0.8615  |               |        4.4361  |
+|          |      5  |     0.9235  |   0.9039  |               |        5.2913  |
+|          |      6  |     0.9500  |   0.9245  |               |        6.1457  |
+|          |      7  |     0.9805  |   0.9339  |               |        7.0010  |
+|          |   eval  |     0.9805  |   0.9339  |       0.9411  |        7.2991  |
+---------------------------------------------------------------------------------
+|      42  |      0  |     0.7315  |   0.6774  |               |        0.9175  |
+|          |      1  |     0.8290  |   0.7392  |               |        1.8227  |
+|          |      2  |     0.8505  |   0.7824  |               |        2.7271  |
+|          |      3  |     0.8795  |   0.8646  |               |        3.5824  |
+|          |      4  |     0.9000  |   0.8564  |               |        4.4368  |
+|          |      5  |     0.9220  |   0.9030  |               |        5.2920  |
+|          |      6  |     0.9495  |   0.9231  |               |        6.1464  |
+|          |      7  |     0.9755  |   0.9300  |               |        7.0016  |
+|          |   eval  |     0.9755  |   0.9300  |       0.9380  |        7.2997  |
+---------------------------------------------------------------------------------
+|      43  |      0  |     0.7380  |   0.5496  |               |        0.9189  |
+|          |      1  |     0.8070  |   0.7026  |               |        1.8243  |
+|          |      2  |     0.8455  |   0.7781  |               |        2.7286  |
+|          |      3  |     0.8805  |   0.8284  |               |        3.5840  |
+|          |      4  |     0.9015  |   0.8754  |               |        4.4386  |
+|          |      5  |     0.9315  |   0.8953  |               |        5.2938  |
+|          |      6  |     0.9540  |   0.9265  |               |        6.1480  |
+|          |      7  |     0.9760  |   0.9336  |               |        7.0034  |
+|          |   eval  |     0.9760  |   0.9336  |       0.9413  |        7.3015  |
+---------------------------------------------------------------------------------
+|      44  |      0  |     0.7365  |   0.5562  |               |        0.9177  |
+|          |      1  |     0.8295  |   0.7953  |               |        1.8230  |
+|          |      2  |     0.8515  |   0.8054  |               |        2.7274  |
+|          |      3  |     0.8840  |   0.8218  |               |        3.5828  |
+|          |      4  |     0.8985  |   0.8680  |               |        4.4368  |
+|          |      5  |     0.9335  |   0.9100  |               |        5.2922  |
+|          |      6  |     0.9575  |   0.9251  |               |        6.1466  |
+|          |      7  |     0.9810  |   0.9344  |               |        7.0021  |
+|          |   eval  |     0.9810  |   0.9344  |       0.9399  |        7.3001  |
+---------------------------------------------------------------------------------
+|      45  |      0  |     0.7275  |   0.6604  |               |        0.9177  |
+|          |      1  |     0.8030  |   0.7191  |               |        1.8230  |
+|          |      2  |     0.8435  |   0.7138  |               |        2.7276  |
+|          |      3  |     0.8940  |   0.8533  |               |        3.5830  |
+|          |      4  |     0.9060  |   0.8626  |               |        4.4375  |
+|          |      5  |     0.9300  |   0.9026  |               |        5.2928  |
+|          |      6  |     0.9570  |   0.9172  |               |        6.1475  |
+|          |      7  |     0.9720  |   0.9322  |               |        7.0028  |
+|          |   eval  |     0.9720  |   0.9322  |       0.9389  |        7.3007  |
+---------------------------------------------------------------------------------
+|      46  |      0  |     0.7360  |   0.7003  |               |        0.9175  |
+|          |      1  |     0.8040  |   0.6536  |               |        1.8229  |
+|          |      2  |     0.8560  |   0.8085  |               |        2.7270  |
+|          |      3  |     0.8835  |   0.8489  |               |        3.5823  |
+|          |      4  |     0.9025  |   0.8815  |               |        4.4368  |
+|          |      5  |     0.9380  |   0.9049  |               |        5.2922  |
+|          |      6  |     0.9470  |   0.9235  |               |        6.1466  |
+|          |      7  |     0.9750  |   0.9305  |               |        7.0019  |
+|          |   eval  |     0.9750  |   0.9305  |       0.9402  |        7.3000  |
+---------------------------------------------------------------------------------
+|      47  |      0  |     0.7195  |   0.5806  |               |        0.9178  |
+|          |      1  |     0.8025  |   0.7591  |               |        1.8231  |
+|          |      2  |     0.8345  |   0.8364  |               |        2.7273  |
+|          |      3  |     0.8790  |   0.8253  |               |        3.5827  |
+|          |      4  |     0.9070  |   0.8714  |               |        4.4372  |
+|          |      5  |     0.9225  |   0.8960  |               |        5.2926  |
+|          |      6  |     0.9525  |   0.9213  |               |        6.1470  |
+|          |      7  |     0.9775  |   0.9291  |               |        7.0022  |
+|          |   eval  |     0.9775  |   0.9291  |       0.9384  |        7.3002  |
+---------------------------------------------------------------------------------
+|      48  |      0  |     0.7035  |   0.6332  |               |        0.9177  |
+|          |      1  |     0.8325  |   0.4697  |               |        1.8231  |
+|          |      2  |     0.8440  |   0.7638  |               |        2.7273  |
+|          |      3  |     0.8935  |   0.8323  |               |        3.5825  |
+|          |      4  |     0.9095  |   0.8700  |               |        4.4368  |
+|          |      5  |     0.9325  |   0.8997  |               |        5.2920  |[bare] step 19950 at 498 s
+[bare] step 20000 at 499 s
+[bare] step 20050 at 500 s
+[bare] step 20100 at 501 s
+[bare] step 20150 at 502 s
+[bare] step 20200 at 503 s
+[bare] step 20250 at 504 s
+[bare] step 20300 at 505 s
+[bare] step 20350 at 505 s
+[bare] step 20400 at 506 s
+[bare] step 20450 at 508 s
+[bare] step 20500 at 509 s
+[bare] step 20550 at 510 s
+[bare] step 20600 at 511 s
+[bare] step 20650 at 511 s
+[bare] step 20700 at 512 s
+[bare] step 20750 at 513 s
+[bare] step 20800 at 514 s
+[bare] step 20850 at 515 s
+[bare] step 20900 at 516 s
+[bare] step 20950 at 517 s
+[bare] step 21000 at 518 s
+[bare] step 21050 at 519 s
+[bare] step 21100 at 520 s
+[bare] step 21150 at 521 s
+[bare] step 21200 at 522 s
+[bare] step 21250 at 523 s
+[bare] step 21300 at 524 s
+[bare] step 21350 at 525 s
+[bare] step 21400 at 526 s
+[bare] step 21450 at 527 s
+[bare] step 21500 at 528 s
+[bare] step 21550 at 529 s
+[bare] step 21600 at 530 s
+[bare] step 21650 at 531 s
+[bare] step 21700 at 532 s
+[bare] step 21750 at 533 s
+[bare] step 21800 at 534 s
+[bare] step 21850 at 535 s
+[bare] step 21900 at 536 s
+[bare] step 21950 at 537 s
+[bare] step 22000 at 537 s
+[bare] step 22050 at 539 s
+[bare] step 22100 at 540 s
+[bare] step 22150 at 541 s
+[bare] step 22200 at 542 s
+[bare] step 22250 at 543 s
+[bare] step 22300 at 543 s
+[bare] step 22350 at 544 s
+[bare] step 22400 at 545 s
+[bare] step 22450 at 547 s
+[bare] step 22500 at 548 s
+[bare] step 22550 at 548 s
+[bare] step 22600 at 549 s
+[bare] step 22650 at 550 s
+[bare] step 22700 at 551 s
+[bare] step 22750 at 552 s
+[bare] step 22800 at 553 s
+[bare] step 22850 at 554 s
+[bare] step 22900 at 555 s
+[bare] step 22950 at 556 s
+[bare] step 23000 at 557 s
+[bare] step 23050 at 558 s
+[bare] step 23100 at 559 s
+[bare] step 23150 at 560 s
+[bare] step 23200 at 561 s
+[bare] step 23250 at 562 s
+[bare] step 23300 at 563 s
+[bare] step 23350 at 564 s
+[bare] step 23400 at 565 s
+[bare] step 23450 at 566 s
+[bare] step 23500 at 567 s
+[bare] step 23550 at 568 s
+[bare] step 23600 at 569 s
+[bare] step 23650 at 570 s
+[bare] step 23700 at 571 s
+[bare] step 23750 at 572 s
+[bare] step 23800 at 573 s
+[bare] step 23850 at 574 s
+[bare] step 23900 at 575 s
+
+|          |      6  |     0.9505  |   0.9242  |               |        6.1460  |
+|          |      7  |     0.9850  |   0.9346  |               |        7.0010  |
+|          |   eval  |     0.9850  |   0.9346  |       0.9403  |        7.2991  |
+---------------------------------------------------------------------------------
+|      49  |      0  |     0.7345  |   0.5860  |               |        0.9179  |
+|          |      1  |     0.8040  |   0.7613  |               |        1.8229  |
+|          |      2  |     0.8485  |   0.7993  |               |        2.7272  |
+|          |      3  |     0.8850  |   0.8222  |               |        3.5827  |
+|          |      4  |     0.8970  |   0.8335  |               |        4.4370  |
+|          |      5  |     0.9245  |   0.8965  |               |        5.2921  |
+|          |      6  |     0.9585  |   0.9185  |               |        6.1461  |
+|          |      7  |     0.9790  |   0.9323  |               |        7.0014  |
+|          |   eval  |     0.9790  |   0.9323  |       0.9412  |        7.2993  |
+---------------------------------------------------------------------------------
+|      50  |      0  |     0.7260  |   0.6441  |               |        0.9179  |
+|          |      1  |     0.8095  |   0.6700  |               |        1.8227  |
+|          |      2  |     0.8485  |   0.7837  |               |        2.7270  |
+|          |      3  |     0.8795  |   0.8383  |               |        3.5823  |
+|          |      4  |     0.9085  |   0.8670  |               |        4.4366  |
+|          |      5  |     0.9310  |   0.8932  |               |        5.2920  |
+|          |      6  |     0.9555  |   0.9283  |               |        6.1467  |
+|          |      7  |     0.9795  |   0.9350  |               |        7.0020  |
+|          |   eval  |     0.9795  |   0.9350  |       0.9412  |        7.2997  |
+---------------------------------------------------------------------------------
+|      51  |      0  |     0.7300  |   0.5920  |               |        0.9178  |
+|          |      1  |     0.7940  |   0.7510  |               |        1.8230  |
+|          |      2  |     0.8520  |   0.8287  |               |        2.7270  |
+|          |      3  |     0.8860  |   0.8272  |               |        3.5820  |
+|          |      4  |     0.9075  |   0.8678  |               |        4.4362  |
+|          |      5  |     0.9165  |   0.9045  |               |        5.2913  |
+|          |      6  |     0.9575  |   0.9195  |               |        6.1458  |
+|          |      7  |     0.9750  |   0.9314  |               |        7.0009  |
+|          |   eval  |     0.9750  |   0.9314  |       0.9396  |        7.2987  |
+---------------------------------------------------------------------------------
+|      52  |      0  |     0.7110  |   0.6622  |               |        0.9173  |
+|          |      1  |     0.8065  |   0.7084  |               |        1.8224  |
+|          |      2  |     0.8435  |   0.7936  |               |        2.7264  |
+|          |      3  |     0.8775  |   0.8314  |               |        3.5815  |
+|          |      4  |     0.9025  |   0.8586  |               |        4.4356  |
+|          |      5  |     0.9320  |   0.9018  |               |        5.2907  |
+|          |      6  |     0.9585  |   0.9186  |               |        6.1451  |
+|          |      7  |     0.9820  |   0.9307  |               |        7.0003  |
+|          |   eval  |     0.9820  |   0.9307  |       0.9381  |        7.2982  |
+---------------------------------------------------------------------------------
+|      53  |      0  |     0.7195  |   0.6850  |               |        0.9178  |
+|          |      1  |     0.8105  |   0.7791  |               |        1.8231  |
+|          |      2  |     0.8610  |   0.7716  |               |        2.7272  |
+|          |      3  |     0.8720  |   0.7965  |               |        3.5824  |
+|          |      4  |     0.9155  |   0.8910  |               |        4.4366  |
+|          |      5  |     0.9240  |   0.8956  |               |        5.2918  |
+|          |      6  |     0.9500  |   0.9229  |               |        6.1463  |
+|          |      7  |     0.9755  |   0.9321  |               |        7.0015  |
+|          |   eval  |     0.9755  |   0.9321  |       0.9383  |        7.2996  |
+---------------------------------------------------------------------------------
+|      54  |      0  |     0.7515  |   0.5596  |               |        0.9181  |
+|          |      1  |     0.8185  |   0.6729  |               |        1.8234  |
+|          |      2  |     0.8525  |   0.6985  |               |        2.7277  |
+|          |      3  |     0.8975  |   0.8523  |               |        3.5829  |
+|          |      4  |     0.9125  |   0.8864  |               |        4.4371  |
+|          |      5  |     0.9340  |   0.9026  |               |        5.2923  |
+|          |      6  |     0.9465  |   0.9226  |               |        6.1468  |
+|          |      7  |     0.9765  |   0.9285  |               |        7.0022  |
+|          |   eval  |     0.9765  |   0.9285  |       0.9390  |        7.3003  |
+---------------------------------------------------------------------------------
+|      55  |      0  |     0.7380  |   0.6735  |               |        0.9176  |
+|          |      1  |     0.8100  |   0.7127  |               |        1.8226  |
+|          |      2  |     0.8465  |   0.8217  |               |        2.7272  |
+|          |      3  |     0.8790  |   0.7916  |               |        3.5823  |
+|          |      4  |     0.9055  |   0.8699  |               |        4.4365  |
+|          |      5  |     0.9390  |   0.8840  |               |        5.2917  |
+|          |      6  |     0.9550  |   0.9202  |               |        6.1458  |
+|          |      7  |     0.9835  |   0.9301  |               |        7.0010  |
+|          |   eval  |     0.9835  |   0.9301  |       0.9383  |        7.2990  |
+---------------------------------------------------------------------------------
+|      56  |      0  |     0.7550  |   0.6361  |               |        0.9173  |
+|          |      1  |     0.8250  |   0.7292  |               |        1.8224  |
+|          |      2  |     0.8390  |   0.7976  |               |        2.7269  |
+|          |      3  |     0.8850  |   0.8299  |               |        3.5822  |
+|          |      4  |     0.9130  |   0.8915  |               |        4.4364  |
+|          |      5  |     0.9350  |   0.8962  |               |        5.2917  |
+|          |      6  |     0.9590  |   0.9241  |               |        6.1456  |
+|          |      7  |     0.9710  |   0.9323  |               |        7.0008  |
+|          |   eval  |     0.9710  |   0.9323  |       0.9409  |        7.2988  |
+---------------------------------------------------------------------------------
+|      57  |      0  |     0.6955  |   0.5446  |               |        0.9175  |
+|          |      1  |     0.8140  |   0.7315  |               |        1.8226  |
+|          |      2  |     0.8550  |   0.7317  |               |        2.7268  |
+|          |      3  |     0.8680  |   0.7815  |               |        3.5820  |
+|          |      4  |     0.9175  |   0.8646  |               |        4.4362  |
+|          |      5  |     0.9370  |   0.8912  |               |        5.2916  |
+|          |      6  |     0.9565  |   0.9225  |               |        6.1461  |
+|          |      7  |     0.9795  |   0.9324  |               |        7.0014  |
+|          |   eval  |     0.9795  |   0.9324  |       0.9410  |        7.2994  |
+---------------------------------------------------------------------------------
+|      58  |      0  |     0.7170  |   0.6003  |               |        0.9177  |
+|          |      1  |     0.8275  |   0.7106  |               |        1.8227  |
+|          |      2  |     0.8575  |   0.8169  |               |        2.7273  |
+|          |      3  |     0.8760  |   0.8259  |               |        3.5827  |
+|          |      4  |     0.9040  |   0.8401  |               |        4.4368  |
+|          |      5  |     0.9310  |   0.9069  |               |        5.2922  |[bare] step 23950 at 575 s
+[bare] step 24000 at 576 s
+[bare] step 24050 at 578 s
+[bare] step 24100 at 579 s
+[bare] step 24150 at 580 s
+[bare] step 24200 at 580 s
+[bare] step 24250 at 581 s
+[bare] step 24300 at 582 s
+[bare] step 24350 at 583 s
+[bare] step 24400 at 584 s
+[bare] step 24450 at 585 s
+[bare] step 24500 at 586 s
+[bare] step 24550 at 587 s
+[bare] step 24600 at 588 s
+[bare] step 24650 at 589 s
+[bare] step 24700 at 590 s
+[bare] step 24750 at 591 s
+[bare] step 24800 at 592 s
+[bare] step 24850 at 593 s
+[bare] step 24900 at 594 s
+[bare] step 24950 at 595 s
+[ground truth 14:36:39] bare run ended (failed) after 601 s, None steps
+[ground truth 14:36:39] recorder run: 5 warmup + 60 timed steps, at most 539 s
+[ground truth 14:38:20] recorder run ended (ok) after 65 steps
+{
+  "script": "cifar10-airbench",
+  "entrypoint": "airbench94_muon.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "overhead": {
+    "sync_overhead": {
+      "median": 0.89845,
+      "ci95": [
+        0.8971,
+        0.9009
+      ],
+      "pairs": 29,
+      "source": "measured"
+    },
+    "hook_overhead": null,
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "vision",
+  "image": "probe",
+  "bare": {
+    "failed": "the bare run took longer than 600 s",
+    "tail": " 0.9550  |   0.9202  |               |        6.1458  |\n|          |      7  |     0.9835  |   0.9301  |               |        7.0010  |\n|          |   eval  |     0.9835  |   0.9301  |       0.9383  |        7.2990  |\n---------------------------------------------------------------------------------\n|      56  |      0  |     0.7550  |   0.6361  |               |        0.9173  |\n|          |      1  |     0.8250  |   0.7292  |               |        1.8224  |\n|          |      2  |     0.8390  |   0.7976  |               |        2.7269  |\n|          |      3  |     0.8850  |   0.8299  |               |        3.5822  |\n|          |      4  |     0.9130  |   0.8915  |               |        4.4364  |\n|          |      5  |     0.9350  |   0.8962  |               |        5.2917  |\n|          |      6  |     0.9590  |   0.9241  |               |        6.1456  |\n|          |      7  |     0.9710  |   0.9323  |               |        7.0008  |\n|          |   eval  |     0.9710  |   0.9323  |       0.9409  |        7.2988  |\n---------------------------------------------------------------------------------\n|      57  |      0  |     0.6955  |   0.5446  |               |        0.9175  |\n|          |      1  |     0.8140  |   0.7315  |               |        1.8226  |\n|          |      2  |     0.8550  |   0.7317  |               |        2.7268  |\n|          |      3  |     0.8680  |   0.7815  |               |        3.5820  |\n|          |      4  |     0.9175  |   0.8646  |               |        4.4362  |\n|          |      5  |     0.9370  |   0.8912  |               |        5.2916  |\n|          |      6  |     0.9565  |   0.9225  |               |        6.1461  |\n|          |      7  |     0.9795  |   0.9324  |               |        7.0014  |\n|          |   eval  |     0.9795  |   0.9324  |       0.9410  |        7.2994  |\n---------------------------------------------------------------------------------\n|      58  |      0  |     0.7170  |   0.6003  |               |        0.9177  |\n|          |      1  |     0.8275  |   0.7106  |               |        1.8227  |\n|          |      2  |     0.8575  |   0.8169  |               |        2.7273  |\n|          |      3  |     0.8760  |   0.8259  |               |        3.5827  |\n|          |      4  |     0.9040  |   0.8401  |               |        4.4368  |\n|          |      5  |     0.9310  |   0.9069  |               |        5.2922  |[bare] step 23950 at 575 s\n[bare] step 24000 at 576 s\n[bare] step 24050 at 578 s\n[bare] step 24100 at 579 s\n[bare] step 24150 at 580 s\n[bare] step 24200 at 580 s\n[bare] step 24250 at 581 s\n[bare] step 24300 at 582 s\n[bare] step 24350 at 583 s\n[bare] step 24400 at 584 s\n[bare] step 24450 at 585 s\n[bare] step 24500 at 586 s\n[bare] step 24550 at 587 s\n[bare] step 24600 at 588 s\n[bare] step 24650 at 589 s\n[bare] step 24700 at 590 s\n[bare] step 24750 at 591 s\n[bare] step 24800 at 592 s\n[bare] step 24850 at 593 s\n[bare] step 24900 at 594 s\n[bare] step 24950 at 595 s\n",
+    "wall_s": 601.1
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 65,
+    "p50_s": 0.04134911918640137,
+    "peak_allocated_bytes": 7886675968,
+    "seconds": 100.877,
+    "by_phase": {
+      "data": 0.0,
+      "forward": 0.0,
+      "backward": 0.6520106406284728,
+      "optimizer": 0.0062622843193965464,
+      "other": 0.3417270750521306
+    },
+    "generation": null,
+    "extras": {
+      "train_peak_before_eval_bytes": 7886675968.0,
+      "params_total": 1972792.0,
+      "params_trainable": 1971352.0,
+      "tokens_per_step": 0.0,
+      "samples_per_step": 0.0,
+      "micro_steps_per_step": 1.0,
+      "host_rss_peak_bytes": 40693854208.0
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  }
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-SHqpGJwRZCpKY4xVxM7qMO
