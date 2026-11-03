@@ -201,7 +201,7 @@ describe("private triage on the check-in desk", () => {
 		const box = screen.getByRole("checkbox", { name: en["newflight.private.label"] });
 		const hint = document.getElementById(box.getAttribute("aria-describedby") ?? "");
 		expect(hint?.textContent).toContain(en["newflight.private.wait"]);
-		expect(hint?.textContent).toMatch(/several minutes/);
+		expect(hint?.textContent).toMatch(/5 to 8 minutes/);
 		// The map and diagnosis lines show only with their own flags on.
 		expect(hint?.textContent).not.toContain(en["newflight.private.map"]);
 		expect(hint?.textContent).not.toContain(en["newflight.private.diagnosis"]);

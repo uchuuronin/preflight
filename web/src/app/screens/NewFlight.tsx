@@ -336,31 +336,34 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									))
 							)}
 						</div>
-						<div className="pf-desk__row">
-							<span className="pf-desk__label" id={`${ids.describe}-goal`}>
-								{t("newflight.goal")}
-							</span>
-							<div className="pf-choice" role="group" aria-labelledby={`${ids.describe}-goal`}>
-								{GOALS.map((g) => (
-									<button key={g.kind} type="button" aria-pressed={goal === g.kind} onClick={() => setGoal(g.kind)}>
-										{t(g.key)}
-									</button>
-								))}
+						{/* Goal and GPU share a row where the desk is wide enough (Chiya, Nov 2: less scrolling). */}
+						<div className="pf-desk__pair">
+							<div className="pf-desk__row">
+								<span className="pf-desk__label" id={`${ids.describe}-goal`}>
+									{t("newflight.goal")}
+								</span>
+								<div className="pf-choice" role="group" aria-labelledby={`${ids.describe}-goal`}>
+									{GOALS.map((g) => (
+										<button key={g.kind} type="button" aria-pressed={goal === g.kind} onClick={() => setGoal(g.kind)}>
+											{t(g.key)}
+										</button>
+									))}
+								</div>
 							</div>
-						</div>
-						<div className="pf-desk__row">
-							<span className="pf-desk__label" id={`${ids.describe}-gpu`}>
-								{t("newflight.gpu")}
-							</span>
-							<div className="pf-choice" role="group" aria-labelledby={`${ids.describe}-gpu`}>
-								{GPUS.map((g) => (
-									<button key={g} type="button" aria-pressed={gpu === g} onClick={() => setGpu(g)}>
-										{g}
+							<div className="pf-desk__row">
+								<span className="pf-desk__label" id={`${ids.describe}-gpu`}>
+									{t("newflight.gpu")}
+								</span>
+								<div className="pf-choice" role="group" aria-labelledby={`${ids.describe}-gpu`}>
+									{GPUS.map((g) => (
+										<button key={g} type="button" aria-pressed={gpu === g} onClick={() => setGpu(g)}>
+											{g}
+										</button>
+									))}
+									<button type="button" aria-pressed={gpu === null} onClick={() => setGpu(null)}>
+										{t("newflight.gpu.unsure")}
 									</button>
-								))}
-								<button type="button" aria-pressed={gpu === null} onClick={() => setGpu(null)}>
-									{t("newflight.gpu.unsure")}
-								</button>
+								</div>
 							</div>
 						</div>
 						{privateOffered ? (
@@ -371,13 +374,17 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								</label>
 								<div id={ids.privateHint} className="pf-private__hint">
 									<p className="pf-hint">{t("newflight.private.body")}</p>
-									{flag("harness.spark_script_map") ? <p className="pf-hint">{t("newflight.private.map")}</p> : null}
-									{/* pipeline.py skips Muse Spark's diagnosis for a private job (contract 0.6.2). */}
-									{flag("harness.spark_diagnosis") ? <p className="pf-hint">{t("newflight.private.diagnosis")}</p> : null}
-									{/* Source: measured, Glimmer's cold starts on its A100-40GB, Nov 1: 286 s (B's smoke,
-									    docs/decisions/glimmer-host.md) and 330 to 459 s (A's triage runs, docs/status/a.md);
-									    a warm triage took 12.8 s (median of 5). */}
-									<p className="pf-hint">{t("newflight.private.wait")}</p>
+									{/* The rest folds away: the box used to be the tallest thing on the form (Chiya, Nov 2). */}
+									<details className="pf-private__more">
+										<summary>{t("newflight.private.more")}</summary>
+										{flag("harness.spark_script_map") ? <p className="pf-hint">{t("newflight.private.map")}</p> : null}
+										{/* pipeline.py skips Muse Spark's diagnosis for a private job (contract 0.6.2). */}
+										{flag("harness.spark_diagnosis") ? <p className="pf-hint">{t("newflight.private.diagnosis")}</p> : null}
+										{/* Source: measured, Glimmer's cold starts on its A100-40GB, Nov 1: 286 s (B's smoke,
+										    docs/decisions/glimmer-host.md) and 330 to 459 s (A's triage runs, docs/status/a.md);
+										    a warm triage took 12.8 s (median of 5). */}
+										<p className="pf-hint">{t("newflight.private.wait")}</p>
+									</details>
 								</div>
 							</div>
 						) : null}
