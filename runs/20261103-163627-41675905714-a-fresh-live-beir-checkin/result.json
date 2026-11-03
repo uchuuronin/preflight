@@ -1,0 +1,11 @@
+{
+	"name": "20261103-163627-41675905714-a-fresh-live-beir-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41675905714",
+	"ref": "e6feefcd123c2491c3030f52554c10257a1626f1",
+	"sha": "e6feefcd123c2491c3030f52554c10257a1626f1",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor fresh-live-beir --gpus L4,A10 --max-minutes 40 --repo https://github.com/beir-cellar/beir --commit ef83d29307061c65d04b035b4f4e7c18bd8374af --entrypoint examples/retrieval/evaluation/dense/evaluate_sbert.py ",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T16:49:40Z"
+}
