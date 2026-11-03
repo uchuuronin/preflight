@@ -88,7 +88,8 @@ EGRESS = [
 # torchvision's dataset host for CIFAR (Nov 2: unseen scripts 8 and 9 stopped there)
 # torchvision 0.20's CIFAR comes from cave.cs.toronto.edu (a-all3-9, Nov 2), not www.cs.toronto.edu
 # OGB's datasets (snap.stanford.edu) and BEIR's (public.ukp.informatik.tu-darmstadt.de): unseen 8 and 7 measured on the
-# ops rig, which has no allowlist, and stopped at their download through production (a-fresh-live-ogb-checkin, Nov 3)
+# ops rig, which has no allowlist; through production OGB stopped at its download (a-fresh-live-ogb-checkin, Nov 3), and
+# BEIR's script downloads from its host the same way
 EXTRA_EGRESS = [
 	"data.pyg.org",
 	"www.cs.toronto.edu",
