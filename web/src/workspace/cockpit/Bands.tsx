@@ -16,6 +16,7 @@ import { Provenance } from "../components/StatusMark";
 import { bounds, likelyFails, trusted } from "../status";
 import { outcomes, useHops } from "../hops";
 import { abstainText } from "./abstain";
+import { useWhyAbstain } from "./whyAbstain";
 
 const MAX_MARKS = 24;
 
@@ -255,12 +256,13 @@ export function MemoryBand() {
 	const memT = targetFor(record, "memory");
 	const peak = memT ? estimates[memT.id] : undefined;
 	const scaleMax = memoryStackScale(record) ?? (capacity ? capacity * 1.25 : null);
+	const why = useWhyAbstain();
 	if (!segments.length || !capacity || !scaleMax) {
 		return (
 			<div className="glass pf-band">
 				<div className="pf-band__head">
 					<b>{t("membar.title")}</b>
-					<span>{peak?.status === "abstain" ? abstainText(peak.reason) : t("membar.unknown")}</span>
+					<span>{peak?.status === "abstain" ? why(peak.reason) : t("membar.unknown")}</span>
 				</div>
 			</div>
 		);

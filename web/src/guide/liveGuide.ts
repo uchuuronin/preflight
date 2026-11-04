@@ -11,6 +11,7 @@
  * setting that is tight, fails or isn't trusted, and at most one per round.
  */
 import { fmt } from "../lib/fmt";
+import { t } from "../lib/i18n";
 import { knobChoices, targetFor } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, Objective, Prediction } from "../workspace/record/types";
 import { fitOf } from "../workspace/status";
@@ -19,6 +20,7 @@ import { breaksLimit, type Limits, limitsForServer, limitsSaved, NO_LIMITS, with
 import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
 import type { PredictionProvider } from "../workspace/provider/PredictionProvider";
+import { isLocalRef } from "../workspace/provider/engineFallback";
 
 /** Knobs that change the GPU rather than the job (as ruleTour's GPU_KNOBS). */
 const GPU_MOVE_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
@@ -383,6 +385,8 @@ export class LiveTour {
 	}
 
 	private async send(extra: Record<string, unknown>): Promise<LiveView> {
+		// A record opened from disk was never checked in, so the server can't read it (Chiya's shot 9b, Nov 3).
+		if (isLocalRef(this.recordRef)) throw new GuideFallback(t("guide.live.local_record"), "local_record");
 		let body: Record<string, unknown> = extra;
 		const answered = new Set(((extra.approvals as Array<{ call_id: string }> | undefined) ?? []).map((x) => x.call_id));
 		for (let round = 0; round <= MAX_BROWSER_ROUNDS; round++) {

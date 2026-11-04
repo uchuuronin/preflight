@@ -228,7 +228,8 @@ cut-offs haven't been checked against real runs yet. A chance between 5% and 95%
 because chances in that band haven't been verified either. **Tight: measure first** means run a probe before you trust it.
 
 How much to trust the ranges: against real full runs, the 90% ranges held 10 times out of 18 (Nov
-3). Treat a **Predicted** range as narrower than it should be.
+3). Treat a **Predicted** range as narrower than it should be. Every check, and how Preflight
+compares with asking Muse Spark alone, is on [Checks](#/checks).
 
 ## How knobs behave
 

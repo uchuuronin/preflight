@@ -9,6 +9,7 @@ describe("Home", () => {
 		render(<Home />);
 		expect(screen.getByText(/Built during the Meta Global AI Developer Hackathon/)).toBeTruthy();
 		expect(screen.getByRole("link", { name: "GitHub" }).getAttribute("href")).toBe("https://github.com/uchuuronin/preflight");
+		expect(screen.getByRole("link", { name: "Checks" }).getAttribute("href")).toBe("#/checks");
 	});
 	it("gives each how-it-works card an h2 under the page's h1", () => {
 		render(<Home />);
