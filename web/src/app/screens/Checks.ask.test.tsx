@@ -18,7 +18,26 @@ describe("the checks page's same-code comparison (B's vs_model.json)", () => {
 		expect(gnn.textContent).toContain("Muse Spark: 18.0×");
 		// a run that ran out of memory says why it has no peak, not a gap
 		const lora = rows.find((r) => r.textContent?.includes("LoRA fine-tune"))!;
-		expect(lora.textContent).toContain("Ran out of memory at 21.8 GiB reserved");
+		expect(lora.textContent).toContain("ran out of memory at 21.8 GiB reserved");
 		for (const c of vs.caveats) expect(screen.getByText(c)).toBeTruthy();
+	});
+
+	it("reads first as three tiles and a dot plot, each mark named in words, never by colour alone", () => {
+		render(<Checks />);
+		const tiles = document.querySelectorAll(".pf-ask__tile");
+		expect(tiles.length).toBe(3);
+		expect(tiles[0].textContent).toContain("8% to 36%");
+		expect(tiles[0].textContent).toContain("1.6× to 18×");
+		expect(tiles[1].textContent).toContain("2 of 4");
+		expect(tiles[1].textContent).toContain("0 of 4");
+		expect(tiles[2].textContent).toContain("1 caught, 1 no answer");
+		expect(tiles[2].textContent).toContain("1 caught, 1 missed");
+		// every plotted ratio is a mark whose label says who, what, the full run and how far off
+		const marks = screen.getAllByRole("img").filter((m) => m.classList.contains("pf-ask__dot"));
+		const plotted = vs.rows.flatMap((r) => [r.ratio.preflight_step, r.ratio.muse_step, r.ratio.preflight_peak, r.ratio.muse_peak]).filter((x) => x !== null).length;
+		expect(marks.length).toBe(plotted);
+		expect(marks.some((m) => /^Muse Spark: 1\.10 s predicted .*full run: 0\.0612 s; 18× too high$/.test(m.getAttribute("aria-label") ?? ""))).toBe(true);
+		// what isn't plotted is said once per script
+		expect(screen.getByText("Retrieval (BEIR): ran out of memory at 21.5 GiB reserved, so its full peak was never seen")).toBeTruthy();
 	});
 });
