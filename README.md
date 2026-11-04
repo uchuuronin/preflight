@@ -172,7 +172,7 @@ back to Preflight's static reader, and the record says which one drew it.
 
 ## Validation
 
-Preflight was scored against real full runs it had never seen, with the engine frozen first. In short:
+Preflight was scored against real full runs of its bug-zoo scripts and one outside script, with the engine frozen before any of them was scored. In short:
 
 - **It catches the crash that costs the most.** It called out-of-memory right on 10 of 11 scripts (it ran out or it didn't), with no false alarms, and found 6 of 7 planted bugs.
 - **It's far closer than asking a model.** On the same scripts, Preflight's step time was off by 8% to 36%; Muse Spark reading the code alone was off by 1.6× to 18×. Peak memory within 10%: Preflight 2 of 4, Muse Spark 0 of 4.
@@ -257,6 +257,8 @@ results, and I checked the work throughout to keep everything aligned.
   tokenizer and `c4_test` slice, from its v0.1.0 tag, under BSD-3-Clause (`LICENSE.txt` beside
   them). The `c4_test` slice is text from C4 by AllenAI, released under ODC-BY 1.0; Common
   Crawl's terms of use apply to its content.
+- **Hugging Face's text-classification notebook** (`validation/fresh/f2/`): unchanged, Apache-2.0,
+  © Hugging Face; kept only so a check-in can send it the way a visitor's upload would.
 - **Bug-zoo scripts:** written for Preflight. They download public models and data at run time
   and bundle none of them:
 
