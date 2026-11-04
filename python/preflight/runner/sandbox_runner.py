@@ -21,6 +21,23 @@ from .wire import result_from_wire, spec_to_wire
 log = logging.getLogger("preflight.sandbox")
 
 ENTRY = ("python", "-m", "preflight.probes.remote")
+# Modal's stdin writer buffers at most 16 MiB between drains: one 16.96 MB write of this repository's check-in raised
+# "BufferError: Buffer size exceed limit. Call drain to flush the buffer." and every probe ended without a result (Nov 4,
+# ops_app.py::sandbox_stdin_check: 16,777,000 bytes in one write went through, 16,957,300 didn't). 4 Mi characters a
+# piece is under it even at 4 bytes a character
+STDIN_CHUNK = 4 * 2**20
+
+
+def write_stdin(stdin, text: str, *, chunk: int = STDIN_CHUNK) -> None:
+	"""The probe's spec on its stdin, in pieces of `chunk` characters with a drain after each, then end-of-file. One
+	piece and one drain for a spec under `chunk`, as before."""
+	for i in range(0, len(text), chunk):
+		stdin.write(text[i : i + chunk])
+		stdin.drain()
+	stdin.write_eof()
+	stdin.drain()
+
+
 EXEC_SLACK_S = 90  # over the probe's own cap: model download is inside it, process start is not
 READY = ("true",)  # a no-op run first: returns once the container is up, after any wait for a GPU
 # Modal's queue for a GPU can be long (L4: 14 to 25 min seen, Oct 31 to Nov 1); kept under the
@@ -304,9 +321,7 @@ class SandboxRunner:
 		watcher = threading.Thread(target=watch, daemon=True)
 		watcher.start()
 		try:
-			proc.stdin.write(spec_to_wire(spec))
-			proc.stdin.write_eof()
-			proc.stdin.drain()
+			write_stdin(proc.stdin, spec_to_wire(spec))
 			out = proc.stdout.read()
 		except Exception:
 			log.warning("probe %s: sandbox exec failed", spec.probe_id, exc_info=True)

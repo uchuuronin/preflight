@@ -370,7 +370,7 @@ def startup_check_sandbox() -> dict:
 
 
 @ops.function(image=worker_image, timeout=900)
-def sandbox_stdin_check_hosted(sizes: list[int]) -> list[dict]:
+def sandbox_stdin_check_hosted(sizes: list[int], chunk: int = 0) -> list[dict]:
 	"""Nov 4 (a repo check-in whose probes all ended "without a result"): write a payload of each size to a CPU probe
 	sandbox's stdin exactly as SandboxRunner does (write, write_eof, drain, read), with a command that only counts the
 	bytes, and report what came back or the exception. No visitor data: the payloads are generated here."""
@@ -388,9 +388,15 @@ def sandbox_stdin_check_hosted(sizes: list[int]) -> list[dict]:
 			row: dict = {"bytes": n}
 			try:
 				proc = sb.exec("python", "-c", "import sys; print('GOT', len(sys.stdin.read()))", timeout=300)
-				proc.stdin.write('{"x": "' + "a" * max(0, n - 9) + '"}')
-				proc.stdin.write_eof()
-				proc.stdin.drain()
+				text = '{"x": "' + "a" * max(0, n - 9) + '"}'
+				if chunk:  # sandbox_runner's chunked write: a drain after each piece
+					from preflight.runner.sandbox_runner import write_stdin
+
+					write_stdin(proc.stdin, text, chunk=chunk)
+				else:
+					proc.stdin.write(text)
+					proc.stdin.write_eof()
+					proc.stdin.drain()
 				row["stdout"] = proc.stdout.read()[-200:]
 				proc.wait()
 				row["exit"] = proc.returncode
@@ -406,10 +412,10 @@ def sandbox_stdin_check_hosted(sizes: list[int]) -> list[dict]:
 
 
 @ops.local_entrypoint()
-def sandbox_stdin_check(sizes: str = "1000000,8000000,16000000,16777000,16957300,24000000"):
+def sandbox_stdin_check(sizes: str = "1000000,8000000,16000000,16777000,16957300,24000000", chunk: int = 0):
 	"""modal run --env main python/preflight/runner/ops_app.py::sandbox_stdin_check
 	Which stdin sizes a probe sandbox takes (sandbox_stdin_check_hosted). Writes out/stdin_check.json."""
-	res = sandbox_stdin_check_hosted.remote([int(x) for x in sizes.split(",") if x])
+	res = sandbox_stdin_check_hosted.remote([int(x) for x in sizes.split(",") if x], chunk)
 	Path("out").mkdir(exist_ok=True)
 	Path("out/stdin_check.json").write_text(json.dumps(res, indent=2))
 	for r in res:
