@@ -177,7 +177,7 @@ def test_the_ip_bucket_limits_check_ins_from_one_address():
 	assert codes == [202, 202, 429]
 
 
-def test_one_address_has_six_jobs_a_day_and_two_at_once():
+def test_one_address_has_ten_jobs_a_day_and_two_at_once():
 	"""PM's audit, Nov 3: a visitor who drops the cookie is new to the store, not a new address."""
 	store = Store()
 	ledger = MemoryLedger(LedgerCore())
@@ -196,14 +196,14 @@ def test_one_address_has_six_jobs_a_day_and_two_at_once():
 	c.get(f"/v1/jobs/{jid}")
 	c.post(f"/v1/jobs/{second.json()['job_id']}/cancel")
 	codes = []
-	for i in range(3, 10):
+	for i in range(3, 14):
 		r = check_in(i)
 		codes.append(r.json()["error"]["code"] if r.status_code == 429 else r.status_code)
 		if r.status_code == 202:
 			c.post(f"/v1/jobs/{r.json()['job_id']}/cancel")
-	assert codes == [202, 202, 202, 202, "ip_jobs_daily", "ip_jobs_daily", "ip_jobs_daily"]
+	assert codes == [202] * 8 + ["ip_jobs_daily"] * 3
 	r = check_in(11)
-	assert "6 jobs today" in r.json()["error"]["message"] and int(r.headers["Retry-After"]) >= 1
+	assert "10 jobs today" in r.json()["error"]["message"] and int(r.headers["Retry-After"]) >= 1
 
 
 def test_a_check_in_that_starts_no_job_keeps_the_address_slot():

@@ -82,7 +82,7 @@ class QueueFull(RuntimeError):
 
 
 # Public demo limits (Chiya, Nov 1), counted per America/New_York calendar day
-VISITOR_DAILY_JOBS = 3  # probe jobs a visitor may submit in a day
+VISITOR_DAILY_JOBS = 5  # probe jobs a visitor may submit in a day (Chiya, Nov 4: 3 -> 5)
 # runner.free_resend (off; Chiya, Nov 2): a resend after a job stopped at an import (no probe reached its first
 # step) is free, this many times a visitor a day; the daily GPU dollar cap still holds
 FREE_RESENDS_PER_DAY = 1

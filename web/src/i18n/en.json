@@ -96,7 +96,7 @@
 	"newflight.private.wait": "Glimmer naps when nobody's using it. Waking it up took about 5 to 8 minutes on 1 Nov; after that, a triage takes seconds.",
 	"newflight.describe.label": "What are you trying to do? The guide reads this.",
 	"newflight.describe.placeholder": "Fine-tune a 7B model on our support tickets, one A100, done by Friday, cheapest possible.",
-	"newflight.cost_hint": "Free, with no account: Preflight pays for the GPU minutes, up to 3 jobs a day (a check-in, or a probe or check from the cockpit). A check-in of the LoRA sample takes about 5 to 11 minutes on an L4.",
+	"newflight.cost_hint": "Free, with no account: Preflight pays for the GPU minutes, up to 5 jobs a day (a check-in, or a probe or check from the cockpit). A check-in of the LoRA sample takes about 5 to 11 minutes on an L4.",
 	"newflight.check_in": "Check in",
 	"newflight.checking_in": "Checking in…",
 	"newflight.error.busy": "The queue can't take this job right now. Try again in {s} seconds, or open a sample meanwhile.",

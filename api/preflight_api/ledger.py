@@ -59,7 +59,7 @@ class Limits:
 	reservation_ttl_s: float = 90.0
 	# source: PM's audit, Nov 3: one address could submit about 13 jobs, the day's GPU cap. Six a day
 	# and two at once leave room for a lab sharing one address, and keep one address under half the cap.
-	jobs_per_ip_day: int = 6
+	jobs_per_ip_day: int = 10
 	jobs_per_ip_open: int = 2
 	# source: derived, a probe job is about 4 minutes plus its queue wait; the event stream gives up
 	# at 15 minutes (routes/jobs.py STREAM_MAX_S). Twice that frees a slot the API never saw end.

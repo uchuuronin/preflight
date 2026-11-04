@@ -336,7 +336,8 @@ def test_a_visitor_gets_three_probe_jobs_a_day_until_midnight_et():
 	from preflight.runner.queue import QueueFull, et_day
 
 	now = [ET_NOON_NOV1]
-	store = InMemoryJobStore(clock=lambda: now[0], max_queued_per_visitor=50)
+	# the mechanism with a limit of 3 (production's VISITOR_DAILY_JOBS is 5 since Nov 4)
+	store = InMemoryJobStore(clock=lambda: now[0], max_queued_per_visitor=50, visitor_daily_jobs=3)
 	assert et_day(now[0]) == "2026-11-01"
 	for i in range(3):
 		store.submit({**REQ, "n": i}, visitor="v", idempotency_key=f"k{i}")

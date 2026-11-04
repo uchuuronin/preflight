@@ -831,15 +831,15 @@ falls back to code only [guess: harness/claim_check.py `JOB_CAP_USD`].
 
 | Limit | Value | Source |
 |---|---|---|
-| Probe jobs (a check-in, or a probe or check from the cockpit) | 3 a day | [derived: runner/queue.py `VISITOR_DAILY_JOBS`] |
+| Probe jobs (a check-in, or a probe or check from the cockpit) | 5 a day | [derived: runner/queue.py `VISITOR_DAILY_JOBS`] |
 | Jobs queued or running at once | 3 | [simulated: runner/queue.py `MAX_QUEUED_PER_VISITOR`, a load test on a simulated clock] |
-| Free resend after a check-in stopped at an import (nothing measured) | 1 a day; doesn't count against the 3 jobs, but the site's GPU cap still holds | [derived: runner/queue.py `FREE_RESENDS_PER_DAY`; `runner.free_resend` on in production] |
+| Free resend after a check-in stopped at an import (nothing measured) | 1 a day; doesn't count against the 5 jobs, but the site's GPU cap still holds | [derived: runner/queue.py `FREE_RESENDS_PER_DAY`; `runner.free_resend` on in production] |
 | Guide rounds | 64 a day per visitor, 256 per network address | [derived: api/preflight_api/ledger.py, from tours measured Oct 27 / guess for the address limit] |
 | Guide spend | $0.40 a tour | [derived: api/preflight_api/ledger.py] |
 
 **For the whole site, per day:** a GPU dollar cap of $15 (the worker image's
 `PREFLIGHT_DAILY_GPU_CAP_USD`, Chiya, Nov 3; live from the runner deployed at 10 PM ET), and $10 of guide spend [cited:
-api/preflight_api/ledger.py, pending confirmation]. Past your 3 jobs or the site's GPU cap, the
+api/preflight_api/ledger.py, pending confirmation]. Past your 5 jobs or the site's GPU cap, the
 site opens samples and shared records only, until midnight ET ("You've run today's 3 probe jobs" or
 "Preflight has used today's GPU budget").
 

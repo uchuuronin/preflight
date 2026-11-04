@@ -196,12 +196,12 @@ took 5 to 8 minutes on Nov 1; after that, a triage takes seconds.
 
 Free, no account. Limits:
 
-- 3 jobs a day (a check-in, or a probe or check from the cockpit), and 3 queued or running at once.
+- 5 jobs a day (a check-in, or a probe or check from the cockpit), and 3 queued or running at once.
   Days run midnight to midnight, US Eastern.
-- Past your 3 jobs, or once the site's daily GPU budget is spent, only samples and shared records
+- Past your 5 jobs, or once the site's daily GPU budget is spent, only samples and shared records
   open until midnight.
 - If a check-in stops before measuring anything, one resend a day is free: it doesn't count against
-  your 3 jobs, but the site's daily GPU budget still applies.
+  your 5 jobs, but the site's daily GPU budget still applies.
 
 A check-in of the LoRA sample on an L4 takes about 5 to 11 minutes (its two production check-ins
 took 4 min 59 s and 10 min 21 s); other jobs vary. Add any wait for a free GPU: the boarding screen
@@ -273,7 +273,7 @@ A knob the guide proposed shows the suggested value. Move it yourself and your v
 
 Knobs with a **Code** badge can only change by editing your script. Muse Code writes the change and
 a short verify run checks it before you get it. Nothing runs until you say so, and each verify run
-or probe counts towards your 3 jobs a day.
+or probe counts towards your 5 jobs a day.
 
 ### Not predicted here yet
 
