@@ -1,0 +1,47 @@
+# Watches the live site through judging (PM, Nov 3): every 4 hours it runs the plain-HTTP live
+# check (scripts/live_site_check.py: public pages, the bundled samples and /v1/status; no secrets,
+# no check-ins, $0) and opens one GitHub issue when it fails, which emails the repository's
+# watchers. A later failure comments on the open issue instead of opening another. It deploys
+# nothing and changes nothing on the site. To stop it, disable the workflow in Actions.
+name: watch
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Live check
+        id: check
+        shell: bash  # bash -eo pipefail, so a failed check fails the step through tee
+        run: python scripts/live_site_check.py https://preflight-cqn.pages.dev 2>&1 | tee check.txt
+      - name: Open or update the issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Live site check failed"
+          body="$(printf 'The scheduled live check failed: %s\n\n```\n%s\n```' "$RUN_URL" "$(tail -n 40 check.txt)")"
+          n=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
