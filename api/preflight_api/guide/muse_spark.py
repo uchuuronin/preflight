@@ -17,11 +17,15 @@ from dataclasses import dataclass, field
 import httpx
 
 MODEL = "muse-spark-1.3"
-# Measured Oct 27 from Modal over 264 tour rounds (run 3): latency is about 0.50 s + 3.4 ms per output
-# token, with the slowest round 1.8 s above that line. At the 2,000-token cap that predicts 9.1 s
-# at worst. Source: derived, that worst case plus about 30% (docs/decisions/guide-limits.md).
+# Measured Oct 27 from Modal over 264 tour rounds (run 3): about 0.50 s + 3.4 ms per output token,
+# so 12 s covered the 2,000-token cap. Re-measured Nov 4, 1 AM ET, on the live site's LoRA tour (C,
+# after D's take timed out): the model is about twice as slow per token now, 453 output tokens in
+# 5.7 s, 1,212 in 11.0 s, 1,580 in 12.9 s (whole request), about 3.2 s + 6.2 ms a token; one turn in
+# four of the tour's second round passed 12 s and handed over to the rule-based tour. At the
+# 2,000-token cap that line predicts 15.6 s. Source: derived, that plus about 60%. The cost caps are
+# unchanged: a round's cost is bounded by its tokens (MAX_OUTPUT_TOKENS), not by its time.
 # Past it the rule-based tour takes over.
-TIMEOUT_S = 12.0
+TIMEOUT_S = 25.0
 
 # Per million tokens. Source: cited from a third-party listing; checked against Meta's Usage page
 # on Oct 27, the tour runs came to $3.01 measured against $2.91 at these prices (3% low).
@@ -111,7 +115,7 @@ async def create_turn(
 	own = client is None
 	c = client or httpx.AsyncClient(timeout=TIMEOUT_S)
 	try:
-		res = await c.post(f"{base}/responses", json=payload, headers=headers)
+		res = await c.post(f"{base}/responses", json=payload, headers=headers, timeout=TIMEOUT_S)
 	except httpx.TimeoutException as e:
 		raise GuideModelError("The guide model took too long to answer.", retryable=True) from e
 	except httpx.HTTPError as e:
