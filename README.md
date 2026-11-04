@@ -26,8 +26,9 @@ Built during the Meta Global AI Developer Hackathon; nothing was carried over fr
 Everything below is live on the site. Samples are free and open instantly; checking in your own
 code runs real probes on a rented GPU, so the public demo has limits:
 
-- **3 check-ins a visitor a day**, plus one free resend when a check-in stopped before measuring anything.
-- **A daily GPU budget for the whole site** ($8 a day). Past it, samples and shared links still open.
+- **3 check-ins a visitor a day**, plus one free resend when a check-in stopped before measuring anything;
+  one network address gets at most 6 a day and 2 at once.
+- **A daily GPU budget for the whole site** ($15 a day). Past it, samples and shared links still open.
 - **The live guide:** up to $0.40 a tour and $10 a day for the whole site; if it's busy, the rule-based tour takes over.
 
 | What | Where you see it | Code |
