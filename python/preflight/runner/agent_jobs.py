@@ -64,9 +64,11 @@ class _SandboxProc:
 	def __init__(self, sb, job: dict):
 		self.sb = sb
 		self.p = sb.exec(*AGENT_ENTRY, timeout=int(job["timeout_s"]) + 600)  # installs come first
-		self.p.stdin.write(json.dumps(job))
-		self.p.stdin.write_eof()
-		self.p.stdin.drain()
+		from .sandbox_runner import write_stdin
+
+		write_stdin(
+			self.p.stdin, json.dumps(job)
+		)  # in pieces: the job carries the repo's files (Nov 4, review)
 		self.report: dict = {}
 
 	def poll(self):

@@ -58,3 +58,15 @@ def test_a_small_spec_is_one_write_as_before():
 	s = ModalLikeStdin()
 	write_stdin(s, "")
 	assert s.calls == ["eof", "drain"]
+
+
+def test_an_agent_runs_job_goes_in_pieces_too():
+	"""Review, Nov 4: an agent run's job carries the same repo files as a probe's spec."""
+	from preflight.runner.agent_jobs import _SandboxProc
+
+	stdin = ModalLikeStdin()
+	proc = type("P", (), {"stdin": stdin})()
+	sb = type("SB", (), {"exec": lambda self, *a, **k: proc})()
+	job = {"timeout_s": 60, "files": {"big.py": "a" * 17_000_000}}
+	_SandboxProc(sb, job)
+	assert stdin.eof and len("".join(stdin.received)) > 17_000_000
