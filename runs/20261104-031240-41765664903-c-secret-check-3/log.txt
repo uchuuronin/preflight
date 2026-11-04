@@ -1,0 +1,9 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-EVBpgnNqftziUK8Ylu8uva
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/secret_check_app.py
+└── ✓ Created Function which.
+{"PREFLIGHT_GITHUB_TOKEN": "set"}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-EVBpgnNqftziUK8Ylu8uva
