@@ -525,6 +525,15 @@ def store_probe(modal_env: str = "main", timeout_s: float = 45.0):
 				"failed": f"{type(exc).__name__}: {exc}"[:400],
 			}
 		print(f"[store] {name}: {json.dumps(out[f'{name}_{len(out) - 1}'])[:600]}", flush=True)
+	# then tick itself, as its schedule runs it: what it does now, and how long it takes
+	t0 = time.monotonic()
+	try:
+		tick = modal.Function.from_name(APP_NAME, "tick", environment_name=modal_env or None)
+		res = tick.spawn().get(timeout=timeout_s + 90)
+		out["tick"] = {"s": round(time.monotonic() - t0, 2), "result": res}
+	except Exception as exc:
+		out["tick"] = {"s": round(time.monotonic() - t0, 2), "failed": f"{type(exc).__name__}: {exc}"[:600]}
+	print(f"[store] tick: {json.dumps(out['tick'])[:800]}", flush=True)
 	Path("out").mkdir(exist_ok=True)
 	Path("out/store_probe.json").write_text(json.dumps(out, indent=2))
 
