@@ -76,6 +76,19 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 21:40 ET (the video: the campaign shot, the type, shot 9b's CUDA run)
+
+The PM, 21:21: PF420 has been measured since Nov 2 (C's D51), so the plan's "illustrative" reason
+was wrong; the campaign calendar gets an 8-second shot (6 s in the short cut), and the plan now
+says why. Chiya, 21:21: "bold words and expressive text", no box behind a subtitle; D's captions
+are now a sans lead line over a large serif punch line, key words in the accent colour.
+Lengths: 2:48.5 and 2:28 [measured: the built timelines]. Chiya's laptop, 21:15 (her PowerShell
+output, native Windows): `preflight run` measured all three probes on CUDA (`"backend": "cuda"`,
+`"gpu": "RTX-4070-Laptop"`, step 4.2 to 5.8 ms, peak about 18 MB) [measured], the first CUDA run on
+Windows any of us has seen; she films shot 9b's watch take next.
+
+This push sends: `docs/demo/video-plan.md`, this file.
+
 ## Tue Nov 3, 21:25 ET (the video: the rules review, the X post)
 
 Chiya's 19:54 to 20:32: the 3-minute video with no voice-over (captions over music), three cuts

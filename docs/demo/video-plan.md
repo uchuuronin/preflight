@@ -6,11 +6,13 @@ the earlier drafts. The 45-second X clip has its own section below (new concept,
 
 ## The edit as built (Tue Nov 3, evening)
 
-By D, Nov 3, 21:20 ET. Chiya's calls (19:54 to 20:32): **no voice-over**: captions of at most 9
-words carry it, over a music bed (lofi-tech or nastelbom, both tried), with the Antonov take-off
+By D, Nov 3, 21:40 ET. Chiya's calls (19:54 to 21:21): **no voice-over**; captions as "bold words
+and expressive text", not a box behind a subtitle (Chiya, 21:21). D's design for that: a short sans
+lead line over a large serif punch line, key words in the accent colour, set into the frame's empty
+space, at most 9 words a line. It carries the film, over a music bed (lofi-tech or nastelbom, both tried), with the Antonov take-off
 sound on Check in. Three cuts of one picture, built in HyperFrames from D's takes of a local
 production build of `main` `f52f3e44` and Chiya's live takes C1 to C4 (until they arrive, labelled
-placeholder cards): lofi-tech 2:48.5, nastelbom 2:48.5, and a shorter nastelbom cut, 2:26.5, that
+placeholder cards): lofi-tech 2:48.5, nastelbom 2:48.5, and a shorter nastelbom cut, 2:28, that
 ends with the track (no loop). The frame plan, its critique and the replan are in D's video project
 (PLAN.md); the shot list below is the earlier plan of record.
 
@@ -36,7 +38,9 @@ The PM's rules review (Nov 3, 21:08), as the edit meets it:
    LoRA record shows "No known issue found for probe p1-eval's error ... Muse Spark searched the
    web"; it is on screen in the replay shot, in the app's own words. No separate shot. (This
    replaces "cut at the freeze" below.)
-7. **Length.** 2:48.5 at most; the short cut 2:26.5 (the scene lengths in D's `gen.py`).
+7. **Length.** 2:48.5 at most, the campaign shot included; the short cut 2:28 [measured: the built
+   timelines] (the scene lengths in D's
+   `gen.py`).
 8. **The X post.** "Meta hackathon" is in the first post (`docs/submission/x-post.md`).
 
 ## At the freeze (Tue Nov 3): the plan of record for Wednesday's recording
@@ -364,7 +368,10 @@ the clip's 0:24 to 0:32 on C's race lanes on the live LoRA sample. D ran the Win
 ## What is left out, and why
 
 - **The range test (7b):** `probes.lr_range` is off in production.
-- **Search grounding:** off; not in the cut.
-- **The campaign calendar:** on in production, but its sample is illustrative; three minutes don't
-  hold it with the stories above. It's in the README.
+- **Search grounding:** in since Nov 3, 21:20 ("The edit as built", item 6).
+- **The campaign calendar: in** (the PM, Nov 3, 21:21). The earlier reason here, "its sample is
+  illustrative", was wrong: PF420 has been measured since Nov 2 (C's D51: rebuilt from the four A10
+  cells measured on Nov 2). It gets an 8-second shot (6 s in the short cut, D's call to keep that cut
+inside the track): the sample's "12 probes"
+  chip, then its Campaign calendar with each person's runs and when the last one lands.
 - **The divergence warning:** its classifier misses (AUROC 0.66 against 0.85) and isn't used.
