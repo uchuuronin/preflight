@@ -248,7 +248,7 @@ function partsLabel(s: MemorySegment): string {
  * untrusted, never squeezed away; terms that abstain here are listed by name.
  */
 export function MemoryBand() {
-	const { record, estimates } = useWorkspace();
+	const { record, estimates, state } = useWorkspace();
 	const hops = useHops();
 	const layout = useOrbitLayout();
 	const { segments, total, capacity, breakdown, untrusted, abstaining, partsBytes } = layout.memory;
@@ -272,6 +272,13 @@ export function MemoryBand() {
 	const hopDraws = hops.on && unit === "bytes" ? outcomes(peak) : [];
 	const shownHops = hops.frame === null ? hopDraws : hopDraws.length ? [hopDraws[hops.frame % hopDraws.length]!] : [];
 	const frameOver = hops.frame !== null && shownHops.length === 1 && shownHops[0]! > capacity;
+	// A campaign's grid probes train only, so a peak led by the eval spike is extrapolated from no eval at all:
+	// say why it's so far past the GPU (PM, Nov 3: "138 GiB of 24 GiB" for a 1.5B LoRA read like a bug).
+	const evalBatch = typeof state.knobs.eval_batch_size === "number" ? state.knobs.eval_batch_size : null;
+	const evalNote =
+		record.campaign && status === "extrapolated" && evalBatch && total && memoryTermBytes(estimates, "eval_spike") > total / 2
+			? t("membar.campaign_eval", { batch: fmt(evalBatch, "count") })
+			: null;
 	return (
 		<div className="glass pf-band" aria-label={t("membar.title")}>
 			<div className="pf-band__head">
@@ -330,6 +337,7 @@ export function MemoryBand() {
 					<li className="pf-dim">{t("membar.untrusted.abstain", { terms: abstaining.map((x) => t(`target.memory.${x}`)).join(", ") })}</li>
 				) : null}
 			</ul>
+			{evalNote ? <p className="pf-band__note">{evalNote}</p> : null}
 		</div>
 	);
 }
