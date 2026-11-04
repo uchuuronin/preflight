@@ -67,7 +67,11 @@ function noLengthNote(record: LoadedRecord, knobs: Readonly<Record<string, KnobV
 	const tasks = typeof knobs.n_tasks === "number" ? knobs.n_tasks : null;
 	if (tasks) return t("plan.tasks", { tasks: fmt(tasks, "count") });
 	const epochs = typeof knobs.epochs === "number" ? knobs.epochs : (record.job.script_map?.training?.epochs ?? null);
-	if (epochs) return t(epochs === 1 ? "plan.no_examples_one" : "plan.no_examples", { epochs: fmt(epochs, "count") });
+	// only when the examples are what's missing (a count with no batch size isn't that)
+	if (epochs && !record.job.script_map?.data?.n_examples) {
+		const n = Number.isInteger(epochs) ? fmt(epochs, "count") : String(Math.round(epochs * 100) / 100);
+		return t(epochs === 1 ? "plan.no_examples_one" : "plan.no_examples", { epochs: n });
+	}
 	return t("plan.no_length");
 }
 
@@ -136,8 +140,8 @@ export function FlightPlanBand() {
 						? stop
 							? // A run that stops spends only up to the crash, at the same per-step rate the playhead uses (PM's audit, Nov 3).
 								t("plan.cost_to_stop", {
-									cost: fmtRange(...scaled(bounds(cost), stop / total), "usd"),
-									time: fmtRange(...scaled(bounds(time), stop / total), "s"),
+									cost: fmtRange(...scaled(bounds(cost), Math.min(1, stop / total)), "usd"),
+									time: fmtRange(...scaled(bounds(time), Math.min(1, stop / total)), "s"),
 									full: fmtRange(...bounds(cost), "usd"),
 								})
 							: t("plan.cost_over_time", { cost: fmtRange(...bounds(cost), "usd"), time: fmtRange(...bounds(time), "s") })
