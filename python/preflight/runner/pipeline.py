@@ -109,9 +109,10 @@ class Budget:
 	spent_usd: float = 0.0  # what the cap is checked against: GPU and the sandbox overhead estimate
 	gpu_usd: float = 0.0  # GPU at measured probe time, every attempt
 	overhead_usd: float = 0.0  # the sandbox CPU and memory estimate alone
-	billed_usd: float | None = (
-		None  # the runner's own bill (sandbox lifetimes), when it knows it: reported if larger
-	)
+	# the runner's own bill (sandbox lifetimes), when it knows it: reported if larger; `bill` reads it live (a job that
+	# fails partway still reports it)
+	billed_usd: float | None = None
+	bill: Callable[[], float] | None = None
 	started: float = field(default_factory=time.monotonic)
 	# time spent waiting for a GPU to schedule: not the job's probe time (Chiya, Nov 1: the wall
 	# counts from when a probe starts on its GPU; the wait has its own cap, in the runner)
@@ -726,6 +727,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	budget = deps.budget()
 	with contextlib.suppress(AttributeError, TypeError):
 		ctx.budget = budget  # the worker reports what the job spent to the day's GPU cap (queue.py)
+	if hasattr(
+		deps.runner, "billed_usd"
+	):  # the job's own runner's bill, read when the worker reports, failed or not
+		budget.bill = lambda: deps.runner.billed_usd(_price)
 	budget.waited = lambda: float(getattr(deps.runner, "queued_s", 0.0) or 0.0)
 	from .queue import GPU_WAIT_PREFIX
 
@@ -1491,10 +1496,13 @@ def _probe_points(
 		def may_step_up(
 			g, est_s=est_s, over=over
 		):  # another GPU only while the job is live and the budget holds it
+			dearest = max(_price(x) for x in (g, *_fallbacks(g, allowed, pinned))) + over
 			return (
 				not pinned
 				and not ctx.should_stop()
 				and budget.allows((_price(g) + over) * est_s / 3600, est_s)
+				# the bound run() applies: a step-up it would refuse keeps the measured OOM (review, Nov 3)
+				and _attempt_cap_s(budget, dearest) >= MIN_ATTEMPT_S
 			)
 
 		steps = max_steps_up(need) if i == 0 else 1

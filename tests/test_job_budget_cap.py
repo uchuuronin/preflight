@@ -57,7 +57,9 @@ def test_the_worker_reports_the_runners_bill_when_it_is_larger():
 	from preflight.runner.worker import _spent
 
 	b = SimpleNamespace(gpu_usd=0.20, overhead_usd=0.05, billed_usd=0.41)
-	assert _spent(SimpleNamespace(budget=b)) == 0.41
+	assert (
+		_spent(SimpleNamespace(budget=b)) == 0.46
+	)  # the bill (GPU only) with the overhead estimate beside it
 	b.billed_usd = 0.10
 	assert _spent(SimpleNamespace(budget=b)) == 0.25
 	b.billed_usd = None
@@ -126,3 +128,25 @@ def test_the_worker_image_carries_the_two_settings():
 		"PREFLIGHT_JUDGING_TO": "2026-11-10",
 	}
 	assert "**WORKER_SETTINGS" in src
+
+
+def test_a_failed_job_reports_its_bill_with_the_overhead_beside_it():
+	from types import SimpleNamespace
+
+	from preflight.runner.worker import _spent
+
+	b = SimpleNamespace(gpu_usd=0.10, overhead_usd=0.05, billed_usd=None, bill=lambda: 0.30)
+	assert _spent(SimpleNamespace(budget=b)) == 0.35  # read live, though the job never reached billed_usd
+
+
+def test_one_refusal_fails_every_queued_job_that_cannot_fit_today():
+	t = [1_762_200_000.0]
+	cap = [3.0]
+	store = InMemoryJobStore(clock=lambda: t[0], daily_cap_usd=lambda day: cap[0], max_running=1)
+	ids = [
+		store.submit({**REQ, "n": i}, visitor=v, idempotency_key=str(i)).job_id for i, v in enumerate("abc")
+	]
+	lease = store.lease("w")
+	store.complete(lease, record_id="r", spent_usd=2.6)
+	assert store.lease("w") is None
+	assert [store.status(j) for j in ids[1:]] == ["failed", "failed"]

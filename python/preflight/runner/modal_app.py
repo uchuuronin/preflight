@@ -142,7 +142,8 @@ _base = modal.Image.debian_slim(python_version="3.11").env(
 FLAG_ENV = "production"  # api/app.py's PREFLIGHT_ENV
 # the worker's own settings (Chiya, Nov 3, 9:07 PM): the day's GPU cap (queue.daily_gpu_cap_usd: $10 through Nov 4,
 # $8 after, without it) and the judging window's end (judging.py: the warm worker and the A10-first ladder through
-# Nov 10, one day past the Nov 9 live finals). Only the worker image (the queue, the worker, the warm-pool check)
+# Nov 10, one day past the Nov 9 live finals). The worker image alone carries them: the queue, the worker and the
+# warm-pool check run on it, and the probe images are untouched. $15 replaces both the $10 and the $8 of the default.
 WORKER_SETTINGS = {"PREFLIGHT_DAILY_GPU_CAP_USD": "15", "PREFLIGHT_JUDGING_TO": "2026-11-10"}
 
 

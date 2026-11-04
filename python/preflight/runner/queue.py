@@ -612,11 +612,11 @@ class InMemoryJobStore:
 			cap = self.daily_cap_usd(day)
 			if spent + self.job_budget_usd > cap:
 
-				def refuse():
-					job = self._jobs[pick]
-					self._order.remove(pick)
-					self._requeue_or_fail(job, "Preflight has used today's GPU budget: samples only until midnight ET",
-						False, "limit.daily_spend")  # fmt: skip
+				def refuse():  # every queued job: none fits today (review, Nov 3: one a call drained slowly)
+					for jid in list(self._order):
+						self._order.remove(jid)
+						self._requeue_or_fail(self._jobs[jid], "Preflight has used today's GPU budget: samples only "
+							"until midnight ET", False, "limit.daily_spend")  # fmt: skip
 
 				self._txn(refuse)
 				return None
