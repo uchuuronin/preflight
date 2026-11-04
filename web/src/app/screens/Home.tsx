@@ -12,6 +12,8 @@ import { href } from "../route";
 import { Plane } from "../Plane";
 import { AddonBoundary } from "../../components/AddonBoundary";
 
+const REPO_URL = "https://github.com/uchuuronin/preflight";
+
 export function Home() {
 	const [p, setP] = useState(0);
 	const raf = useRef(0);
@@ -91,6 +93,13 @@ export function Home() {
 						{t("home.start")}
 					</a>
 				</section>
+				{/* The rules ask that judges can tell what was built during the event (PM, Nov 3). */}
+				<footer className="pf-home__foot">
+					{t("home.built_during")} ·{" "}
+					<a href={REPO_URL} target="_blank" rel="noreferrer">
+						GitHub
+					</a>
+				</footer>
 			</div>
 		</div>
 	);

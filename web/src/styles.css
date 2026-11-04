@@ -587,6 +587,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	text-align: center;
 }
 .pf-closing .pf-display { max-width: 16ch; }
+.pf-home__foot { margin: -72px 0 0; padding: 0 16px 32px; text-align: center; font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
+.pf-home__foot a { color: inherit; text-underline-offset: 3px; }
 
 /* ---------- New flight: check-in desk and departures board ---------- */
 
