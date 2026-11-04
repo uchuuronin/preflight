@@ -76,6 +76,19 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 20:00 ET (live with the LoRA refill: filming can start)
+
+C, 7:53 PM: live with the LoRA refill (main `f52f3e44`, deploy 41749515115), race lanes checked on
+the refilled PF102, "D: you can film now". The CLI didn't change from `2b62f25c` to `f52f3e44`
+(measured: git diff, no change under the top-level `src/` or to `pyproject.toml`; the other changes
+are the API, the web app, D's own Windows workflow file and docs), so the Windows check on
+`2b62f25c` stands for shot 9b. The clip's 0:24 row now follows C's live path (Eval loop node, Fix
+it with Muse Code, Write the fixes). Open: the 3-minute video's shot 8b asks for a new A10 race,
+while the live lanes show the Nov 2 verdicts beside "Not verified"; D settles it in the video's
+replan. "Before filming": the deploy item ticked.
+
+This push sends: `docs/demo/video-plan.md`, this file.
+
 ## Tue Nov 3, 18:55 ET (the clip's 0:08: Entry point is in the fold)
 
 C, 6:45 PM: New flight's Entry point, Arguments and Extra packages now sit in "Optional flight
