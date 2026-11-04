@@ -539,6 +539,34 @@ def store_probe(modal_env: str = "main", timeout_s: float = 45.0):
 
 
 @ops.local_entrypoint()
+def settled(modal_env: str = "main", tries: int = 12):
+	"""modal run --env main python/preflight/runner/ops_app.py::settled
+	After a deploy, before any check that drives the queue: wait until the deployed tick answers cleanly twice in a
+	row (the old job-store container is gone). Nov 4: the limit check right after the 153ffa59 redeploy drove the
+	old container while the new one claimed the state, its fence fired on live traffic, and tick's calls to it hung
+	to their 120 s limit until it was torn down. Exits non-zero if it never settles."""
+	import sys
+	import time
+
+	tick = modal.Function.from_name(APP_NAME, "tick", environment_name=modal_env or None)
+	clean = 0
+	for _ in range(tries):
+		t0 = time.monotonic()
+		try:
+			tick.spawn().get(timeout=90)
+			clean += 1
+			print(f"[settled] tick answered in {time.monotonic() - t0:.1f} s ({clean} clean)", flush=True)
+			if clean >= 2:
+				return
+		except Exception as exc:
+			clean = 0
+			print(f"[settled] tick didn't answer ({type(exc).__name__}); waiting", flush=True)
+		time.sleep(30)
+	print("[settled] the service never settled", flush=True)
+	sys.exit(1)
+
+
+@ops.local_entrypoint()
 def limit_check(modal_env: str = ""):
 	"""Confirm the demo limit on the deployed runner: one visitor's (VISITOR_DAILY_JOBS + 1)th probe job of the ET day
 	is refused with limit.visitor_daily (the limit read from this checkout's queue.py, which the deploy carries: 5 since
