@@ -3,7 +3,7 @@
 Preflight runs a few minutes of your job on a real GPU, then lets you try the whole run in the
 cockpit before you pay for it. This page covers every box on **New flight** and every knob in the
 cockpit. You don't need to have trained a model before. For the engine's line-by-line account of
-each knob, see [`knobs-reference.md`](knobs-reference.md).
+each knob, see [`knobs-reference.md`](https://github.com/uchuuronin/preflight/blob/main/docs/guide/knobs-reference.md).
 
 Two terms used throughout:
 
