@@ -1,0 +1,63 @@
+{
+ "key_set": true,
+ "base_set": true,
+ "api_up": true,
+ "npm_ci": 0,
+ "web_up": true,
+ "playwright_install": 0,
+ "runs": [
+  {
+   "url": "http://localhost:5173/#/cockpit/lora-qwen",
+   "label_before": "Rule-based tour",
+   "start_button": "Start the tour",
+   "label": "Rule-based tour",
+   "status": "Waiting for you",
+   "waited_s": 0,
+   "said": "None of the single changes left clears the out-of-memory risk here. Together, eval batch from 32 to 8 and sequence length from 1,024 to 256 bring peak memory to 14.3 GiB, with a 0.5% chance of running out.",
+   "apply_offered": 1,
+   "turns": [
+    {
+     "url": "/v1/guide/limits/state",
+     "status": 200,
+     "body": "{\"limits\":null}"
+    },
+    {
+     "url": "/v1/guide/limits/state",
+     "status": 200,
+     "body": "{\"limits\":null}"
+    }
+   ],
+   "name": "readme_as_written",
+   "muse_spark_answered": false
+  },
+  {
+   "url": "http://localhost:5173/?flags=c.guide.live#/cockpit/lora-qwen",
+   "label_before": "Muse Spark",
+   "start_button": "Start the tour",
+   "label": "Muse Spark",
+   "status": "Working",
+   "waited_s": 6,
+   "said": "Starting your fastest run tour, checking the strongest time saver.",
+   "apply_offered": 0,
+   "turns": [
+    {
+     "url": "/v1/guide/limits/state",
+     "status": 200,
+     "body": "{\"limits\":null}"
+    },
+    {
+     "url": "/v1/guide/limits/state",
+     "status": 200,
+     "body": "{\"limits\":null}"
+    },
+    {
+     "url": "/v1/guide/turns",
+     "status": 200,
+     "body": "{\"text\":\"Starting your fastest run tour, checking the strongest time saver.\",\"withheld\":null,\"calls\":[{\"call_id\":\"call_78837113-daef-450d-b1e8-7da090b51ed8\",\"name\":\"sensitivity\",\"arguments\":{\"objective\":\"min_time\"},\"runs_in\":\"browser\"}],\"reverts\":[],\"awaiting\":\"results\",\"state\":\"nIdOYaFCJaU-Ox2a-VYyrVY0n630S8J75lpJS2FiSz54nLVTTXMaMQz9Kx6fF2aXhITSU39DewPGI2wBbnZlxx_bIQz_vbI3gWZ6zmm9T5L13pN8kaNcd420"
+    }
+   ],
+   "name": "with_url_flag",
+   "muse_spark_answered": true
+  }
+ ]
+}

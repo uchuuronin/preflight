@@ -1,0 +1,11 @@
+{
+	"name": "20261104-021011-41758935780-b-readme-live-guide-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41758935780",
+	"ref": "ws-b",
+	"sha": "ebb3a45f6d86200a67e98d8ec2ffbe5f27494676",
+	"cmd": "python scripts/readme_live_guide_check.py",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T02:11:16Z"
+}
