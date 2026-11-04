@@ -4,7 +4,7 @@
 evaluation, serving or agent job, builds a model of how it behaves, and lets you fly the whole
 run, or a whole campaign of runs, before you spend real GPU hours or API dollars.
 
-Built for the Meta Global AI Developer Hackathon.
+Built during the Meta Global AI Developer Hackathon; nothing was carried over from earlier work.
 
 **Live:** <https://preflight-cqn.pages.dev> · **The manual:** [Technical Documentation](https://preflight-cqn.pages.dev/#/help)
 
@@ -53,6 +53,26 @@ was built and measured, and set aside when it missed its target ([Validation](#v
 **In the browser:** open <https://preflight-cqn.pages.dev>. Pick a sample to open it in the
 cockpit, or check in your own code under New flight. [The manual](https://preflight-cqn.pages.dev/#/help)
 explains every input and knob.
+
+**From this repo, with no account or key:** the cockpit runs locally with every sample, the knobs,
+the replay and the rule-based guide.
+
+```bash
+git clone https://github.com/uchuuronin/preflight && cd preflight/web
+npm ci && npm run dev                             # open http://localhost:5173
+```
+
+To have Muse Spark guide you live, run the API beside it with your own Meta Model API key (the names
+are in `.env.example`; never commit a filled-in copy):
+
+```bash
+cd ../api                                         # from preflight/web
+export META_API_KEY=...  META_API_BASE=...        # from the Meta dashboard's API page
+PREFLIGHT_FLAGS='{"c.guide.live": true}' uv run uvicorn preflight_api.app:create_app --factory --port 8000
+```
+
+Checking in your own code needs a GPU, so it runs on the hosted site, or on your own GPU with
+`preflight run` below.
 
 **On your own machine** (Python 3.11 or 3.12, in the environment that has your torch):
 
@@ -123,6 +143,15 @@ browser from the flight record.
 | **Modal** | GPU sandboxes for probes, the job store and API, the corpus sweep, the fix sandboxes | Every NVIDIA measurement |
 | **AMD MI300X** (rented) | ROCm probes and the AMD slice of the corpus | Measured: the planted OOM caught on the MI300X too; NVIDIA-to-AMD step time isn't predictable yet, so it abstains |
 | **Cloudflare Pages** | The web app, the API's edge, and share pages | Live |
+
+Every model Preflight calls at runtime is one of Meta's four above. Everything else is Preflight's own
+code: the engine's predictions come from formulas and small statistical models fitted on Preflight's
+own measured corpus, not from a pretrained model.
+
+**What's real and what isn't:** a sample labelled with its GPU and date is a real recorded run;
+the others say "Example numbers". Every number on screen says whether it was measured, predicted or extrapolated, or reads "Not measured here". The
+guide without a Meta key is a rule-based tour, and says so. Without Muse Spark, a script map falls
+back to Preflight's static reader, and the record says which one drew it.
 
 ## What a run costs
 
