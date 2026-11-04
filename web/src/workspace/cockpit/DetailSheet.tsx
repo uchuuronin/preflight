@@ -3,6 +3,7 @@
  * knobs) or from a probe, and the sheet says which: "measured at batch 4" is not a prediction
  * for batch 8. Groups list what they hold; findings say what to do about them.
  */
+import { type KeyboardEvent, useId, useRef, useState } from "react";
 import { fmt, fmtSpread } from "../../lib/fmt";
 import { hasKey, t } from "../../lib/i18n";
 import { usePanels } from "../../registry";
@@ -17,6 +18,8 @@ import { AddonBoundary } from "../../components/AddonBoundary";
 import { FixFinding } from "../../fix/FixFinding";
 import { FindingCitations, findingSourceKey, plainDetail } from "./findingSource";
 import { useWhyAbstain } from "./whyAbstain";
+import { splitQuote } from "./Findings";
+import type { Finding, Knob } from "../record/types";
 
 /** A metric path with no label of its own, as words: "probe.eval.peak_allocated_bytes" reads "Eval peak allocated". */
 function plainMetric(key: string): string {
@@ -52,7 +55,13 @@ export function DetailSheet() {
 
 	return (
 		<section className="glass pf-detail" aria-label={t("detail.label", { name: title })}>
-			<span className="pf-eyebrow">{eyebrow}</span>
+			{/* Back sits beside the eyebrow, not under the sheet, so it costs no row (Chiya, Nov 3). */}
+			<div className="pf-detail__top">
+				<span className="pf-eyebrow">{eyebrow}</span>
+				<button type="button" className="pf-detail__back" aria-label={t("detail.back")} title={t("detail.back")} onClick={() => actions.focus(null)}>
+					<span aria-hidden="true">×</span>
+				</button>
+			</div>
 			<h3>{title}</h3>
 			{node.phase && hasKey(`detail.about.${node.phase}`) ? <p>{t(`detail.about.${node.phase}`)}</p> : null}
 			{children.length ? (
@@ -100,36 +109,104 @@ export function DetailSheet() {
 					})}
 				</dl>
 			) : null}
-			{findings.length ? (
-				<div className="pf-detail__findings">
-					{findings.map((f) => (
-						<div key={f.id} className={`pf-finding pf-finding--${f.severity}`}>
-							<b>{f.title}</b>
-							{f.detail ? <p>{plainDetail(f.detail).text}</p> : null}
-							{plainDetail(f.detail).unsupported ? <p className="pf-dim">{t("findings.claim_unsupported")}</p> : null}
-							<p className="pf-dim">
-								{t(findingSourceKey(f))}
-								{f.knob_id && knobs.get(f.knob_id) ? ` · ${t("detail.fix_with", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}` : ""}
-							</p>
-							<FindingCitations finding={f} />
-							{f.knob_id && knobs.has(f.knob_id) ? (
-								<button type="button" className="pf-btn pf-btn--small" onClick={() => actions.openKnob(f.knob_id ?? null)}>
-									{t("detail.open_knob", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}
-								</button>
-							) : null}
-							<FixFinding finding={f} />
-						</div>
-					))}
-				</div>
-			) : null}
+			{findings.length ? <FindingTabs key={node.id} findings={findings} knobs={knobs} onOpenKnob={(id) => actions.openKnob(id)} /> : null}
 			{drawer.map((p) => (
 				<AddonBoundary key={p.id} id={p.id}>
 					<p.component nodeId={node.id} record={record} knobs={state.knobs} estimates={estimates} />
 				</AddonBoundary>
 			))}
-			<button type="button" className="pf-btn pf-btn--small" onClick={() => actions.focus(null)}>
-				{t("detail.back")}
-			</button>
 		</section>
+	);
+}
+
+const RANK: Record<string, number> = { critical: 0, error: 1, warn: 2, info: 3 };
+
+/**
+ * A node's findings, one at a time (Chiya, Nov 3): every finding open at once made the sheet taller than
+ * the map and pushed the knobs down, and a scroll box read as chopped. The worst comes first; a row of
+ * numbered marks above it (the severity's mark and colour, the title on hover and to a screen reader)
+ * pages through the rest, so the sheet's height is one finding's and nothing is cropped. A probe's log
+ * line, the longest part, is one click away.
+ */
+function FindingTabs({ findings, knobs, onOpenKnob }: { findings: Finding[]; knobs: Map<string, Knob>; onOpenKnob: (id: string) => void }) {
+	const sorted = [...findings].sort((a, b) => (RANK[a.severity] ?? 9) - (RANK[b.severity] ?? 9));
+	const [at, setAt] = useState(0);
+	const base = useId();
+	const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+	const f = sorted[Math.min(at, sorted.length - 1)]!;
+	const go = (i: number) => {
+		const n = (i + sorted.length) % sorted.length;
+		setAt(n);
+		tabs.current[n]?.focus();
+	};
+	const onKey = (e: KeyboardEvent) => {
+		if (e.key === "ArrowRight" || e.key === "ArrowDown") go(at + 1);
+		else if (e.key === "ArrowLeft" || e.key === "ArrowUp") go(at - 1);
+		else if (e.key === "Home") go(0);
+		else if (e.key === "End") go(sorted.length - 1);
+		else return;
+		e.preventDefault();
+	};
+	const plain = plainDetail(f.detail);
+	const { text, quote } = splitQuote(plain.text);
+	const knob = f.knob_id ? knobs.get(f.knob_id) : undefined;
+	const panel = (
+		<div className={`pf-finding pf-finding--${f.severity}`} {...(sorted.length > 1 ? { role: "tabpanel", id: `${base}-p`, "aria-labelledby": `${base}-t${at}` } : {})}>
+			<b>{f.title}</b>
+			{text ? <p>{text}</p> : null}
+			{plain.unsupported ? <p className="pf-dim">{t("findings.claim_unsupported")}</p> : null}
+			{quote ? (
+				<details className="pf-finding__log">
+					<summary>{t("detail.log")}</summary>
+					<code>{quote}</code>
+				</details>
+			) : null}
+			<p className="pf-dim">
+				{t(findingSourceKey(f))}
+				{knob ? ` · ${t("detail.fix_with", { knob: t(knob.label_key).toLowerCase() })}` : ""}
+			</p>
+			<FindingCitations finding={f} />
+			<div className="pf-finding__acts">
+				{knob ? (
+					<button type="button" className="pf-btn pf-btn--small" onClick={() => onOpenKnob(knob.id)}>
+						{t("detail.open_knob", { knob: t(knob.label_key).toLowerCase() })}
+					</button>
+				) : null}
+				<FixFinding finding={f} />
+			</div>
+		</div>
+	);
+	if (sorted.length === 1) return <div className="pf-detail__findings">{panel}</div>;
+	return (
+		<div className="pf-detail__findings is-tabbed">
+			<div className="pf-ftabs">
+				<span className="pf-ftabs__count" aria-hidden="true">
+					{t("detail.finding_of", { i: at + 1, n: sorted.length })}
+				</span>
+				<div className="pf-ftabs__marks" role="tablist" aria-label={t("detail.findings", { n: sorted.length })} onKeyDown={onKey}>
+				{sorted.map((x, i) => (
+					<button
+						key={x.id}
+						ref={(el) => {
+							tabs.current[i] = el;
+						}}
+						type="button"
+						role="tab"
+						id={`${base}-t${i}`}
+						aria-selected={i === at}
+						aria-controls={`${base}-p`}
+						tabIndex={i === at ? 0 : -1}
+						className={`pf-ftab pf-ftab--${x.severity}${i === at ? " is-on" : ""}`}
+						aria-label={x.title}
+						title={x.title}
+						onClick={() => setAt(i)}
+					>
+						<span aria-hidden="true">{i + 1}</span>
+					</button>
+				))}
+				</div>
+			</div>
+			{panel}
+		</div>
 	);
 }

@@ -563,7 +563,7 @@ export function GuidePanel() {
 				/>
 			) : (
 				<>
-					<p className="pf-guide__say">
+					<p className={`pf-guide__say${!active && !setAside ? " pf-guide__intro" : ""}`}>
 						{active
 							? t(active.step.textKey, vars)
 							: setAside
