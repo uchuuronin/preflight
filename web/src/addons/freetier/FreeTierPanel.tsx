@@ -6,6 +6,7 @@
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import type { WorkspaceContextValue } from "../../registry";
+import type { Estimate } from "../../workspace/record/types";
 import { provenanceKey } from "../../workspace/components/StatusMark";
 import { isFixture } from "../../workspace/record/model";
 import { canonicalGpu, checkPreset, gpuMemoryBytes, type Verdict } from "./check";
@@ -39,13 +40,16 @@ function chip(v: Verdict, p: Preset): string {
 }
 
 /** The memory need says where its number comes from, as the readouts do (a sample's is illustrative). */
-function say(v: Verdict, p: Preset, current: string | null, gpu: string | null, memStatus: string): string {
+function say(v: Verdict, p: Preset, current: string | null, gpu: string | null, memStatus: string, mem: Estimate | undefined): string {
 	switch (v.kind) {
 		case "sessions":
 			return t("addon.freetier.say.sessions", { every: fmt(v.saveEveryS, "s") });
 		case "no_memory": {
 			const on = gpu && p.gpus.includes(gpu) ? gpu : (p.gpus.find((g) => gpuMemoryBytes(g) === v.haveBytes) ?? p.gpus[0] ?? "");
-			return t("addon.freetier.say.no_memory", { need: fmt(v.needBytes, "bytes"), status: memStatus, gpu: short(on), have: fmt(v.haveBytes, "bytes") });
+			// Judged on the top of the range on purpose; the estimate itself is what the cockpit shows (B, Nov 3).
+			const pct = Math.round((mem?.level ?? 0.9) * 100);
+			const point = typeof mem?.point === "number" ? fmt(mem.point, "bytes") : fmt(v.needBytes, "bytes");
+			return t("addon.freetier.say.no_memory", { need: fmt(v.needBytes, "bytes"), pct, point, status: memStatus, gpu: short(on), have: fmt(v.haveBytes, "bytes") });
 		}
 		case "other_gpu":
 			return t("addon.freetier.say.other_gpu", { current: current ?? "", gpus: gpuList(p) });
@@ -89,7 +93,7 @@ export function FreeTierPanel({ record, knobs, estimates }: WorkspaceContextValu
 								<span className="pf-addon-freetier__meta">{t("addon.freetier.cap", { h: p.sessionCapS / 3600 })}</span>
 								<span className={CHIP[v.kind]}>{chip(v, p)}</span>
 							</div>
-							<p className="pf-addon-freetier__say">{say(v, p, raw ? short(gpu ?? raw) : null, gpu, memStatus)}</p>
+							<p className="pf-addon-freetier__say">{say(v, p, raw ? short(gpu ?? raw) : null, gpu, memStatus, mem)}</p>
 							{"overCredit" in v && v.overCredit && p.monthlyCreditUsd !== undefined ? (
 								<p className="pf-addon-freetier__say">{t("addon.freetier.over_credit", { credit: fmt(p.monthlyCreditUsd, "usd") })}</p>
 							) : null}

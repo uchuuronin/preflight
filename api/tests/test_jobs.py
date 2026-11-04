@@ -177,9 +177,52 @@ def test_the_ip_bucket_limits_check_ins_from_one_address():
 	assert codes == [202, 202, 429]
 
 
+def test_one_address_has_six_jobs_a_day_and_two_at_once():
+	"""PM's audit, Nov 3: a visitor who drops the cookie is new to the store, not a new address."""
+	store = Store()
+	ledger = MemoryLedger(LedgerCore())
+	c = client(store, ledger=ledger)
+
+	def check_in(i):
+		c.cookies.clear()  # a fresh visitor each time, from the same address
+		return c.post("/v1/jobs", json=BODY, headers={"Idempotency-Key": f"k-ip-{i:08d}"})
+
+	first, second, third = check_in(0), check_in(1), check_in(2)
+	assert [first.status_code, second.status_code] == [202, 202]
+	assert third.status_code == 429 and third.json()["error"]["code"] == "ip_jobs_open"
+	# a job seen to end frees its slot: by its status, its event stream, or a cancel
+	jid = first.json()["job_id"]
+	store.jobs[jid]["over"] = True
+	c.get(f"/v1/jobs/{jid}")
+	c.post(f"/v1/jobs/{second.json()['job_id']}/cancel")
+	codes = []
+	for i in range(3, 10):
+		r = check_in(i)
+		codes.append(r.json()["error"]["code"] if r.status_code == 429 else r.status_code)
+		if r.status_code == 202:
+			c.post(f"/v1/jobs/{r.json()['job_id']}/cancel")
+	assert codes == [202, 202, 202, 202, "ip_jobs_daily", "ip_jobs_daily", "ip_jobs_daily"]
+	r = check_in(11)
+	assert "6 jobs today" in r.json()["error"]["message"] and int(r.headers["Retry-After"]) >= 1
+
+
+def test_a_check_in_that_starts_no_job_keeps_the_address_slot():
+	ledger = MemoryLedger(LedgerCore(Limits(jobs_per_ip_day=2)))
+	c = client(Store(full=True), ledger=ledger)
+	for i in range(4):
+		assert (
+			c.post("/v1/jobs", json=BODY, headers={"Idempotency-Key": f"k-full-{i:06d}"}).status_code == 429
+		)
+	store = Store()
+	c = client(store, ledger=ledger)
+	assert c.post("/v1/jobs", json=BODY, headers=KEY).status_code == 202
+	assert c.post("/v1/jobs", json=BODY, headers=KEY).json()["created"] is False  # the same check-in again
+	assert list(ledger.core.snapshot()["day"]["jobs_ip"].values()) == [1]
+
+
 def test_branch_links_become_the_bare_repo_and_a_full_commit():
 	store = Store()
-	c = client(store)
+	c = client(store, ledger=MemoryLedger(LedgerCore(Limits(jobs_per_ip_open=9))))
 	cases = [
 		("github.com/karpathy/nanoGPT", None, SHA, "HEAD"),
 		("https://github.com/karpathy/nanoGPT/tree/main/data", None, SHA, "main"),

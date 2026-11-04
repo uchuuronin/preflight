@@ -124,10 +124,13 @@ class SpendLedger:
 		usd: float,
 		run_cap: float | None = None,
 		ttl_s: float | None = None,
+		job: bool = False,
 	) -> dict:
 		from dataclasses import asdict
 
-		decision = self.core.reserve(visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s)
+		decision = self.core.reserve(
+			visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s, job=job
+		)
 		if decision.ok:
 			self._save()
 		return asdict(decision)
@@ -141,6 +144,16 @@ class SpendLedger:
 	def release(self, reservation: str) -> None:
 		self.core.release(reservation)
 		self._save()
+
+	@modal.method()
+	def bind_job(self, reservation: str, job_id: str) -> None:
+		self.core.bind_job(reservation, job_id)
+		self._save()
+
+	@modal.method()
+	def end_job(self, job_id: str) -> None:
+		if self.core.end_job(job_id):
+			self._save()
 
 	@modal.method()
 	def spent_today(self) -> float:

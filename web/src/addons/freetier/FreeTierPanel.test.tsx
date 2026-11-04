@@ -50,14 +50,14 @@ describe("FreeTierPanel", () => {
 		const colab = row("Google Colab (free)");
 		expect(colab.getByText("Won't fit")).toBeTruthy();
 		// The dev record is a sample (fixture models), so its need is illustrative, as on the readouts.
-		expect(colab.getByText(/Needs 15.4 GiB at its peak \((extrapolated|predicted)\); a T4 has 14.7 GiB/)).toBeTruthy();
+		expect(colab.getByText(/Needs up to 15.4 GiB at its peak \(the top of its 90% range; the estimate is 14 GiB, (extrapolated|predicted)\); a T4 has 14.7 GiB/)).toBeTruthy();
 	});
 
 	it("says where the memory need comes from on a real record: the estimate's own status", () => {
 		const real = { ...record, record_id: "01REALRUN", predictions: { ...record.predictions, grids: [], estimates: {} } };
 		const estimates = { "memory.peak": est(15e9, "bytes", 1.1), "time.total": est(2 * H, "s") };
 		render(<FreeTierPanel record={real} knobs={{ gpu_type: "T4" }} estimates={estimates} />);
-		expect(row("Google Colab (free)").getByText(/Needs 15.4 GiB at its peak \(predicted\); a T4 has 14.7 GiB/)).toBeTruthy();
+		expect(row("Google Colab (free)").getByText(/Needs up to 15.4 GiB at its peak \(the top of its 90% range; the estimate is 14 GiB, predicted\); a T4 has 14.7 GiB/)).toBeTruthy();
 	});
 
 	it("asks for a probe on the free GPU when the run was measured elsewhere", () => {

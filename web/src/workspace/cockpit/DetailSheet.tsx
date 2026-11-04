@@ -15,7 +15,7 @@ import { bounds, trusted } from "../status";
 import { Provenance } from "../components/StatusMark";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { FixFinding } from "../../fix/FixFinding";
-import { FindingCitations, findingSourceKey } from "./findingSource";
+import { FindingCitations, findingSourceKey, plainDetail } from "./findingSource";
 import { abstainText } from "./abstain";
 
 /** A metric path with no label of its own, as words: "probe.eval.peak_allocated_bytes" reads "Eval peak allocated". */
@@ -104,7 +104,8 @@ export function DetailSheet() {
 					{findings.map((f) => (
 						<div key={f.id} className={`pf-finding pf-finding--${f.severity}`}>
 							<b>{f.title}</b>
-							{f.detail ? <p>{f.detail}</p> : null}
+							{f.detail ? <p>{plainDetail(f.detail).text}</p> : null}
+							{plainDetail(f.detail).unsupported ? <p className="pf-dim">{t("findings.claim_unsupported")}</p> : null}
 							<p className="pf-dim">
 								{t(findingSourceKey(f))}
 								{f.knob_id && knobs.get(f.knob_id) ? ` · ${t("detail.fix_with", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}` : ""}

@@ -9,7 +9,7 @@
 import { fmt } from "../../lib/fmt";
 import { hasKey, t } from "../../lib/i18n";
 import { FixFinding } from "../../fix/FixFinding";
-import { FindingCitations, findingSourceKey } from "./findingSource";
+import { FindingCitations, findingSourceKey, plainDetail } from "./findingSource";
 import { useOrbitLayout } from "../map/Orbit";
 import type { LoadedRecord } from "../record/types";
 import { useWorkspace } from "../state";
@@ -88,13 +88,15 @@ export function FindingsBand() {
 			</div>
 			<ul className="pf-findings__list">
 				{loose.map((f) => {
-					const { text, quote, unquoted } = splitQuote(f.detail);
+					const plain = plainDetail(f.detail);
+					const { text, quote, unquoted } = splitQuote(plain.text);
 					const lines = evidenceLines(f);
 					return (
 						<li key={f.id} className={`pf-finding pf-finding--${f.severity}`}>
 							<span className={`pf-findings__sev is-${f.severity}`}>{t(`findings.severity.${f.severity}`)}</span>
 							<b>{f.title}</b>
 							{text ? <p>{text}</p> : null}
+							{plain.unsupported ? <p className="pf-dim">{t("findings.claim_unsupported")}</p> : null}
 							{quote ? (
 								<blockquote className="pf-findings__quote">
 									<code>{quote}</code>
