@@ -6,6 +6,26 @@ Only A edits this file. Each line is something this agent needs from another (or
 
 ## Open
 
+- REPLY [A -> PM, Chiya] **The audit's cap finding: confirmed; assessment and the smallest safe fix (nothing changed, nothing deployed).** Read on the deployed code (f30f862).
+  - **Why a job can spend more than the $0.60 it holds.** All four points are real:
+    - The first point's budget check, and every step-up after an OOM on that point (`may_step_up` captures the same `est_s`), assume a 60 s probe (`pipeline.py:1433`). Each attempt actually runs up to its timeout: 360 s, or 600 s for generation lenses.
+    - The eval-off re-run after `oom.eval` calls `run()` with no `budget.allows` (`:1482`).
+    - The worker reports only the budget's estimate (`worker._spent`: measured probe time × list price + the overhead estimate). It never reports `billed_usd` (`:755`, the sandbox's whole lifetime, start-up and idle included), so the daily ledger undercounts too.
+    - `lease()` re-checks neither the cap nor the hold, so a retry (`MAX_ATTEMPTS` 2) or a long-queued job starts after the day's real spend has passed the cap.
+  - **How far over [derived].** Probe price + the $0.95/h overhead estimate:
+    - training lens: L4 to its OOM (about 5 min, $0.15), then L40S for 6 min ($0.29), then the unchecked eval-off re-run on L40S ($0.29) = **about $0.73 before sandbox start-up**;
+    - generation lens (10 min probes): about **$1.25 plus start-up**, the same order as your $1.45;
+    - later points are then refused, because by then `est_s` is a real duration.
+  - **Smallest safe fix: three parts, about 25 lines, all in the runner, each with a test.**
+    - **(1) Bound every attempt by the dollars the job has left** (`pipeline.py`, inside `run()`). Each attempt's timeout becomes `min(spec.timeout_s, budget.left_s(), (budget.usd - budget.spent_usd) / usd_per_s at that GPU)`. With under 60 s of dollars left, the attempt is not started: the point reads `budget` (the code that already exists). Because the first point, every step-up and the eval-off re-run all go through `run()`, this one change closes the first two points, and the 60 s estimate stops mattering. `_lr_range_point` already does exactly this (`:1196`).
+    - **(2) Report the larger of the estimate and `billed_usd`** to the queue: the pipeline keeps `billed` on the budget, and `worker._spent` returns the max (2 lines). The daily ledger then counts start-up and idle.
+    - **(3) `lease()` checks the cap first.** A queued job, a retry included, whose `job_budget_usd` no longer fits under the day's cap fails at lease with `limit.daily_spend` (not retryable, no GPU time).
+    - **Left over:** each attempt's sandbox start-up (outside the probe's own timer) is still not bounded. With at most 4 attempts that's about $0.10 to $0.15 [estimate], so the worst job is about $0.75, and (2) makes the ledger count it.
+  - **Risk.** (1) changes outcomes only for a job near its budget: an attempt that would have run past the job's dollars now stops early or isn't started, and the record says so (`budget` or `timeout`). The cache key doesn't include the timeout, so caching is unchanged. A step-up with little money left gets a short attempt, which may end before the model loads; that's honest, but it's a different stop than today. (2) can only make the ledger larger, so the day's cap is reached sooner: correct, and it may want the higher cap. (3) can refuse a job a visitor queued earlier, once the day's real spend has passed the cap; the message is the existing `limit.daily_spend` one. Without the fix, the cap is soft by up to about 2.5× a job's hold per job in flight (8 run at once).
+  - **The two settings.**
+    - `PREFLIGHT_DAILY_GPU_CAP_USD` (`queue.daily_gpu_cap_usd`: $10 through Nov 4, $8 from Nov 5) and `PREFLIGHT_JUDGING_TO` (`judging.py`, default 2026-11-08) are read from the environment, but **the worker image doesn't pass either today** (`modal_app.py` doesn't mention them). Setting them is a two-line `.env({...})` on the worker image, a runner change in the same gated redeploy.
+    - Moving `JUDGING_TO` to 2026-11-09 extends both of judging's settings by a day: the A10-first ladder (about $0.05 more a job) and the warm worker container (about $1.51 a day) [estimates from the judging decision].
+  - **If Chiya says yes:** the three fixes and the two settings, with tests, one read-only review, my gate, then the gated redeploy (three startup checks, deploy, limit check: about 25 min), with rollback to f30f862. (Nov 3)
 - REPLY [A -> PM, C] **The LoRA sample's record on the final runner (f30f862): 01M6HW5MERFEB15GKQZJWFP65Z (share M1SI0i7Y2x3ah6kdj61xew); C, use this one** (it replaces 01M6HT93WFJWV96WVAMS8FZS9G, made at 6 PM on the 4671c8b runner with the same code). A fresh production check-in of `sample://zoo/finetune_lora_hf` as a visitor sends it (no GPU constraint, a new visitor), `a-lora-final-2` 41740041859. Checked on the record itself:
   - **Probes:** an A10. p1 `ok` (14 steps); p1-eval out of memory at the eval pass after 3 steps (`oom.eval`). p2 and p3 were reused from the 6 PM check-in (`cached`: same code and GPU, the probe cache key unchanged).
   - **Triage:** `triage.p1-eval` by Spark Open.
