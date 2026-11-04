@@ -64,19 +64,19 @@ export function Home() {
 				<section className="pf-beats" aria-label={t("home.how")}>
 					<div className={`glass pf-beat pf-shape-circle${progress > 0.12 ? " is-in" : ""}`}>
 						<span className="pf-beat__num">{t("home.step", { n: 1 })}</span>
-						<h3>{t("home.probe.title")}</h3>
+						<h2>{t("home.probe.title")}</h2>
 						<p>{t("home.probe.body")}</p>
 					</div>
 					<div className={`glass pf-beat pf-shape-capsule${progress > 0.26 ? " is-in" : ""}`}>
 						<span className="pf-beat__num">{t("home.step", { n: 2 })}</span>
-						<h3>{t("home.simulate.title")}</h3>
+						<h2>{t("home.simulate.title")}</h2>
 						<p>{t("home.simulate.body")}</p>
 						{/* Named only when the live guide runs on Muse Spark in this build (audit finding 12). */}
 						{flag("c.guide.live") ? <span className="pf-model">{t("home.simulate.model")}</span> : null}
 					</div>
 					<div className={`glass pf-beat pf-shape-ticket${progress > 0.4 ? " is-in" : ""}`}>
 						<span className="pf-beat__num">{t("home.step", { n: 3 })}</span>
-						<h3>{t("home.verify.title")}</h3>
+						<h2>{t("home.verify.title")}</h2>
 						<p>{t("home.verify.body")}</p>
 					</div>
 					{extraBeats.map((b) => (

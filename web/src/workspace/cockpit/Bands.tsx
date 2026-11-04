@@ -9,7 +9,7 @@ import { useOrbitLayout } from "../map/Orbit";
 import { runPlan, targetFor } from "../record/model";
 import { memoryStackScale } from "../record/scale";
 import { memoryTermBytes, type MemorySegment } from "../record/terms";
-import type { LoadedRecord, Prediction } from "../record/types";
+import type { KnobValue, LoadedRecord, Prediction } from "../record/types";
 import { useWorkspace } from "../state";
 import { Info } from "../components/Info";
 import { Provenance } from "../components/StatusMark";
@@ -62,6 +62,19 @@ export function targetsApart(marks: readonly PlanMark[], width: number, keep: (m
 	return out;
 }
 
+/** Why there's no step plan, naming what the script does say (PM's audit, Nov 3: Epochs 1, Tasks 500). */
+function noLengthNote(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): string {
+	const tasks = typeof knobs.n_tasks === "number" ? knobs.n_tasks : null;
+	if (tasks) return t("plan.tasks", { tasks: fmt(tasks, "count") });
+	const epochs = typeof knobs.epochs === "number" ? knobs.epochs : (record.job.script_map?.training?.epochs ?? null);
+	if (epochs) return t(epochs === 1 ? "plan.no_examples_one" : "plan.no_examples", { epochs: fmt(epochs, "count") });
+	return t("plan.no_length");
+}
+
+function scaled([lo, hi]: readonly [number, number], f: number): [number, number] {
+	return [lo * f, hi * f];
+}
+
 export function FlightPlanBand() {
 	const { record, estimates, state, actions } = useWorkspace();
 	const track = useRef<HTMLDivElement>(null);
@@ -86,7 +99,7 @@ export function FlightPlanBand() {
 			<div className="glass pf-band">
 				<div className="pf-band__head">
 					<b>{t("plan.title")}</b>
-					<span>{t("plan.no_length")}</span>
+					<span>{noLengthNote(record, state.knobs)}</span>
 				</div>
 			</div>
 		);
@@ -120,7 +133,14 @@ export function FlightPlanBand() {
 				<span className={stop ? "is-bad" : ""}>{note}</span>
 				<span>
 					{trusted(cost) && trusted(time)
-						? t("plan.cost_over_time", { cost: fmtRange(...bounds(cost), "usd"), time: fmtRange(...bounds(time), "s") })
+						? stop
+							? // A run that stops spends only up to the crash, at the same per-step rate the playhead uses (PM's audit, Nov 3).
+								t("plan.cost_to_stop", {
+									cost: fmtRange(...scaled(bounds(cost), stop / total), "usd"),
+									time: fmtRange(...scaled(bounds(time), stop / total), "s"),
+									full: fmtRange(...bounds(cost), "usd"),
+								})
+							: t("plan.cost_over_time", { cost: fmtRange(...bounds(cost), "usd"), time: fmtRange(...bounds(time), "s") })
 						: t("plan.cost_unknown")}
 				</span>
 				<Info label={t("plan.title")} align="end">
