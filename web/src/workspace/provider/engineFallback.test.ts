@@ -6,7 +6,8 @@ import { askEngine, engineVersion, mergeEngine, needsEngine, resetEngineCache, w
 import { GridProvider } from "./GridProvider";
 
 let on = true;
-vi.mock("../../lib/flags", () => ({ flag: (name: string) => name === "c.engine_fallback" && on }));
+let local = false;
+vi.mock("../../lib/flags", () => ({ flag: (name: string) => (name === "c.engine_fallback" && on) || (name === "c.local_predict" && local) }));
 
 const record = normaliseRecord(raw as unknown as FlightRecord);
 const grid = new GridProvider();
@@ -24,6 +25,7 @@ function answer(cells: number, status = 200) {
 
 beforeEach(() => {
 	on = true;
+	local = false;
 	resetEngineCache();
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -78,5 +80,17 @@ describe("the engine where the grids hold no value (Chiya, Nov 2)", () => {
 		await askEngine("lora-qwen", record, [at({ lr: 0.0003 })]);
 		expect(busy).toHaveBeenCalledTimes(3);
 		expect(withEngine(grid, "lora-qwen")).toBe(grid);
+	});
+
+	it("sends a record from disk with its settings when local predictions are on (PM, Nov 3)", async () => {
+		local = true;
+		const fetch = answer(1);
+		vi.stubGlobal("fetch", fetch);
+		const knobs = at({ batch_size: 4, lr: 0.0002 });
+		await askEngine("live", record, [knobs]);
+		expect(String(fetch.mock.calls[0]?.[0])).toBe("/v1/predict");
+		const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as { record: { record_id: string }; cells: unknown[] };
+		expect(body.record.record_id).toBe(record.record_id);
+		expect(withEngine(grid, "live").predict(record, knobs)["time.step"]).toMatchObject({ point: 1.709, status: "predicted" });
 	});
 });
