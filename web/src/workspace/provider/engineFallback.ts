@@ -62,8 +62,14 @@ export function isLocalRef(ref: string | null | undefined): boolean {
 	return typeof ref !== "string" || LOCAL_REFS.has(ref);
 }
 
+/** A local record asks the engine with the record itself in the request (`POST /v1/predict`), never stored. */
+export function localPredictOn(): boolean {
+	return flag("c.engine_fallback") && flag("c.local_predict");
+}
+
 export function engineOn(ref: string | null | undefined): ref is string {
-	return flag("c.engine_fallback") && typeof ref === "string" && !LOCAL_REFS.has(ref);
+	if (!flag("c.engine_fallback") || typeof ref !== "string") return false;
+	return !LOCAL_REFS.has(ref) || flag("c.local_predict");
 }
 
 /** The setting as the API takes it: every record knob, in a fixed order, so equal settings share a key. */
@@ -138,11 +144,14 @@ export async function askEngine(ref: string, record: LoadedRecord, settings: rea
 	for (let i = 0; i < todo.length; i += MAX_CELLS) {
 		const page = todo.slice(i, i + MAX_CELLS);
 		try {
-			const res = await fetch(`/v1/records/${encodeURIComponent(ref)}/predict`, {
+			const cells = page.map((x) => x.setting);
+			// A record from the visitor's disk was never checked in: it goes with the request, read and dropped.
+			const local = LOCAL_REFS.has(ref);
+			const res = await fetch(local ? "/v1/predict" : `/v1/records/${encodeURIComponent(ref)}/predict`, {
 				method: "POST",
 				credentials: "same-origin",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ cells: page.map((x) => x.setting) }),
+				body: JSON.stringify(local ? { record, cells } : { cells }),
 			});
 			if (res.status === 429 || res.status >= 500) {
 				page.forEach((x) => cache.delete(x.key));

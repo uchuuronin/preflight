@@ -47,6 +47,7 @@
 	"c.inflight": false,
 	"c.checkin_help": false,
 	"c.engine_fallback": false,
+	"c.local_predict": false,
 	"d.expertise": false,
 	"d.currency": false,
 	"engine.memory": false,

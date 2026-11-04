@@ -39,6 +39,7 @@ import { GridProvider } from "../../workspace/provider/GridProvider";
 import { loadRecord } from "../../workspace/record/load";
 import { LIVE_REF, useLive } from "../../workspace/live/liveFile";
 import { LivePanel } from "../../workspace/live/LivePanel";
+import { isLocalRef, localPredictOn } from "../../workspace/provider/engineFallback";
 import { isFixture, targetFor } from "../../workspace/record/model";
 import type { LoadedRecord } from "../../workspace/record/types";
 import { useWorkspace, WorkspaceProvider } from "../../workspace/state";
@@ -97,7 +98,7 @@ export function CockpitScreen({ recordRef }: { recordRef: string }) {
 }
 
 function Cockpit() {
-	const { record, state, estimates } = useWorkspace();
+	const { record, recordRef, state, estimates } = useWorkspace();
 	// Every probe stopped before measuring (A's records keep each probe's status and code): nothing to read here.
 	const nothingStop = isFixture(record) ? null : nothingMeasured(record.probes as ProbeSeen[] | undefined);
 	const nothing = nothingStop?.step === "measure";
@@ -175,6 +176,7 @@ function Cockpit() {
 							{line.text}
 						</p>
 						<LivePanel />
+						{isLocalRef(recordRef) && localPredictOn() ? <p className="pf-cockpit__models">{t("cockpit.local_predict")}</p> : null}
 						<CostLine />
 						<FindingsChip />
 						<ProbeHere />

@@ -131,3 +131,49 @@ def test_every_sample_answers(monkeypatch, ref, cell):
 		r = ask(c, [cell], ref=ref)
 	assert r.status_code == 200, (ref, r.text[:200])
 	assert r.json()["cells"][0]
+
+
+def _local(monkeypatch, on: bool = True):
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"c.engine_fallback": True, "c.local_predict": on}))
+	monkeypatch.setenv("PREFLIGHT_SESSION_KEYS", "k" * 40)
+	session.reset_keys()
+	flags.reload()
+
+
+def _lora_raw() -> dict:
+	from pathlib import Path
+
+	p = Path(__file__).resolve().parents[2] / "web/src/workspace/fixtures/lora-live-nov3.record.json"
+	return json.loads(p.read_text())
+
+
+def test_a_local_record_is_predicted_inline_and_answers_as_its_sample_does(monkeypatch):
+	"""PM, Nov 3 (Chiya's shot 9b): a record opened from disk sends itself; the engine answers the same."""
+	_local(monkeypatch)
+	cells = [{"batch_size": 4, "lr": 0.0002}, {"batch_size": 4, "gpu_type": "L4"}]
+	with client() as c:
+		inline = c.post("/v1/predict", json={"record": _lora_raw(), "cells": cells})
+		stored = ask(c, cells)
+	assert inline.status_code == 200, inline.text
+	assert inline.json() == stored.json()
+
+
+def test_inline_is_off_by_default_capped_and_charged_for_its_record(monkeypatch):
+	_local(monkeypatch, on=False)
+	with client() as c:
+		assert c.post("/v1/predict", json={"record": {}, "cells": [{"lr": 1}]}).status_code == 404
+	_local(monkeypatch)
+	with client() as c:
+		big = {"record": {"pad": "x" * (predict_route.MAX_INLINE_BYTES + 1)}, "cells": [{"lr": 1}]}
+		assert c.post("/v1/predict", json=big).status_code == 413
+		assert (
+			c.post("/v1/predict", json={"record": {"not": "a record"}, "cells": [{"lr": 1}]}).status_code
+			== 422
+		)
+		# each request costs its record's parse plus its settings (five tokens here): of 30, the unreadable
+		# record took five, so five more one-setting requests go through and the sixth waits
+		codes = [
+			c.post("/v1/predict", json={"record": _lora_raw(), "cells": [{"lr": 0.0002}]}).status_code
+			for _ in range(6)
+		]
+	assert codes[:5] == [200] * 5 and codes[5] == 429

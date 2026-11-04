@@ -6,6 +6,10 @@ Nov 2 LoRA record, lr 2e-4 (1.709 s a step, the same as 1e-4) and the A10 (1.236
 across GPUs). This asks the engine (`preflight.engine.api.predict`) for a few settings at a time.
 Pure computation on the record as stored: no model, no GPU, nothing written. Behind
 `c.engine_fallback` (C, Nov 2; off until the PM turns it on).
+
+POST /v1/predict does the same for a record the server has never seen: one opened from the
+visitor's own disk (`preflight run` / `preflight watch`), sent inline with the settings (PM, Nov 3,
+Chiya's shot 9b). Size-capped, read in memory, never stored or logged; behind `c.local_predict`.
 """
 
 from __future__ import annotations
@@ -51,6 +55,18 @@ def _take(ip: str, n: int = 1, now: float | None = None) -> bool:
 
 
 class PredictBody(BaseModel):
+	cells: list[dict[str, bool | int | float | str]] = Field(min_length=1, max_length=MAX_CELLS)
+
+
+# Source: derived, the largest record the site serves is the campaign sample (319 KB); a local record
+# with a live probe's steps runs larger. 2 MB is six times the largest, and about 30 ms to parse.
+MAX_INLINE_BYTES = 2 * 2**20
+# A request also costs its record's parse and validation: charged as this many settings.
+INLINE_COST = 4
+
+
+class InlineBody(BaseModel):
+	record: dict
 	cells: list[dict[str, bool | int | float | str]] = Field(min_length=1, max_length=MAX_CELLS)
 
 
@@ -125,6 +141,39 @@ async def predict_cells(ref: str, request: Request) -> dict:
 		raise ApiError(404, "record_not_found", "No flight record matches this link.")
 	try:
 		cells = await asyncio.to_thread(_predict_all, raw, body.cells)
+	except ApiError:
+		raise
+	except Exception as e:
+		raise ApiError(422, "record_unreadable", "The engine can't read this record.") from e
+	return {"cells": cells}
+
+
+@router.post("/predict")
+async def predict_inline(request: Request) -> dict:
+	"""The engine on a record sent with the request (a local one), read in memory and dropped after."""
+	if not (flag("c.engine_fallback") and flag("c.local_predict")):
+		raise ApiError(404, "not_found", "Not found.")
+	if int(request.headers.get("content-length") or 0) > MAX_INLINE_BYTES:
+		raise ApiError(413, "too_large", "That record is larger than this check reads (2 MB).")
+	raw = await request.body()
+	if len(raw) > MAX_INLINE_BYTES:
+		raise ApiError(413, "too_large", "That record is larger than this check reads (2 MB).")
+	try:
+		body = InlineBody.model_validate_json(raw)
+	except ValueError as e:
+		raise ApiError(
+			422, "invalid_request", f"Send the record and up to {MAX_CELLS} settings as cells."
+		) from e
+	if not _take(edge.ip_key(edge.client_ip(request)), INLINE_COST + len(body.cells)):
+		raise ApiError(
+			429,
+			"rate_limited",
+			"Too many requests from here; try again shortly.",
+			retryable=True,
+			retry_after=2,
+		)
+	try:
+		cells = await asyncio.to_thread(_predict_all, body.record, body.cells)
 	except ApiError:
 		raise
 	except Exception as e:

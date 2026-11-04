@@ -1339,6 +1339,7 @@
 	"newflight.packages.placeholder": "einops, timm",
 	"newflight.packages.hint": "PyPI names your code imports that may not be installed, up to {n}, separated by commas. Preflight installs them before the run; a name it doesn't install stops the check-in before any GPU time.",
 	"newflight.gpu.default": "L4 or A10",
+	"cockpit.local_predict": "This record is from your disk. For a setting its grids don't hold, it goes to Preflight's engine with the request, is read there and isn't stored.",
 	"cockpit.nothing_measured": "Nothing was measured.",
 	"cockpit.nothing_again": "Check in again",
 	"cockpit.check_in_own": "Check in your script",
