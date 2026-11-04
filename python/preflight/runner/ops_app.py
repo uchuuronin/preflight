@@ -505,17 +505,39 @@ def startup_check():
 
 @ops.local_entrypoint()
 def limit_check(modal_env: str = ""):
-	"""Confirm the demo limit on the deployed runner: one visitor's 4th probe job of the ET day is
-	refused with limit.visitor_daily. The three it accepts name a sample that doesn't exist, so the
-	worker fails them at fetch with no GPU spent. Writes out/limit_check.json."""
+	"""Confirm the demo limit on the deployed runner: one visitor's (VISITOR_DAILY_JOBS + 1)th probe job of the ET day
+	is refused with limit.visitor_daily (the limit read from this checkout's queue.py, which the deploy carries: 5 since
+	Chiya raised it on Nov 4). The ones it accepts name a sample that doesn't exist, so the worker fails them at fetch
+	with no GPU spent. Writes out/limit_check.json."""
 	import json
 	import time
+
+	from preflight.runner.queue import VISITOR_DAILY_JOBS
 
 	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME, environment_name=modal_env or None)()
 	visitor = f"ops-limit-check-{uuid.uuid4().hex[:8]}"
 	request = {"source": {"kind": "sample", "uri": "sample://zoo/limit-check-no-such-script"}}
-	out: dict = {"visitor": visitor, "accepted": [], "refused": None}
-	for i in range(4):
+	out: dict = {
+		"visitor": visitor,
+		"limit": VISITOR_DAILY_JOBS,
+		"accepted": [],
+		"refused": None,
+		"accepted_ended": {},
+	}
+
+	def ended(job_id: str, deadline_s: float = 300) -> dict | None:
+		deadline = time.monotonic() + deadline_s
+		while time.monotonic() < deadline:
+			st = svc.status.remote(job_id)
+			if st["status"] in ("done", "failed", "cancelled"):
+				return {"status": st["status"], "error_code": st.get("error_code")}
+			time.sleep(3)
+		return None
+
+	# one at a time, each left to end before the next: the daily limit is the only cap that can refuse (with several
+	# waiting at once, the in-flight cap MAX_QUEUED_PER_VISITOR refuses first and this check would say nothing about
+	# the day's limit; Nov 4, the 3 -> 5 deploy)
+	for i in range(VISITOR_DAILY_JOBS + 1):
 		try:
 			sub = svc.submit.remote(request, visitor, f"limit-check-{i}")
 			out["accepted"].append(sub["job_id"])
@@ -525,20 +547,17 @@ def limit_check(modal_env: str = ""):
 				"retry_after_s": getattr(exc, "retry_after_s", None), "message": str(exc)[:200]}  # fmt: skip
 			print(f"[limit] job {i + 1} refused: {out['refused']}", flush=True)
 			break
-	deadline = time.monotonic() + 300
-	ended = {}
-	while time.monotonic() < deadline and len(ended) < len(out["accepted"]):  # the accepted ones end
-		for j in out["accepted"]:
-			st = svc.status.remote(j)
-			if st["status"] in ("done", "failed", "cancelled"):
-				ended[j] = {"status": st["status"], "error_code": st.get("error_code")}
-		time.sleep(5)
-	out["accepted_ended"] = ended
+		end = ended(sub["job_id"])
+		out["accepted_ended"][sub["job_id"]] = end
+		if end is None:
+			print(f"[limit] job {i + 1} didn't end within 300 s; stopping", flush=True)
+			break
 	Path("out").mkdir(exist_ok=True)
 	Path("out/limit_check.json").write_text(json.dumps(out, indent=2))
 	ok = (
 		out["refused"] is not None
-		and out["refused"]["job"] == 4
+		and out["refused"]["job"] == VISITOR_DAILY_JOBS + 1
+		and len(out["accepted"]) == VISITOR_DAILY_JOBS
 		and out["refused"]["code"] == "limit.visitor_daily"
 	)
 	print(f"[limit] {'PASS' if ok else 'FAIL'}: {json.dumps(out)}", flush=True)
