@@ -1,0 +1,11 @@
+{
+	"name": "20261104-195451-41901499560-c-guide-tours-after",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41901499560",
+	"ref": "main",
+	"sha": "79a3e6b4775fc369a70bc2c2e09c16158f55593b",
+	"cmd": "python scripts/guide_tours_live.py https://preflight-cqn.pages.dev",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T20:05:50Z"
+}

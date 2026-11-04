@@ -1,0 +1,26 @@
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+
+Service restarts being deferred:
+ systemctl restart hosted-compute-agent.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+{"tour":1,"turn":1,"ms":8585,"status":200,"output_tokens":675,"calls":["sensitivity","highlight"],"awaiting":"results","error":null}
+{"tour":1,"turn":2,"ms":14013,"status":200,"output_tokens":1096,"calls":["highlight"],"awaiting":"results","error":null}
+{"tour":1,"turn":3,"ms":10125,"status":200,"output_tokens":763,"calls":[],"awaiting":"visitor","error":null}
+{"tour":1,"result":"muse_spark","turns":3,"slowest_ms":14013}
+{"tour":2,"turn":1,"ms":5881,"status":200,"output_tokens":414,"calls":["sensitivity"],"awaiting":"results","error":null}
+{"tour":2,"turn":2,"ms":15274,"status":200,"output_tokens":1397,"calls":["highlight"],"awaiting":"results","error":null}
+{"tour":2,"turn":3,"ms":10522,"status":200,"output_tokens":1241,"calls":[],"awaiting":"visitor","error":null}
+{"tour":2,"result":"muse_spark","turns":3,"slowest_ms":15274}
+{"tour":3,"turn":1,"ms":5334,"status":200,"output_tokens":464,"calls":["sensitivity"],"awaiting":"results","error":null}
+{"tour":3,"turn":2,"ms":8697,"status":200,"output_tokens":950,"calls":["highlight"],"awaiting":"results","error":null}
+{"tour":3,"turn":3,"ms":13693,"status":200,"output_tokens":1359,"calls":[],"awaiting":"visitor","error":null}
+{"tour":3,"result":"muse_spark","turns":3,"slowest_ms":13693}
+{"tours":3,"handed_over_or_stalled":0}
