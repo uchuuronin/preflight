@@ -1,0 +1,11 @@
+{
+	"name": "20261104-060227-41782903853-a-stdin-check-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41782903853",
+	"ref": "d3a57c4380523eb999cda9ec5307a1786588adaa",
+	"sha": "d3a57c4380523eb999cda9ec5307a1786588adaa",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::sandbox_stdin_check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T06:03:02Z"
+}

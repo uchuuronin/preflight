@@ -1,0 +1,32 @@
+[
+  {
+    "bytes": 1000000,
+    "stdout": "GOT 1000000\n",
+    "exit": 0
+  },
+  {
+    "bytes": 8000000,
+    "stdout": "GOT 8000000\n",
+    "exit": 0
+  },
+  {
+    "bytes": 16000000,
+    "stdout": "GOT 16000000\n",
+    "exit": 0
+  },
+  {
+    "bytes": 16777000,
+    "stdout": "GOT 16777000\n",
+    "exit": 0
+  },
+  {
+    "bytes": 16957300,
+    "failed": "BufferError: Buffer size exceed limit. Call drain to flush the buffer.",
+    "traceback": "Traceback (most recent call last):\n  File \"/root/ops_app.py\", line 391, in sandbox_stdin_check_hosted\n    proc.stdin.write('{\"x\": \"' + \"a\" * max(0, n - 9) + '\"}')\n  File \"/pkg/modal/io_streams.py\", line 840, in write\n    self._impl.write(data)\n  File \"/pkg/modal/io_streams.py\", line 741, in write\n    raise BufferError(\"Buffer size exceed limit. Call drain to flush the buffer.\")\nBufferError: Buffer size exceed limit. Call drain to flush the buffer.\n"
+  },
+  {
+    "bytes": 24000000,
+    "failed": "BufferError: Buffer size exceed limit. Call drain to flush the buffer.",
+    "traceback": "Traceback (most recent call last):\n  File \"/root/ops_app.py\", line 391, in sandbox_stdin_check_hosted\n    proc.stdin.write('{\"x\": \"' + \"a\" * max(0, n - 9) + '\"}')\n  File \"/pkg/modal/io_streams.py\", line 840, in write\n    self._impl.write(data)\n  File \"/pkg/modal/io_streams.py\", line 741, in write\n    raise BufferError(\"Buffer size exceed limit. Call drain to flush the buffer.\")\nBufferError: Buffer size exceed limit. Call drain to flush the buffer.\n"
+  }
+]
