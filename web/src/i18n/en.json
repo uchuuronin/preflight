@@ -411,6 +411,7 @@
 	"plan.at": "Step {step}: about {time} in, about {cost} spent",
 	"plan.drag_hint": "Drag along the plan to replay the run on the map",
 	"membar.title": "What fills the GPU at its peak",
+	"membar.campaign_eval": "The eval at batch {batch} holds every logit; the grid never ran its eval, so this is extrapolated.",
 	"membar.line": "{total} of {cap}",
 	"membar.no_breakdown": "Breakdown by term isn't predicted for this record yet",
 	"membar.unknown": "Memory isn't predicted at these settings",
