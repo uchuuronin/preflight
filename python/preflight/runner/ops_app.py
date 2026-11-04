@@ -380,7 +380,7 @@ def startup_check_sandbox() -> dict:
 
 
 @ops.function(image=worker_image, timeout=900)
-def sandbox_stdin_check_hosted(sizes: list[int], chunk: int = 0) -> list[dict]:
+def sandbox_stdin_check_hosted(sizes: list[int], chunk: int = 0, entry: bool = False) -> list[dict]:
 	"""Nov 4 (a repo check-in whose probes all ended "without a result"): write a payload of each size to a CPU probe
 	sandbox's stdin exactly as SandboxRunner does (write, write_eof, drain, read), with a command that only counts the
 	bytes, and report what came back or the exception. No visitor data: the payloads are generated here."""
@@ -397,8 +397,28 @@ def sandbox_stdin_check_hosted(sizes: list[int], chunk: int = 0) -> list[dict]:
 		for n in sizes:
 			row: dict = {"bytes": n}
 			try:
-				proc = sb.exec("python", "-c", "import sys; print('GOT', len(sys.stdin.read()))", timeout=300)
-				text = '{"x": "' + "a" * max(0, n - 9) + '"}'
+				if entry:  # the real recorder entry on a real spec of this size, its stderr kept (the runner drops it)
+					from dataclasses import replace
+
+					from preflight.probes.local import ProbeSpec
+					from preflight.runner.sandbox_runner import ENTRY
+					from preflight.runner.wire import spec_to_wire
+
+					base = ProbeSpec(
+						probe_id="check",
+						files={"train.py": _CHECK_LOOP},
+						entrypoint="train.py",
+						timeout_s=300,
+					)
+					pad = max(0, n - len(spec_to_wire(base)) - 40)
+					text = spec_to_wire(replace(base, files={**base.files, "docs/pad.txt": "a" * pad}))
+					row["bytes"] = len(text)
+					proc = sb.exec(*ENTRY, timeout=420)
+				else:
+					proc = sb.exec(
+						"python", "-c", "import sys; print('GOT', len(sys.stdin.read()))", timeout=300
+					)
+					text = '{"x": "' + "a" * max(0, n - 9) + '"}'
 				if chunk:  # sandbox_runner's chunked write: a drain after each piece
 					from preflight.runner.sandbox_runner import write_stdin
 
@@ -407,7 +427,9 @@ def sandbox_stdin_check_hosted(sizes: list[int], chunk: int = 0) -> list[dict]:
 					proc.stdin.write(text)
 					proc.stdin.write_eof()
 					proc.stdin.drain()
-				row["stdout"] = proc.stdout.read()[-200:]
+				row["stdout"] = proc.stdout.read()[-600:]
+				if entry:
+					row["stderr"] = proc.stderr.read()[-4000:]
 				proc.wait()
 				row["exit"] = proc.returncode
 			except Exception as exc:
@@ -422,15 +444,18 @@ def sandbox_stdin_check_hosted(sizes: list[int], chunk: int = 0) -> list[dict]:
 
 
 @ops.local_entrypoint()
-def sandbox_stdin_check(sizes: str = "1000000,8000000,16000000,16777000,16957300,24000000", chunk: int = 0):
+def sandbox_stdin_check(
+	sizes: str = "1000000,8000000,16000000,16777000,16957300,24000000", chunk: int = 0, entry: bool = False
+):
 	"""modal run --env main python/preflight/runner/ops_app.py::sandbox_stdin_check
 	Which stdin sizes a probe sandbox takes (sandbox_stdin_check_hosted). Writes out/stdin_check.json."""
-	res = sandbox_stdin_check_hosted.remote([int(x) for x in sizes.split(",") if x], chunk)
+	res = sandbox_stdin_check_hosted.remote([int(x) for x in sizes.split(",") if x], chunk, entry)
 	Path("out").mkdir(exist_ok=True)
 	Path("out/stdin_check.json").write_text(json.dumps(res, indent=2))
 	for r in res:
 		print(
-			f"[stdin] {r['bytes']:>10,} bytes: {r.get('stdout', '').strip() or r.get('failed', '')[:300]}",
+			f"[stdin] {r['bytes']:>10,} bytes: {r.get('stdout', '').strip()[-300:] or r.get('failed', '')[:300]}"
+			+ (f"\n[stdin] stderr: {r['stderr'][-1500:]}" if r.get("stderr") else ""),
 			flush=True,
 		)
 
