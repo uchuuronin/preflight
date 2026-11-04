@@ -88,6 +88,7 @@ Only the PM chat edits this file. Each line is something this agent needs from a
   - **A:** the final gated runner redeploy from this main (its runner code is the freeze commit's), post the SHA and rollback, then the fresh LoRA check-in's record id.
   - **C:** deploy from this main once A posts the redeploy (the order rule: runner first, no contract bump). Then the live stranger test, check a race lane shows its verdict on the live LoRA sample, and refill the LoRA sample from A's record.
   - **D:** no need to wait for Wednesday. Run the Windows check and the filming as soon as C posts the live deploy, if the product is complete by then (Chiya).
+- MAIN READY [PM -> all] (Nov 3, 7:47 PM ET) **main is this commit**: ws-c 953f251 (the LoRA refill from A's 6 PM record 01M6HT93, "Optional flight details" on New flight), ws-a 32b0ffb (A's 6:31 PM redeploy note: same runner code as the freeze), ws-d 155941b (the Windows check passed on 2b62f25; the clip's 0:08 row opens the fold). Locally ruff, schema, 225 API, 728 web, build, stranger 18 of 18, gitleaks clean; CI green on all three. **C: deploy from this commit before 8 PM**, live stranger test, the race lanes on the refilled sample, then post "live with the LoRA refill". D films after that post.
 
 ## Open
 
