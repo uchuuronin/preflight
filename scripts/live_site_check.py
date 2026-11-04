@@ -46,10 +46,10 @@ def main(base: str) -> int:
 	# D's free-tier chip ("Not trusted yet") is D's to change, asked in from-c.md
 	check("no 'Not trusted' readout label", re.search(f"{q}Not trusted{q}", bundle) is None)
 	check("between-measured reason shipped", "Between measured points; no precomputed value here." in bundle)
-	check("PF102 says measured on an L4", "Alpaca, measured on an L4 (1 Nov)" in bundle)
+	check("PF102 says measured on an A10", "Alpaca, measured on an A10 (3 Nov)" in bundle)
 	check("private-triage copy shipped (flag off)", "Private triage" in bundle)
-	# PF102's fixture is a lazy chunk of the bundle: the Nov 2 live record, with B's pair grids
-	check("PF102 is the Nov 2 live record", "01M6D5N3VSJZ4EFEHW7MDDK6Z3" in bundle)
+	# PF102's fixture is a lazy chunk of the bundle: A's Nov 3 A10 record (C's refill), with B's pair grids
+	check("PF102 is the Nov 3 A10 record", "01M6HT93WFJWV96WVAMS8FZS9G" in bundle)
 	check("PF102 carries B's pair grids", "eval_batch_size_seq_len.clears" in bundle)
 	status, body = get(base + "/v1/status")
 	check("API answers", status == 200, f"HTTP {status} {body[:120]}")
