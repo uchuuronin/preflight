@@ -76,6 +76,16 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Wed Nov 4, 18:50 ET (real times in the video; live dials replace the re-run steps)
+
+Chiya, 6:37 PM: C1 to C3 filmed; she asked for each run's real time to be shown, since judges re-run
+the flows and the video cuts them. Each cut or sped-up shot now carries a badge ("Cut · each Muse
+Spark turn takes 5 to 15 s"), and `video-plan.md` gains "Real times" with sources. C's D87 (a watched run fills
+the dials "Measured live" where the record has no prediction) replaces most of the re-run steps in
+`shot-9b-laptop.md`; that section now says what fills and when a `preflight run` is still needed. The PM wasn't reachable as a session; nothing new for the PM.
+
+This push sends: `docs/demo/video-plan.md`, `docs/demo/shot-9b-laptop.md`, this file.
+
 ## Wed Nov 4, 00:10 ET (shot 9b in the video; measuring a new variation)
 
 Chiya's laptop take (Nov 3, 23:53, RTX 4070 Laptop, native Windows): `preflight watch` followed by

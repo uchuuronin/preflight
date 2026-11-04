@@ -299,45 +299,15 @@ probe or the run exits, and it keeps the GPU's memory until it is.
 - No alert in the terminal: check step 11's lines took, and that step 10 had a range.
 - The Logbook shows no "Watch a real run": tell C (`c.inflight` is on in production since Nov 2).
 
-## Measure a new variation, and see it in the cockpit
+## A changed script, watched live
 
-(Chiya's question, Nov 3, 23:58: after changing the script, how do the probes test the new
-version?) The cockpit doesn't probe a new setting by itself: probing spends GPU time, so it runs only
-when you run `preflight run`. And the Logbook's picker (**Choose the live record**) opens only live
-records, the kind `preflight watch` writes; a plain `preflight run` record is refused as "That isn't
-a live record from preflight watch" (`asLiveRecord` in `web/src/workspace/live/liveFile.ts`). So to
-see a changed script in the cockpit: measure it, then watch it against the new record. In the same
-PowerShell window, in `E:\pf9b`:
-
-1. Stop the current watch: **Ctrl+C**.
-2. Measure the changed script (about a minute on the RTX 4070):
-
-   ```powershell
-   preflight run film\tiny_train.py
-   ```
-
-   It ends by printing the record it wrote, like `records\<token>.json`. Copy that path. (Give it the
-   script, not `.`: a folder makes Preflight read everything in it, here the pip and CUDA caches
-   too.)
-3. Watch again, against the new record:
-
-   ```powershell
-   preflight watch records\<token>.json film\tiny_train.py --window 200
-   ```
-
-   Its first line says where the live record goes (`live record records\<new>.json`).
-4. On the site: **Logbook**, then **Choose the live record**, and pick that new `<new>.json`. If the
-   cockpit is still following the old one, press **Stop following** first.
-
-The dials then show the time, memory and out-of-memory chance at the new settings, and the live
-panel compares the run with the new prediction. Chiya's take at 23:53 is this flow already: her
-terminal shows the record's probes at batch 4096, 2048 and 1024, the step-11 change to
-`nn.Linear(32, 8192)` and batch 4096, then `preflight watch` against that record. On her RTX 4070
-the record said "Fits on RTX-4070-Laptop. It finishes in 8 min 8 s (6 min 39 s to 9 min
-58 s)", and the live panel read "Step time 6.33 ms (predicted 6.36 ms to 10.3 ms)" with "faster
-than the predicted ... Not a problem" [measured: her screen recording, Nov 3, 23:53]. Away from the
-probed settings the cockpit says "Not measured here" (filed for B and C in
-`docs/requests/from-d.md`).
+Since C's D87 (web only; live with C's deploy of `main` `ce764b41`, D88), a followed run fills the
+dials where the record has no prediction at the run's own settings: time to finish (projected from
+the steps so far), run cost (that time at the record's GPU rate) and peak memory (the peak so far),
+each labelled **Measured live**, one reading with no range (`web/src/workspace/live/liveFill.ts`).
+Where the record does predict, the dials keep its prediction and the live panel compares the run
+with it. So for a changed script's own predictions, with ranges, measure it first: step 9's
+`preflight run film\tiny_train.py`, then step 13's `preflight watch` against the record it prints.
 
 ## To redo a take
 

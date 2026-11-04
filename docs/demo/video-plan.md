@@ -43,6 +43,20 @@ The PM's rules review (Nov 3, 21:08), as the edit meets it:
    `gen.py`).
 8. **The X post.** "Meta hackathon" is in the first post (`docs/submission/x-post.md`).
 
+## Real times, for anyone re-running the video's flows
+
+(Chiya, Nov 4, 6:37 PM: judges run the flows as the video shows them, and the video cuts and speeds
+them up to fit 3 minutes.) Every shot that is cut or sped up says so in a small badge on screen
+("Cut", "Sped up", "3.3×"). The real times:
+
+| Flow in the video | Real time | Source |
+| --- | --- | --- |
+| Check in a repo link, to the cockpit (Boarding: the GPU starts, the probes run, the logs are read) | about 5 to 11 minutes | measured: production's two LoRA check-ins |
+| The live guide (Muse Spark), one move | about 5 to 15 s a turn, three turns a tour; the panel says "Thinking" meanwhile; after 25 s a turn the rule-based tour takes over (`TIMEOUT_S = 25.0`) | measured: C's D86, nine live turns, Nov 4 |
+| Muse Code writes the fixes | 30 s to a minute: 28 s and 34 s for the two lanes on Nov 3; about 50 s from "Write the fixes" to both lanes written in the video's take (Nov 4) | measured: C's live check, Nov 3, 7:53 PM (from-c.md); Chiya's take C3 |
+| Moving a knob | at once (139 ms p95 on the live site) | measured: C's stranger test, Nov 3, 7:50 PM (from-c.md, "Live with the LoRA refill") |
+| `preflight run` on a laptop GPU, then `preflight watch` | the probes take a minute or two [guess: Windows loads CUDA slowly the first time]; the watched run goes on until it finishes or you press Ctrl+C | Chiya's RTX 4070 takes, Nov 3 |
+
 ## At the freeze (Tue Nov 3): the plan of record for Wednesday's recording
 
 By D, Tue Nov 3, 08:25 ET (the PM's 08:07 item 6, plan only). This section supersedes the shot
