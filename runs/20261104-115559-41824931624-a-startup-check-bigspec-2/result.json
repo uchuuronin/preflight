@@ -1,0 +1,11 @@
+{
+	"name": "20261104-115559-41824931624-a-startup-check-bigspec-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41824931624",
+	"ref": "41df3d6060df7c59efbb4f53f69e6d87c5fe33e2",
+	"sha": "41df3d6060df7c59efbb4f53f69e6d87c5fe33e2",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::startup_check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T11:57:53Z"
+}
