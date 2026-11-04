@@ -113,8 +113,15 @@ def test_a_refusal_inside_the_sandbox_comes_back_as_the_probes_result_with_its_r
 
 	spec = ProbeSpec(probe_id="p1", files={"train.py": "x = 1\n", "docs/pad.txt": "a" * 9_000_000}, entrypoint="train.py",
 		timeout_s=60)  # fmt: skip
+	import os
+	from pathlib import Path
+
+	env = {
+		**os.environ,
+		"PYTHONPATH": str(Path(__file__).resolve().parents[1] / "python"),
+	}  # the child's own path
 	proc = subprocess.run([sys.executable, "-m", "preflight.probes.remote"], input=spec_to_wire(spec), capture_output=True,
-		text=True, timeout=300)  # fmt: skip
+		text=True, timeout=300, env=env)  # fmt: skip
 	r = result_from_wire(spec, proc.stdout)
 	assert r.probe.status == "error" and r.probe.error_code == "submission.too_large", (
 		proc.stderr[-800:],
