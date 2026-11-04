@@ -10,6 +10,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { fmt } from "../lib/fmt";
 import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
+import { isLocalRef } from "../workspace/provider/engineFallback";
 import type { Knob, KnobValue, LoadedRecord } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { valueText } from "./GuidePanel";
@@ -163,6 +164,11 @@ export function LimitsPanel() {
 	const read = async () => {
 		const words = text.trim();
 		if (!words || reading) return;
+		if (isLocalRef(recordRef)) {
+			// the server reads the words against a checked-in record; the boxes below still work here
+			setError(t("limits.read.local"));
+			return;
+		}
 		setReading(true);
 		setError(null);
 		try {

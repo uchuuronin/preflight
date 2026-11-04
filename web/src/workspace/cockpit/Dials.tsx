@@ -21,6 +21,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import { durMs, useTweenedText } from "../../lib/tween";
 import { duskTokens } from "../../theme/tokens";
 import { abstainText } from "./abstain";
+import { useWhyAbstain } from "./whyAbstain";
 
 const ARC = 188.5; // 270 degrees of a radius-40 circle
 const FULL = 251.3;
@@ -278,6 +279,7 @@ function scaleText(scale: DialScale, format: (v: number) => string): string {
 /** The four main readouts as dial specs (time, cost, speed or tokens, risk). */
 function useDialSpecs(): DialSpec[] {
 	const { record, estimates } = useWorkspace();
+	const why = useWhyAbstain();
 
 	const est = (r: Readout) => {
 		const tg = targetFor(record, r);
@@ -386,7 +388,7 @@ function useDialSpecs(): DialSpec[] {
 	// not "beyond what was measured" (PM, Nov 2).
 	return specs.map((s) =>
 		s.est?.status === "abstain"
-			? { ...s, reason: abstainText(s.est.reason), ...(s.est.reason === "between_measured" && !s.note ? { note: t("dial.between_short") } : {}) }
+			? { ...s, reason: why(s.est.reason), ...(s.est.reason === "between_measured" && !s.note ? { note: t("dial.between_short") } : {}) }
 			: s,
 	);
 }

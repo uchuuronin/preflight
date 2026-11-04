@@ -83,6 +83,14 @@ describe("the live tour loop", () => {
 		const tour = new LiveTour("lora-7b", ctx, () => {}, post);
 		await expect(tour.start()).rejects.toBeInstanceOf(GuideFallback);
 	});
+
+	it("hands a record opened from disk to the rule-based tour without asking the server (Chiya, Nov 3)", async () => {
+		const { ctx } = makeCtx();
+		const post = vi.fn();
+		const tour = new LiveTour("live", ctx, () => {}, post);
+		await expect(tour.start()).rejects.toThrow("The live guide reads records checked in on the site");
+		expect(post).not.toHaveBeenCalled();
+	});
 });
 
 describe("the browser's set_knob guard", () => {

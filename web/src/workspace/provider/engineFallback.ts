@@ -57,6 +57,11 @@ export function resetEngineCache(): void {
 	bump();
 }
 
+/** A record read from the visitor's own disk: the server has never seen it. */
+export function isLocalRef(ref: string | null | undefined): boolean {
+	return typeof ref !== "string" || LOCAL_REFS.has(ref);
+}
+
 export function engineOn(ref: string | null | undefined): ref is string {
 	return flag("c.engine_fallback") && typeof ref === "string" && !LOCAL_REFS.has(ref);
 }

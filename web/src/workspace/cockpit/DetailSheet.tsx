@@ -16,7 +16,7 @@ import { Provenance } from "../components/StatusMark";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { FixFinding } from "../../fix/FixFinding";
 import { FindingCitations, findingSourceKey, plainDetail } from "./findingSource";
-import { abstainText } from "./abstain";
+import { useWhyAbstain } from "./whyAbstain";
 
 /** A metric path with no label of its own, as words: "probe.eval.peak_allocated_bytes" reads "Eval peak allocated". */
 function plainMetric(key: string): string {
@@ -27,6 +27,7 @@ function plainMetric(key: string): string {
 
 export function DetailSheet() {
 	const { record, estimates, state, actions } = useWorkspace();
+	const why = useWhyAbstain();
 	const layout = useOrbitLayout();
 	const drawer = usePanels("drawer", record.job.lens);
 	const node = layout.nodes.find((n) => n.id === state.focus);
@@ -91,7 +92,7 @@ export function DetailSheet() {
 											) : null}
 										</>
 									) : (
-										<span className="pf-dim">{est?.status === "abstain" ? abstainText(est.reason) : t("detail.no_value")}</span>
+										<span className="pf-dim">{est?.status === "abstain" ? why(est.reason) : t("detail.no_value")}</span>
 									)}
 								</dd>
 							</div>
