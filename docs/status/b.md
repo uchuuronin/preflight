@@ -33,6 +33,7 @@ Updated Mon Nov 2, about 1 AM ET, on `ws-b` (merges, not rebases, for pushed com
 | 61 | **`harness.map_closure` re-check: pass** | A's c38eb79a takes the model and RL fields from the full read; whole-map comparison: zoo 11 of 11 identical, held out 12 of 12 pass (model and rl identical to the flag off; job type and loop the closure's, same or better). |
 | 62 | **Preflight vs Muse Spark data for C's Checks page; map_closure pass on 5660a75f** | `web/src/coverage/vs_model.json` from `scripts/vs_model_from_final.py`, every number checked against `coverage.json`, the answer files and the ground truth. Decided: the summary's Preflight range is 8% to 36% (the measured errors), not the 15% to 35% in the ask; BEIR carries its name, not its unseen id. map_closure re-run on 5660a75f: identical to 5:13, pass. |
 | 63 | **README is final on main (the PM, 5:52)** | Its validation block is a simplified version of B's; B doesn't run the scorer or `compose_final_table.py --readme` into README.md or readme-final again. ws-b's README.md matches main's (merged). |
+| 64 | **Checks redesign reverted on ws-b (the PM, 9:42 PM)** | `git revert e1cf9a6d` as 767173ac, pushed, no force; C owns the site's UI and cherry-picks from e1cf9a6d into Chiya's theme. From here B posts UI ideas in from-b.md for C and edits no files under `web/src` except the data files it produces (`web/src/coverage/*.json`). |
 
 ## Decisions today (Nov 2, from 11:15 AM ET; Chiya out until about 5 PM)
 
