@@ -1,0 +1,30 @@
+{
+  "visitor": "ops-limit-check-22804621",
+  "limit": 5,
+  "accepted": [
+    "01M6M8YY8D9S9AS6THRA5YGRAD",
+    "01M6M8YYXR97TAB3KECNNX6YPF",
+    "01M6M8YZFWJBW5R5X5QAGG1BR8"
+  ],
+  "refused": {
+    "job": 4,
+    "type": "QueueFull",
+    "code": "queue_full",
+    "retry_after_s": 60,
+    "message": "this visitor already has 3 jobs waiting or running"
+  },
+  "accepted_ended": {
+    "01M6M8YY8D9S9AS6THRA5YGRAD": {
+      "status": "failed",
+      "error_code": "submission"
+    },
+    "01M6M8YYXR97TAB3KECNNX6YPF": {
+      "status": "failed",
+      "error_code": "submission"
+    },
+    "01M6M8YZFWJBW5R5X5QAGG1BR8": {
+      "status": "failed",
+      "error_code": "submission"
+    }
+  }
+}

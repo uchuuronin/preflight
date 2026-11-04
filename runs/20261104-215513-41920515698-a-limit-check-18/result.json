@@ -1,0 +1,11 @@
+{
+	"name": "20261104-215513-41920515698-a-limit-check-18",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41920515698",
+	"ref": "a7a58beb8e20a922dedabc54f4a6d6bd8da41993",
+	"sha": "a7a58beb8e20a922dedabc54f4a6d6bd8da41993",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::limit_check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T21:55:53Z"
+}
