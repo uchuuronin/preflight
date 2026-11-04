@@ -104,6 +104,10 @@ function Cockpit() {
 	const nothing = nothingStop?.step === "measure";
 	const nothingWhy = errorCopy(nothingStop?.step === "measure" ? nothingStop.code : null);
 	const headPanels = usePanels("cockpit-head", record.job.lens);
+	// the detail level is a control, so it joins the side column; a panel that reads the record stays with its lines
+	const SIDE = new Set(["expertise.detail-level"]);
+	const sidePanels = headPanels.filter((p) => SIDE.has(p.id));
+	const mainPanels = headPanels.filter((p) => !SIDE.has(p.id));
 	const below = usePanels("below", record.job.lens);
 	const layout = useOrbitLayout();
 	const spent = (record.costs?.gpu_usd ?? 0) + (record.costs?.llm_usd ?? 0);
@@ -154,9 +158,19 @@ function Cockpit() {
 				<section className="pf-cockpit">
 					<header className="pf-cockpit__head">
 						<h1>{record.job.title ?? t(`lens.${record.job.lens}`)}</h1>
-
-						{/* A sample's own cost is part of its fixture, not money anyone spent. */}
-						{spent > 0 && !isFixture(record) ? <span className="pf-tag">{t("cockpit.made_for", { cost: fmt(spent, "usd") })}</span> : null}
+						{/* The record's cost, the detail level and the findings chip sit in their own column on the right,
+						    beside the record's lines (Chiya, Nov 3); on a phone, under the title. */}
+						<div className="pf-cockpit__side">
+							{/* A sample's own cost is part of its fixture, not money anyone spent. */}
+							{spent > 0 && !isFixture(record) ? <span className="pf-tag">{t("cockpit.made_for", { cost: fmt(spent, "usd") })}</span> : null}
+							{sidePanels.map((p) => (
+								<AddonBoundary key={p.id} id={p.id}>
+									<p.component record={record} knobs={state.knobs} estimates={estimates} />
+								</AddonBoundary>
+							))}
+							<FindingsChip />
+						</div>
+						<div className="pf-cockpit__main">
 						{meta ? (
 							// From the record's own model calls (provenance): which Meta model did what, and their cost.
 							<p className="pf-cockpit__models">
@@ -167,7 +181,7 @@ function Cockpit() {
 							</p>
 						) : null}
 						<Measured />
-						{headPanels.map((p) => (
+						{mainPanels.map((p) => (
 							<AddonBoundary key={p.id} id={p.id}>
 								<p.component record={record} knobs={state.knobs} estimates={estimates} />
 							</AddonBoundary>
@@ -178,8 +192,8 @@ function Cockpit() {
 						<LivePanel />
 						{isLocalRef(recordRef) && localPredictOn() ? <p className="pf-cockpit__models">{t("cockpit.local_predict")}</p> : null}
 						<CostLine />
-						<FindingsChip />
 						<ProbeHere />
+						</div>
 					</header>
 					{nothing ? (
 						// A check-in whose probes never ran (PM, Nov 3): say so above the dials, not empty readouts under "done".
