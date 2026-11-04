@@ -17,6 +17,8 @@ import { bounds, likelyFails, trusted } from "../status";
 import { outcomes, useHops } from "../hops";
 import { abstainText } from "./abstain";
 import { useWhyAbstain } from "./whyAbstain";
+import { LIVE_REF, liveRecord } from "../live/liveFile";
+import { isLiveEstimate, liveStillRunning } from "../live/liveFill";
 
 const MAX_MARKS = 24;
 
@@ -249,7 +251,7 @@ function partsLabel(s: MemorySegment): string {
  * untrusted, never squeezed away; terms that abstain here are listed by name.
  */
 export function MemoryBand() {
-	const { record, estimates, state } = useWorkspace();
+	const { record, recordRef, estimates, state } = useWorkspace();
 	const hops = useHops();
 	const layout = useOrbitLayout();
 	const { segments, total, capacity, breakdown, untrusted, abstaining, partsBytes } = layout.memory;
@@ -270,6 +272,8 @@ export function MemoryBand() {
 	const pct = (b: number) => `${Math.min(100, (b / scaleMax) * 100).toFixed(2)}%`;
 	const offScale = Math.max(total ?? 0, partsBytes) > scaleMax;
 	const status = peak?.status ?? "abstain";
+	// A followed run's peak is a peak so far until the run ends (Chiya, Nov 4).
+	const liveSoFar = isLiveEstimate(peak) && liveStillRunning((recordRef === LIVE_REF ? liveRecord() : null) ?? record);
 	const unit = memT?.unit === "fraction" ? "fraction" : "bytes";
 	const hopDraws = hops.on && unit === "bytes" ? outcomes(peak) : [];
 	const shownHops = hops.frame === null ? hopDraws : hopDraws.length ? [hopDraws[hops.frame % hopDraws.length]!] : [];
@@ -285,8 +289,8 @@ export function MemoryBand() {
 		<div className="glass pf-band" aria-label={t("membar.title")}>
 			<div className="pf-band__head">
 				<b>{t("membar.title")}</b>
-				<span>{total ? t("membar.line", { total: fmt(total, unit), cap: fmt(capacity, unit) }) : ""}</span>
-				<Provenance status={status} />
+				<span>{total ? t(liveSoFar ? "membar.line_so_far" : "membar.line", { total: fmt(total, unit), cap: fmt(capacity, unit) }) : ""}</span>
+				<Provenance status={status} live={isLiveEstimate(peak)} />
 				{!breakdown ? <span className="pf-dim">{t("membar.no_breakdown")}</span> : null}
 				{frameOver ? <span className="pf-hop-note" aria-hidden="true">{t("hops.oom")}</span> : null}
 			</div>

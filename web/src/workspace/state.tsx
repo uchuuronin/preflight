@@ -19,6 +19,9 @@ import { currentKnobs, isFixture } from "./record/model";
 import type { KnobValue, LoadedRecord, Objective, ObjectiveKind, Prediction } from "./record/types";
 import { askEngine, engineOn, engineVersion, needsEngine, subscribeEngine, withEngine } from "./provider/engineFallback";
 import type { PredictionProvider } from "./provider/PredictionProvider";
+import { flag } from "../lib/flags";
+import { LIVE_REF, useLive } from "./live/liveFile";
+import { withLive } from "./live/liveFill";
 import { loadRate, type RateOverride, saveRate, withRate } from "./rate";
 import { recordKnobLatency } from "./telemetry";
 
@@ -233,7 +236,14 @@ export function WorkspaceProvider({
 	// made moves look like savings (D's walkthrough, Nov 2: four PF101 knobs gave the same, cheaper
 	// numbers, the engine's at the base being below the sample's own).
 	const engineRef = isFixture(record) ? null : ref;
-	const engineBase = useMemo(() => withEngine(baseProvider, engineRef), [baseProvider, engineRef, engineV]); // eslint-disable-line react-hooks/exhaustive-deps
+	// A followed run's own readings where the record abstains at the run's settings (live/liveFill.ts):
+	// the file's latest copy when it is followed here, else the live record as opened. Under the engine,
+	// so the engine fills only what the run can't say; under the rate, so the visitor's rate re-prices
+	// the live cost like any other.
+	const liveState = useLive();
+	const liveRec = flag("c.inflight") && record.job.source?.kind === "inflight" ? (ref === LIVE_REF && liveState.record ? liveState.record : record) : null;
+	const lived = useMemo(() => withLive(baseProvider, liveRec), [baseProvider, liveRec]);
+	const engineBase = useMemo(() => withEngine(lived, engineRef), [lived, engineRef, engineV]); // eslint-disable-line react-hooks/exhaustive-deps
 	const rated = useMemo(() => withRate(engineBase, state.rate), [engineBase, state.rate]);
 	const estimates = useMemo(() => rated.predict(record, state.knobs), [rated, record, state.knobs]);
 	const tableEstimates = useMemo(() => (state.rate ? engineBase.predict(record, state.knobs) : estimates), [state.rate, engineBase, record, state.knobs, estimates]);

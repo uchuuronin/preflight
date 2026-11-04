@@ -9,10 +9,10 @@ import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useReadouts } from "../../registry";
 import { failureTarget, isFixture, target, targetFor } from "../record/model";
-import type { Estimate, ObjectiveKind, Readout } from "../record/types";
+import type { Estimate, LoadedRecord, ObjectiveKind, Readout } from "../record/types";
 import { Provenance, provenanceKey } from "../components/StatusMark";
 import { useWorkspace } from "../state";
-import { type DialScale, dialScale, scaleFraction } from "../record/scale";
+import { type DialScale, dialScale, scaleAround, scaleFraction } from "../record/scale";
 import { FAILS_AT, FITS_BELOW, oomStatus } from "../record/terms";
 import { bounds, trusted } from "../status";
 import { flag } from "../../lib/flags";
@@ -22,6 +22,7 @@ import { durMs, useTweenedText } from "../../lib/tween";
 import { duskTokens } from "../../theme/tokens";
 import { abstainText } from "./abstain";
 import { useWhyAbstain } from "./whyAbstain";
+import { isLiveEstimate } from "../live/liveFill";
 
 const ARC = 188.5; // 270 degrees of a radius-40 circle
 const FULL = 251.3;
@@ -55,7 +56,7 @@ interface DialSpec {
 
 /** The one word under every dial: where this number comes from. */
 function statusWord(est: Estimate | undefined, illustrative: boolean): string {
-	return t(provenanceKey(est?.status ?? "abstain", illustrative));
+	return t(provenanceKey(est?.status ?? "abstain", illustrative, isLiveEstimate(est)));
 }
 
 /** What a knob move did to one readout, shown in the dial's open gap for WAKE_MS. */
@@ -164,7 +165,7 @@ function useWakeSource(specs: DialSpec[], knobs: object): void {
 
 /** The dial's size class for a value's text (its length): applied by React and by the tween per frame. */
 export function sizeClass(text: string): string | undefined {
-	return text.length > 11 ? "is-longest" : text.length > 9 ? "is-longer" : text.length > 6 ? "is-long" : undefined;
+	return text.length > 11 ? "is-longest" : text.length > 8 ? "is-longer" : text.length > 6 ? "is-long" : undefined;
 }
 
 function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => void; goalOn: boolean; wake?: Wake | undefined }) {
@@ -197,7 +198,7 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 	const valueRef = useRef<HTMLElement>(null);
 	useTweenedText(valueRef, ok ? point : null, spec.format, { classFor: (text) => (ok ? sizeClass(text) : "is-abstain") });
 	const aria = ok
-		? `${t("dial.aria", { label: spec.label, value, lo: spec.format(lo), hi: spec.format(hi) })}. ${statusWord(est, illustrative)}${at.off ? `. ${t("dial.off_scale")}` : ""}`
+		? `${isLiveEstimate(est) ? `${spec.label}: ${value}` : t("dial.aria", { label: spec.label, value, lo: spec.format(lo), hi: spec.format(hi) })}. ${statusWord(est, illustrative)}${at.off ? `. ${t("dial.off_scale")}` : ""}`
 		: t("dial.aria_abstain", { label: spec.label, why: spec.reason || t("provenance.abstain.help") });
 	const face = (
 		<>
@@ -256,7 +257,7 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 				{failedHere ? (
 					<span className="pf-prov pf-prov--abstain">{t("readout.abstain_failed")}</span>
 				) : stepNote ? null : (
-					<Provenance status={est?.status ?? "abstain"} />
+					<Provenance status={est?.status ?? "abstain"} live={isLiveEstimate(est)} />
 				)}
 				{at.off ? <span className="pf-dial__off">{t("dial.off_scale_short")}</span> : null}
 			</span>
@@ -276,6 +277,8 @@ function scaleText(scale: DialScale, format: (v: number) => string): string {
 	return "";
 }
 
+const LIVE_SCALES = new WeakMap<LoadedRecord, Map<string, DialScale>>();
+
 /** The four main readouts as dial specs (time, cost, speed or tokens, risk). */
 function useDialSpecs(): DialSpec[] {
 	const { record, estimates } = useWorkspace();
@@ -287,7 +290,16 @@ function useDialSpecs(): DialSpec[] {
 	};
 	const scaleFor = (r: Readout, limit?: number | null) => {
 		const tg = targetFor(record, r);
-		return tg ? dialScale(record, tg.id, tg.unit, limit) : null;
+		const s = tg ? dialScale(record, tg.id, tg.unit, limit) : null;
+		// A followed run's reading where the record holds nothing to scale by: a scale around the first
+		// reading, kept for the record, so the needle moves as the projection does.
+		const e = tg ? estimates[tg.id] : undefined;
+		if (s || !tg || !isLiveEstimate(e) || !trusted(e) || !(e.point > 0)) return s;
+		let byTarget = LIVE_SCALES.get(record);
+		if (!byTarget) LIVE_SCALES.set(record, (byTarget = new Map()));
+		let ls = byTarget.get(tg.id);
+		if (!ls) byTarget.set(tg.id, (ls = scaleAround(null, e.point)));
+		return ls;
 	};
 
 	const c = record.job.constraints ?? {};
@@ -310,7 +322,8 @@ function useDialSpecs(): DialSpec[] {
 	const oomEst = fail ? estimates[fail] : undefined;
 	const stops = fail === "risk.oom" && trusted(oomEst) && oomEst.point >= FAILS_AT;
 	// Only under a number: an abstaining dial keeps its own note (between measured points).
-	const stopNote = (e: Estimate | undefined) => (stops && trusted(e) ? { note: t("dial.if_it_fits") } : {});
+	// Not under a live reading: the run is measuring, so its time isn't conditional on anything.
+	const stopNote = (e: Estimate | undefined) => (stops && trusted(e) && !isLiveEstimate(e) ? { note: t("dial.if_it_fits") } : {});
 
 	const specs: DialSpec[] = [
 		{

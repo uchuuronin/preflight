@@ -26,7 +26,8 @@ export function FitMark({ fit, label }: { fit: Fit; label?: string }) {
  * cockpit, that its numbers are examples (PM, Nov 3: one banner, not a word on every dial); each
  * number keeps its own status, but none says "Measured", since no real run measured it.
  */
-export function provenanceKey(status: EstimateStatus, illustrative: boolean): string {
+export function provenanceKey(status: EstimateStatus, illustrative: boolean, live = false): string {
+	if (live) return "provenance.measured_live";
 	return illustrative && status === "measured" ? "provenance.sample_probe" : `provenance.${status}`;
 }
 
@@ -52,9 +53,9 @@ function placeTip(word: DOMRect): TipAt {
  * second tap, a tap elsewhere or a scroll closes it. Screen readers get the same line as the word's
  * description, always.
  */
-export function Provenance({ status }: { status: EstimateStatus }) {
+export function Provenance({ status, live = false }: { status: EstimateStatus; live?: boolean }) {
 	const ws = useOptionalWorkspace();
-	const key = provenanceKey(status, ws ? isFixture(ws.record) : false);
+	const key = provenanceKey(status, ws ? isFixture(ws.record) : false, live);
 	const desc = useId();
 	const word = useRef<HTMLButtonElement>(null);
 	const [at, setAt] = useState<TipAt | null>(null);
@@ -89,7 +90,7 @@ export function Provenance({ status }: { status: EstimateStatus }) {
 			<button
 				ref={word}
 				type="button"
-				className={`pf-prov pf-prov--${status}`}
+				className={`pf-prov pf-prov--${status}${live ? " pf-prov--live" : ""}`}
 				aria-describedby={desc}
 				onClick={(e) => {
 					e.stopPropagation(); // a tap on the word inside a clickable area explains the word, nothing else
