@@ -150,3 +150,22 @@ def test_one_refusal_fails_every_queued_job_that_cannot_fit_today():
 	store.complete(lease, record_id="r", spent_usd=2.6)
 	assert store.lease("w") is None
 	assert [store.status(j) for j in ids[1:]] == ["failed", "failed"]
+
+
+def test_the_limit_check_reads_the_deployed_limit_rather_than_hardcoding_it():
+	"""Chiya raised VISITOR_DAILY_JOBS 3 -> 5 (Nov 4): the gate's check must test the real boundary, not a fixed 4th job."""
+	import ast
+	from pathlib import Path
+
+	src = (Path(__file__).resolve().parents[1] / "python/preflight/runner/ops_app.py").read_text()
+	fn = next(
+		n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef) and n.name == "limit_check"
+	)
+	body = ast.get_source_segment(src, fn)
+	assert (
+		"range(VISITOR_DAILY_JOBS + 1)" in body and 'out["refused"]["job"] == VISITOR_DAILY_JOBS + 1' in body
+	)
+	assert "range(4)" not in body and '["job"] == 4' not in body
+	from preflight.runner.queue import VISITOR_DAILY_JOBS
+
+	assert VISITOR_DAILY_JOBS == 5

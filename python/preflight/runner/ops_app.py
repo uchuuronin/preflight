@@ -505,17 +505,20 @@ def startup_check():
 
 @ops.local_entrypoint()
 def limit_check(modal_env: str = ""):
-	"""Confirm the demo limit on the deployed runner: one visitor's 4th probe job of the ET day is
-	refused with limit.visitor_daily. The three it accepts name a sample that doesn't exist, so the
-	worker fails them at fetch with no GPU spent. Writes out/limit_check.json."""
+	"""Confirm the demo limit on the deployed runner: one visitor's (VISITOR_DAILY_JOBS + 1)th probe job of the ET day
+	is refused with limit.visitor_daily (the limit read from this checkout's queue.py, which the deploy carries: 5 since
+	Chiya raised it on Nov 4). The ones it accepts name a sample that doesn't exist, so the worker fails them at fetch
+	with no GPU spent. Writes out/limit_check.json."""
 	import json
 	import time
+
+	from preflight.runner.queue import VISITOR_DAILY_JOBS
 
 	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME, environment_name=modal_env or None)()
 	visitor = f"ops-limit-check-{uuid.uuid4().hex[:8]}"
 	request = {"source": {"kind": "sample", "uri": "sample://zoo/limit-check-no-such-script"}}
-	out: dict = {"visitor": visitor, "accepted": [], "refused": None}
-	for i in range(4):
+	out: dict = {"visitor": visitor, "limit": VISITOR_DAILY_JOBS, "accepted": [], "refused": None}
+	for i in range(VISITOR_DAILY_JOBS + 1):
 		try:
 			sub = svc.submit.remote(request, visitor, f"limit-check-{i}")
 			out["accepted"].append(sub["job_id"])
@@ -538,7 +541,8 @@ def limit_check(modal_env: str = ""):
 	Path("out/limit_check.json").write_text(json.dumps(out, indent=2))
 	ok = (
 		out["refused"] is not None
-		and out["refused"]["job"] == 4
+		and out["refused"]["job"] == VISITOR_DAILY_JOBS + 1
+		and len(out["accepted"]) == VISITOR_DAILY_JOBS
 		and out["refused"]["code"] == "limit.visitor_daily"
 	)
 	print(f"[limit] {'PASS' if ok else 'FAIL'}: {json.dumps(out)}", flush=True)
