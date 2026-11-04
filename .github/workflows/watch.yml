@@ -1,4 +1,4 @@
-# Watches the live site through judging (PM, Nov 3): every 4 hours it runs the plain-HTTP live
+# Watches the live site through judging (PM, Nov 3): every hour it runs the plain-HTTP live
 # check (scripts/live_site_check.py: public pages, the bundled samples and /v1/status; no secrets,
 # no check-ins, $0) and opens one GitHub issue when it fails, which emails the repository's
 # watchers. A later failure comments on the open issue instead of opening another. It deploys
@@ -7,7 +7,7 @@ name: watch
 
 on:
   schedule:
-    - cron: "17 */4 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
