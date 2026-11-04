@@ -71,6 +71,9 @@ export META_API_KEY=...  META_API_BASE=...        # from the Meta dashboard's AP
 PREFLIGHT_FLAGS='{"c.guide.live": true}' uv run uvicorn preflight_api.app:create_app --factory --port 8000
 ```
 
+Then open <http://localhost:5173/?flags=c.guide.live#/cockpit/lora-qwen>: the `?flags=` part turns the
+live guide on in the browser too, and the guide panel says "Muse Spark" instead of "Rule-based tour".
+
 Checking in your own code needs a GPU, so it runs on the hosted site, or on your own GPU with
 `preflight run` below.
 

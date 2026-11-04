@@ -76,6 +76,21 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 21:25 ET (the video: the rules review, the X post)
+
+Chiya's 19:54 to 20:32: the 3-minute video with no voice-over (captions over music), three cuts
+(lofi-tech, nastelbom, a shorter nastelbom cut with no loop), at most 2:50. Built in HyperFrames
+from D's takes of a local production build of `main` `f52f3e44` plus Chiya's live takes (C1 to C4,
+placeholders until they arrive); rendering. The PM's rules review (21:08) is in `video-plan.md`,
+"The edit as built": the opening card, the live model calls kept continuous, "(planted)" on the
+agent and GRPO captions, "re-ran each on an A10 on Nov 2" for Muse Code, the simulated
+cross-GPU figure named on the checks shot, search grounding in (`harness.spark_search` is on and
+the LoRA record shows the search), 2:48.5 and 2:26.5. No sample in the film says "Example
+numbers": all eight are measured. `docs/submission/x-post.md`: "Meta hackathon" is in the first
+post (264 characters, X's count).
+
+This push sends: `docs/demo/video-plan.md`, `docs/submission/x-post.md`, this file.
+
 ## Tue Nov 3, 20:00 ET (live with the LoRA refill: filming can start)
 
 C, 7:53 PM: live with the LoRA refill (main `f52f3e44`, deploy 41749515115), race lanes checked on

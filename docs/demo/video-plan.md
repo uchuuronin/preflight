@@ -4,6 +4,41 @@ By D, Mon Nov 2, overnight (Chiya's list, item 3); statuses updated Mon Nov 2, 1
 replaces the plan A and plan B shot lists in `storyboard.md` and `fallback-cut.md`, which stay as
 the earlier drafts. The 45-second X clip has its own section below (new concept, Nov 3).
 
+## The edit as built (Tue Nov 3, evening)
+
+By D, Nov 3, 21:20 ET. Chiya's calls (19:54 to 20:32): **no voice-over**: captions of at most 9
+words carry it, over a music bed (lofi-tech or nastelbom, both tried), with the Antonov take-off
+sound on Check in. Three cuts of one picture, built in HyperFrames from D's takes of a local
+production build of `main` `f52f3e44` and Chiya's live takes C1 to C4 (until they arrive, labelled
+placeholder cards): lofi-tech 2:48.5, nastelbom 2:48.5, and a shorter nastelbom cut, 2:26.5, that
+ends with the track (no loop). The frame plan, its critique and the replan are in D's video project
+(PLAN.md); the shot list below is the earlier plan of record.
+
+The PM's rules review (Nov 3, 21:08), as the edit meets it:
+
+1. **The opening line.** The film opens on a card: "Nothing of this existed on Oct 26." /
+   "Everything you'll see was built during the hackathon." (4.5 s; 4 s in the short cut).
+2. **Live Meta model calls, labelled, each shown whole (planned; the takes are Chiya's C1 to C3, not
+   in yet).** Boarding (shot 4: Muse Spark reads the script, Muse Spark Open reads every log), the
+   guide (shot 8: Muse Spark) and the Muse Code lanes (shot 8b) come from Chiya's live takes. No
+   cut inside a model's call: each stage plays from its start to its result, labelled by its
+   caption. A long call plays faster, with the speed on screen, rather than being cut; only the
+   GPU wait between Boarding's stages is shortened. PM: say if "uncut" means real time too.
+3. **What's simulated (shot 13).** Every sample is a measured record now (`numbers: "measured"` for all eight
+   in `web/src/workspace/record/load.ts`), so no "Example numbers" banner appears in the film. The
+   checks shot's caption reads "Misses included · cross-GPU figure simulated on held-out corpus".
+4. **"(planted)" (shots 10 and 11)** ends the captions of the agent sample ("an uncapped retry loop (planted)") and
+   the GRPO sample ("15 of 20 prompts teach nothing (planted)").
+5. **Muse Code (shot 8b).** The caption reads "Preflight re-ran each on an A10 on Nov 2": each
+   lane's earlier patch, as the lane's own line says ("An earlier patch for this fix, checked on 2
+   Nov on an A10"), beside its "Not verified" for the patch written on film.
+6. **Search grounding: in.** `harness.spark_search` is on in production, and the refilled
+   LoRA record shows "No known issue found for probe p1-eval's error ... Muse Spark searched the
+   web"; it is on screen in the replay shot, in the app's own words. No separate shot. (This
+   replaces "cut at the freeze" below.)
+7. **Length.** 2:48.5 at most; the short cut 2:26.5 (the scene lengths in D's `gen.py`).
+8. **The X post.** "Meta hackathon" is in the first post (`docs/submission/x-post.md`).
+
 ## At the freeze (Tue Nov 3): the plan of record for Wednesday's recording
 
 By D, Tue Nov 3, 08:25 ET (the PM's 08:07 item 6, plan only). This section supersedes the shot
@@ -39,8 +74,8 @@ Monday's table below); "Chiya's live test" means D can't reach the live site to 
 | 14 | 2:42 | The share link opened in a new tab | Works: use the `/s/` link, now live, rather than the address bar | |
 | 15 | 2:50 | End card | Works | Repository public first |
 
-Cut at the freeze: **7b** (the range test: `probes.lr_range` is off), and **search grounding**
-(off; Chiya decides at noon from the one result, and it wasn't in the cut).
+Cut at the freeze: **7b** (the range test: `probes.lr_range` is off). **Search grounding** was cut
+here; it is in as of Nov 3, 21:20 (see "The edit as built", item 6).
 
 ### Voice-over with times
 
