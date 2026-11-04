@@ -110,10 +110,6 @@ export const duskTokens = {
 	"term-4": "#E7D3F5",
 	"term-5": "#FFC46B",
 	"term-6": "#E57AA3",
-	// Two-series charts (the Checks page's Preflight vs Muse Spark): validated with the dataviz palette
-	// script on glass-solid, dark band L 0.48 to 0.67, CVD dE 13.7, normal-vision dE 21.0, contrast >= 3:1
-	"series-a": "#6F86E8",
-	"series-b": "#D9608F",
 	focus: "#FFB98F",
 } as const;
 
@@ -160,9 +156,6 @@ export const dayTokens = {
 	"term-4": "#7B5674",
 	"term-5": "#C99A1E",
 	"term-6": "#B5577A",
-	// light: L 0.43 to 0.77, normal-vision dE 18.3, contrast >= 3:1 on glass-solid (the same script)
-	"series-a": "#4A5F9C",
-	"series-b": "#B5577A",
 	focus: "#241B3D",
 } as const;
 
