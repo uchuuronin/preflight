@@ -1,0 +1,11 @@
+{
+	"name": "20261104-194225-41899500144-c-guide-tours-baseline",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41899500144",
+	"ref": "ws-c",
+	"sha": "4621c22a577e58616c2faa9bf40a6af417ba42fd",
+	"cmd": "python scripts/guide_tours_live.py https://preflight-cqn.pages.dev",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T19:53:08Z"
+}
