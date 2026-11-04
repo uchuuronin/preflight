@@ -47,11 +47,12 @@ adding any tag or handle (X allows 280 a post). The repository link works once i
 ## Tags and handles: check before posting (for Chiya)
 
 D found **no required hashtag or handle** in what D could read: the event page
-(cerebralvalley.ai/e/meta-ai-developer-hackathon), the hackathon's GitHub repository front page,
-and our own judging playbook all say only that Most Viral is judged on X engagement through Nov 8
-and that the post's link is submitted on the platform. The official rules file
-(`info/grading criteria.md` in the hackathon's GitHub repository) and the portal's own Most Viral
-field weren't reachable from D's sandbox. Chiya: check those two before posting. If they name a
+(cerebralvalley.ai/e/meta-ai-developer-hackathon) and our own judging playbook say only that Most
+Viral is judged on X engagement through Nov 8 and that the post's link is submitted on the platform.
+The `meta-ai-hackathon/meta-hack` repository D read earlier is another entrant's planning repo, not
+the organisers', so it isn't a source for the rules. The official rules (the event page's waiver
+link) and the portal's own Most Viral field weren't readable from the agents' sandboxes. Chiya: check
+those two, and the hackathon's Discord, before posting. If they name a
 hashtag or handles (Meta's or Cerebral Valley's accounts, say), add them to the **first post**, and
 recount: there are 27 characters to spare.
 
