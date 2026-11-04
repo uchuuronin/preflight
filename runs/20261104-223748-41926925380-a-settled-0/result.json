@@ -1,0 +1,11 @@
+{
+	"name": "20261104-223748-41926925380-a-settled-0",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41926925380",
+	"ref": "f3e8bdf0c7c6e1e04d9a4e02f4be75e2444066ec",
+	"sha": "f3e8bdf0c7c6e1e04d9a4e02f4be75e2444066ec",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::settled",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T22:38:49Z"
+}
