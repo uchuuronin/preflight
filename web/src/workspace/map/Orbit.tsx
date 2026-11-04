@@ -12,6 +12,8 @@ import { fitOf, likelyFails, trusted, type Fit } from "../status";
 import { FitMark } from "../components/StatusMark";
 import { R_BAND, R_MEM, R_ORBIT, R_OVER, FRAME, NODE_BOX, arcDash, layoutOrbit, type OrbitLayout, type OrbitNode } from "./orbitLayout";
 import { AddonBoundary } from "../../components/AddonBoundary";
+import { LIVE_REF, liveRecord } from "../live/liveFile";
+import { isLiveEstimate, liveStillRunning } from "../live/liveFill";
 
 interface BgData extends Record<string, unknown> {
 	layout: OrbitLayout;
@@ -254,7 +256,7 @@ export function offStage(layout: Pick<OrbitLayout, "nodes">, id: string, v: { x:
 }
 
 function OrbitInner({ compact = false }: { compact?: boolean }) {
-	const { record, estimates, state, actions } = useWorkspace();
+	const { record, recordRef, estimates, state, actions } = useWorkspace();
 	const overlays = useMapOverlays(record.job.lens);
 	const flow = useReactFlow();
 	const layout = useMemo(() => layoutOrbit(record, state.knobs, estimates), [record, state.knobs, estimates]);
@@ -301,9 +303,12 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 						? t(memT.label_key)
 						: !trusted(peak) && (fit === "fails" || fit === "tight") && cap
 							? t("map.core.peak_unmeasured", { cap: fmt(cap, "bytes") })
-							: cap
-								? t("map.core.of_capacity", { cap: fmt(cap, "bytes") })
-								: t("map.core.peak"),
+							: // a followed run's peak is a peak so far until the run ends (Chiya, Nov 4)
+								isLiveEstimate(peak) && cap && liveStillRunning((recordRef === LIVE_REF ? liveRecord() : null) ?? record)
+								? t("map.core.live_so_far", { cap: fmt(cap, "bytes") })
+								: cap
+									? t("map.core.of_capacity", { cap: fmt(cap, "bytes") })
+									: t("map.core.peak"),
 				coreStatus:
 					fit === "fails" && trusted(peak) && cap && peak.point > cap && memT?.unit === "bytes"
 						? t("map.core.over_by", { over: fmt(peak.point - cap, "bytes") })

@@ -491,6 +491,9 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-prov--predicted .pf-prov__line { border-top-style: dashed; }
 .pf-prov--extrapolated .pf-prov__line { border-top-style: dotted; }
 .pf-prov--abstain .pf-prov__line { border-top-style: dotted; opacity: 0.5; }
+/* A followed run's own reading (live/liveFill.ts): the measured line, a shade brighter than a model's word. */
+.pf-prov--live { color: var(--pf-fg); }
+.pf-prov--live .pf-prov__line { border-top-style: solid; }
 
 /* ---------- Home ---------- */
 

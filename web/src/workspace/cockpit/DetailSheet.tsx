@@ -18,6 +18,7 @@ import { AddonBoundary } from "../../components/AddonBoundary";
 import { FixFinding } from "../../fix/FixFinding";
 import { FindingCitations, findingSourceKey, plainDetail } from "./findingSource";
 import { useWhyAbstain } from "./whyAbstain";
+import { isLiveEstimate } from "../live/liveFill";
 import { splitQuote } from "./Findings";
 import type { Finding, Knob } from "../record/types";
 
@@ -94,7 +95,7 @@ export function DetailSheet() {
 											{trusted(est) && est.lo !== null && est.hi !== null && fmtSpread(...bounds(est), est.unit) ? (
 												<span className="pf-dim">{fmtSpread(...bounds(est), est.unit)}</span>
 											) : null}
-											{m.kind === "prediction" && est ? <Provenance status={est.status} /> : null}
+											{m.kind === "prediction" && est ? <Provenance status={est.status} live={isLiveEstimate(est)} /> : null}
 											{m.kind === "measured_here" ? <Provenance status="measured" /> : null}
 											{m.kind === "measured_elsewhere" ? (
 												<span className="pf-dim">{t(isFixture(record) ? "detail.illustrative_at" : "detail.measured_at", { where: probeWhere(m.probeKnobs) })}</span>

@@ -62,11 +62,14 @@ function compute(record: LoadedRecord, targetId: string): DialScale | null {
 		const lo = Math.max(Math.min(range.lo, eLo && eLo > 0 ? eLo : range.lo), hi / LOG_SPAN_MAX);
 		return lo < hi ? { kind: "log", lo, hi, source: "grid" } : { kind: "linear", lo: 0, hi: hi * 2, source: "grid" };
 	}
-	if (eHi && eHi > 0) {
-		const lo = Math.max((eLo && eLo > 0 ? eLo : eHi) / ESTIMATE_ONLY_SPAN, eHi / LOG_SPAN_MAX);
-		return { kind: "log", lo, hi: eHi * ESTIMATE_ONLY_SPAN, source: "estimate" };
-	}
+	if (eHi && eHi > 0) return scaleAround(eLo, eHi);
 	return null;
+}
+
+/** A log scale around one estimate (or one reading), where the record holds nothing else to scale by. */
+export function scaleAround(lo: number | null, hi: number): DialScale {
+	const l = Math.max((lo && lo > 0 ? lo : hi) / ESTIMATE_ONLY_SPAN, hi / LOG_SPAN_MAX);
+	return { kind: "log", lo: l, hi: hi * ESTIMATE_ONLY_SPAN, source: "estimate" };
 }
 
 /** Position of a value on the arc, 0 to 1, and whether it lies past the right end. */
