@@ -27,7 +27,7 @@ const sig3 = nf({ minimumSignificantDigits: 3, maximumSignificantDigits: 3 });
 const one = nf({ maximumFractionDigits: 1 });
 
 /** "0.916×", "18.0×": three significant figures, so the table says what B's summary says. */
-export function ratio(x: number): string {
+function ratio(x: number): string {
 	return `${sig3.format(x)}×`;
 }
 
@@ -64,7 +64,8 @@ function actualOf(r: Row, m: Metric): number | null {
 	return m === "step" ? r.full_run.step_s : r.full_run.peak_gib;
 }
 function ratioOf(r: Row, who: "preflight" | "muse", m: Metric): number | null {
-	return r.ratio[`${who}_${m}` as keyof Row["ratio"]];
+	const x = r.ratio[`${who}_${m}` as keyof Row["ratio"]];
+	return typeof x === "number" && Number.isFinite(x) && x > 0 ? x : null;
 }
 
 /** Why a row has nothing to plot for this side, in B's words. */
@@ -78,12 +79,17 @@ function whyNot(r: Row, who: "preflight" | "muse", m: Metric): string {
 }
 
 /** The miss in words: "8% too fast", "18× too slow", "within 10%" for a peak inside the target. */
-export function missWords(x: number, m: Metric): string {
+function missWords(x: number, m: Metric): string {
 	const high = x >= 1;
 	const dir = m === "step" ? (high ? "slow" : "fast") : high ? "high" : "low";
-	if (x >= 2 || x <= 0.5) return t(`checks.ask.miss.times_${dir}`, { v: one.format(high ? x : 1 / x) });
-	return t(`checks.ask.miss.pct_${dir}`, { v: Math.round(Math.abs(x - 1) * 100) });
+	// times from 1.5x either way, as the step tile writes Muse Spark's misses; a percentage below that
+	if (x >= 1.5 || x <= 1 / 1.5) return t(`checks.ask.miss.times_${dir}`, { v: one.format(high ? x : 1 / x) });
+	const pct = missPct(x);
+	return pct === 0 ? t("checks.ask.miss.exact") : t(`checks.ask.miss.pct_${dir}`, { v: pct });
 }
+
+/** The miss as the words round it, so "10% too high" and the 10% target always agree. */
+const missPct = (x: number) => Math.round(Math.abs(x - 1) * 100);
 
 function Lane({ r, who, m }: { r: Row; who: "preflight" | "muse"; m: Metric }) {
 	const x = ratioOf(r, who, m);
@@ -113,14 +119,13 @@ function Lane({ r, who, m }: { r: Row; who: "preflight" | "muse"; m: Metric }) {
 	const right = x >= 1;
 	const left = Math.min(50, at(x));
 	const width = Math.max(0.8, Math.abs(at(x) - 50));
-	const onTarget = Math.abs(x - 1) <= TARGET[m];
+	const onTarget = x < 1.5 && x > 1 / 1.5 && missPct(x) <= TARGET[m] * 100;
 	return (
 		<li className={`pf-miss__lane pf-miss__lane--${who}${onTarget ? " is-on" : ""}`} title={detail}>
 			<span className={`pf-ask__key pf-ask__key--${who}`} aria-hidden="true" />
 			<span className="pf-miss__track" aria-hidden="true">
-				<span className={`pf-miss__bar${right ? " is-right" : " is-left"}`} style={{ left: `${left}%`, width: `${width}%` }}>
-					<span className="pf-miss__end" />
-				</span>
+				<span className={`pf-miss__bar${right ? " is-right" : " is-left"}`} style={{ left: `${left}%`, width: `${width}%` }} />
+				<span className="pf-miss__end" style={{ left: `${at(x)}%` }} />
 			</span>
 			<span className="pf-miss__words">
 				<span className="pf-visually-hidden">{name}: </span>
@@ -292,7 +297,7 @@ export function ChecksAsk() {
 							<span role="cell" data-label={t("checks.ask.col.oom")}>
 								<span className="pf-checks__pair">
 									<span>{t("checks.ask.preflight", { v: r.preflight.p_oom === null || r.preflight.p_oom === undefined ? t("checks.ask.no_answer") : fmt(r.preflight.p_oom, "probability") })}</span>
-									<span>{t("checks.ask.muse", { v: fmt(r.muse_spark.p_oom ?? 0, "probability") })}</span>
+									<span>{t("checks.ask.muse", { v: r.muse_spark.p_oom === null || r.muse_spark.p_oom === undefined ? t("checks.ask.no_answer") : fmt(r.muse_spark.p_oom, "probability") })}</span>
 									<small className="pf-dim">{t(r.full_run.ran_out_of_memory ? "checks.ask.ran_out" : "checks.ask.did_not")}</small>
 								</span>
 							</span>

@@ -2263,14 +2263,11 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-checks__row:first-child { border-top: 0; }
 /* The same-code comparison (B, Nov 2): four columns in the summary's style. */
 .pf-checks__row--ask { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
-.pf-checks__ask { display: flex; flex-direction: column; gap: 10px; }
-.pf-checks__note { margin: 0; font-size: 13px; }
+.pf-checks__ask { display: flex; flex-direction: column; gap: var(--pf-space-4); }
 .pf-checks__pair { display: flex; flex-direction: column; gap: 2px; }
 .pf-checks__caveats { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
-/* The same-code comparison as a dot plot (B, Nov 3, the dataviz method): tiles first, then each prediction
-   over the full run on one log scale, two small multiples (step time, peak memory), never two axes.
-   Preflight is a circle in series-a, Muse Spark a diamond in series-b: shape carries identity too. */
-.pf-checks__ask { gap: var(--pf-space-4); }
+/* The same-code comparison (B's tiles, Nov 3; C's miss charts below). Preflight is a circle in
+   series-a, Muse Spark a diamond in series-b: shape carries identity too. */
 .pf-ask__lede { margin: 0; max-width: 72ch; color: var(--pf-fg); }
 .pf-ask__summary { margin: 0; max-width: 90ch; font-size: var(--pf-text-sm); line-height: 1.55; }
 .pf-ask__tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--pf-space-3); }
@@ -2316,9 +2313,7 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-miss__bar.is-right { transform-origin: left center; }
 .pf-miss__lane--preflight .pf-miss__bar { background: color-mix(in srgb, var(--pf-series-a) 70%, transparent); }
 .pf-miss__lane--muse .pf-miss__bar { background: color-mix(in srgb, var(--pf-series-b) 70%, transparent); }
-.pf-miss__end { position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; }
-.pf-miss__bar.is-right .pf-miss__end { right: -7px; }
-.pf-miss__bar.is-left .pf-miss__end { left: -7px; }
+.pf-miss__end { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; animation: pf-miss-land 300ms var(--pf-ease) 600ms both; }
 .pf-miss__lane--preflight .pf-miss__end { border-radius: 50%; background: var(--pf-series-a); box-shadow: 0 0 0 2px var(--pf-glass-solid); }
 .pf-miss__lane--muse .pf-miss__end { background: var(--pf-series-b); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .pf-miss__words { font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -2327,7 +2322,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-miss__why { font-size: var(--pf-text-xs); line-height: 1.4; color: var(--pf-fg-dim); }
 .pf-miss__note { margin: var(--pf-space-1) 0 0; font-size: var(--pf-text-xs); line-height: 1.5; color: var(--pf-fg-dim); }
 @keyframes pf-miss-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-@media (prefers-reduced-motion: reduce) { .pf-miss__bar { animation: none; } }
+@keyframes pf-miss-land { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pf-miss__bar, .pf-miss__end { animation: none; } }
 .pf-ask__more > summary { cursor: pointer; font-size: var(--pf-text-sm); color: var(--pf-fg-dim); padding: var(--pf-space-1) 0; }
 .pf-ask__more > summary:hover { color: var(--pf-fg); }
 .pf-ask__more[open] > summary { margin-bottom: var(--pf-space-2); }
