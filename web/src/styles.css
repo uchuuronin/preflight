@@ -887,20 +887,42 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	padding-block: 96px 20px;
 }
 
+/* Two columns (Chiya, Nov 3): the title and the record's lines on the left; its cost, the detail level
+   and the findings chip on the right, right-aligned. On a phone: title, that column, then the lines. */
 .pf-cockpit__head {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-areas: "title side" "main side";
+	gap: 8px 32px;
+	align-items: start;
+}
+.pf-cockpit__main {
+	grid-area: main;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px 14px;
 	align-items: baseline;
+	min-width: 0;
 }
+.pf-cockpit__side {
+	grid-area: side;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 10px;
+	max-width: 400px;
+	text-align: right;
+}
+.pf-cockpit__side .pf-addon-expertise { align-items: flex-end; }
 .pf-cockpit__head h1 {
-	margin: 0 auto 0 0;
+	grid-area: title;
+	margin: 0;
 	font-family: var(--pf-font-serif);
 	font-weight: 400;
 	font-size: 34px;
 	line-height: 1.1;
 }
-.pf-cockpit__head > .pf-dim { flex-basis: 100%; order: 5; font-size: 13px; }
+.pf-cockpit__main > .pf-dim { flex-basis: 100%; order: 5; font-size: 13px; }
 
 .pf-deck {
 	flex: 1;
@@ -1281,11 +1303,12 @@ button.pf-prov:hover { color: var(--pf-fg); }
 
 /* Side column: node detail and the guide */
 .pf-side { grid-area: side; position: relative; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-/* An open node's sheet can be taller than the stage; it used to stretch the row, and the map and the
-   dials (centred in it) dropped by a few hundred pixels on each open (Chiya, Nov 2). The sheet now takes
-   the stage's height at most and scrolls inside, so the map holds still. */
+/* An open node's sheet can be taller than the stage. It used to stretch the row, and the map and the
+   dials (centred in it) dropped by a few hundred pixels on each open (Chiya, Nov 2); then it scrolled
+   inside a cropped box, which read as chopped (Chiya, Nov 3). Now the sheet shows whole and the row
+   grows below, while the dials and the map keep their place at the top of the row. */
 @media (min-width: 1101px) {
-	.pf-deck.has-detail > .pf-side { max-height: clamp(540px, calc(100dvh - 400px), 1400px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 24px 6px 24px 24px; margin: -24px -6px -24px -24px; }
+	.pf-deck { align-items: start; }
 	.pf-deck.has-detail > .pf-side > .pf-detail { flex: none; }
 }
 
@@ -1954,6 +1977,9 @@ button.pf-prov:hover { color: var(--pf-fg); }
 @media (max-width: 760px) {
 	.pf-cockpit { padding-block: 84px 16px; }
 	.pf-cockpit__head h1 { font-size: 28px; }
+	.pf-cockpit__head { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "side" "main"; }
+	.pf-cockpit__side { align-items: flex-start; max-width: none; text-align: left; }
+	.pf-cockpit__side .pf-addon-expertise { align-items: flex-start; }
 	.pf-deck { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "stage" "dials" "side"; gap: 20px; }
 	.pf-dials { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 	.pf-dial-wrap { width: 108px; }
