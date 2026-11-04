@@ -145,7 +145,7 @@ browser from the flight record.
 
 Preflight was scored against real full runs it had never seen, with the engine frozen first. In short:
 
-- **It catches the crash that costs the most.** It predicted 10 of 11 out-of-memory failures before the run, with no false alarms, and found 6 of 7 planted bugs.
+- **It catches the crash that costs the most.** It called out-of-memory right on 10 of 11 scripts (it ran out or it didn't), with no false alarms, and found 6 of 7 planted bugs.
 - **It's far closer than asking a model.** On the same scripts, Preflight's step time was off by 8% to 36%; Muse Spark reading the code alone was off by 1.6× to 18×. Peak memory within 10%: Preflight 2 of 4, Muse Spark 0 of 4.
 - **It's fast and cheap.** The knobs answer in 68 ms on the live site, and a check-in costs under $1.
 - **Where it's still short:** memory that keeps growing after the probes end, such as an allocator pool that grows for epochs or an evaluation after training. The per-script table says which scripts and why, and the ranges on screen are widened to match.
@@ -155,7 +155,7 @@ Each count carries a Wilson 95% interval, so a small sample never reads better t
 <!-- validation:start -->
 | Check | Target | Result | 95% interval | What's going on |
 |---|---|---|---|---|
-| Out-of-memory prediction | No missed OOMs | 10 of 11 | 62% to 99% | No false alarms. The one it missed is a retrieval script where no probe ran |
+| Out-of-memory prediction | No missed OOMs | 10 of 11 | 62% to 99% | Right on 10 of 11 scripts, with no false alarms. Of the 3 that ran out, it caught 2; the one it missed is a retrieval script where no probe ran |
 | Planted problems caught | All of them | 6 of 7 | 48% to 98% | The one it missed is a vision script's missing channels-last layout, a speed setting rather than a crash |
 | Knob response | Under 400 ms | 120 of 120 | 96% to 100% | 95th percentile 68 ms on the live site |
 | Agent run total cost | Inside the 90% range | 1 of 1 | 20% to 100% | Predicted $5.90 to $13.71; the full run cost $6.66. One run so far |
