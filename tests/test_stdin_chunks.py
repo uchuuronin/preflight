@@ -100,3 +100,25 @@ def test_a_repo_sized_spec_runs_through_the_sandbox_runner_in_pieces():
 	assert len(spec_to_wire(spec)) > LIMIT
 	SR.write_stdin(stdin, spec_to_wire(spec))
 	assert "".join(stdin.received) == spec_to_wire(spec) and stdin.eof
+
+
+def test_a_refusal_inside_the_sandbox_comes_back_as_the_probes_result_with_its_reason():
+	"""Nov 4: the deploy gate's repo-sized probe ended "without a result" because validate_files raised inside the
+	sandbox and the remote exited with no result line. The remote now writes the refusal as the result."""
+	import subprocess
+	import sys
+
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner.wire import result_from_wire, spec_to_wire
+
+	spec = ProbeSpec(probe_id="p1", files={"train.py": "x = 1\n", "docs/pad.txt": "a" * 9_000_000}, entrypoint="train.py",
+		timeout_s=60)  # fmt: skip
+	proc = subprocess.run([sys.executable, "-m", "preflight.probes.remote"], input=spec_to_wire(spec), capture_output=True,
+		text=True, timeout=300)  # fmt: skip
+	r = result_from_wire(spec, proc.stdout)
+	assert r.probe.status == "error" and r.probe.error_code == "submission.too_large", (
+		proc.stderr[-800:],
+		r.probe,
+	)
+	assert "docs/pad.txt" in (r.probe.error or "") and "8 MB" in (r.probe.error or "")
+	assert "ended without a result" not in (r.probe.error or "")

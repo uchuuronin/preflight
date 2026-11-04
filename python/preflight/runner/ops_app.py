@@ -369,8 +369,11 @@ def startup_check_sandbox() -> dict:
 		# a repo-sized spec through the same path (Nov 4: this repository's own check-in, a 16.96 MB spec, ended every
 		# probe "without a result" at Modal's 16 MiB stdin buffer; sandbox_runner.write_stdin): the script plus a
 		# generated file it never imports, so the spec on the wire passes that buffer
-		big = ProbeSpec(probe_id="check-big", files={"train.py": _CHECK_LOOP, "docs/pad.txt": "a" * BIG_SPEC_PAD},
-			entrypoint="train.py", timeout_s=300)  # fmt: skip
+		# the real shape of a big repo: many files, each under the 8 MB per-file cap (one 17 MB file is refused by
+		# validate_files, rightly, and that refusal now comes back as the probe's result)
+		pad = {f"docs/pad{i}.txt": "a" * (BIG_SPEC_PAD // 5) for i in range(5)}
+		big = ProbeSpec(probe_id="check-big", files={"train.py": _CHECK_LOOP, **pad}, entrypoint="train.py",
+			timeout_s=300)  # fmt: skip
 		out["big_spec_bytes"] = len(spec_to_wire(big))
 		rb = runner(big, "cpu", should_stop=lambda: False)
 	out.update(probe_status=r.probe.status, probe_steps=r.probe.steps, probe_error=r.probe.error,
