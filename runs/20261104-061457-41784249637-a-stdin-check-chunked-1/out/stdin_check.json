@@ -1,0 +1,22 @@
+[
+  {
+    "bytes": 1000,
+    "stdout": "GOT 1000\n",
+    "exit": 0
+  },
+  {
+    "bytes": 16957300,
+    "stdout": "GOT 16957300\n",
+    "exit": 0
+  },
+  {
+    "bytes": 24000000,
+    "stdout": "GOT 24000000\n",
+    "exit": 0
+  },
+  {
+    "bytes": 40000000,
+    "stdout": "GOT 40000000\n",
+    "exit": 0
+  }
+]

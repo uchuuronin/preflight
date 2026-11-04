@@ -1,0 +1,11 @@
+{
+	"name": "20261104-061457-41784249637-a-stdin-check-chunked-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41784249637",
+	"ref": "be1b71a319db223e52cf251204ed6cac10d69895",
+	"sha": "be1b71a319db223e52cf251204ed6cac10d69895",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::sandbox_stdin_check --sizes 1000,16957300,24000000,40000000 --chunk 4194304",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T06:16:11Z"
+}
