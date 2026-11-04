@@ -182,7 +182,9 @@ Preflight was scored against real full runs of its bug-zoo scripts and one outsi
 - **It's fast and cheap.** The knobs answer in 68 ms on the live site, and a check-in costs under $1.
 - **Where it's still short:** memory that keeps growing after the probes end, such as an allocator pool that grows for epochs or an evaluation after training. The per-script table says which scripts and why, and the ranges on screen are widened to match.
 
-Each count carries a Wilson 95% interval, so a small sample never reads better than it is.
+Each count carries a Wilson 95% interval, so a small sample never reads better than it is. The
+same checks, and the side-by-side with Muse Spark, are on the site's
+[Checks page](https://preflight-cqn.pages.dev/#/checks).
 
 <!-- validation:start -->
 | Check | Target | Result | 95% interval | What's going on |
