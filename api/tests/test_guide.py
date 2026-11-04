@@ -494,3 +494,29 @@ def test_the_description_stays_out_of_the_models_notes():
 	src = inspect.getsource(route)
 	assert src.count('objective.model_dump(exclude_none=True, exclude={"description"})') == 2
 	assert "objective.model_dump(exclude_none=True)" not in src
+
+
+def test_a_guide_round_waits_long_enough_for_its_token_cap(monkeypatch):
+	"""Nov 4, 1 AM: a 1,580-token round took 12.9 s on the live site and the 12 s limit handed the tour
+	to the rule-based one. The limit now covers the 2,000-token cap at the measured speed, on every
+	request, whatever the shared client's own default."""
+	import asyncio
+
+	from preflight_api.guide import muse_spark
+
+	seen = {}
+
+	def model(request: httpx.Request) -> httpx.Response:
+		seen["timeout"] = request.extensions.get("timeout")
+		return httpx.Response(200, json={"id": "r", "output": [], "usage": {}})
+
+	monkeypatch.setenv("META_API_BASE", "https://model.test/v1")
+	monkeypatch.setenv("META_API_KEY", "k")
+	client = httpx.AsyncClient(transport=httpx.MockTransport(model), timeout=5.0)
+	asyncio.run(
+		muse_spark.create_turn(
+			instructions="", input_items=[], tools=[], max_output_tokens=2000, client=client
+		)
+	)
+	assert seen["timeout"]["read"] == muse_spark.TIMEOUT_S
+	assert muse_spark.TIMEOUT_S >= 3.2 + 0.0062 * 2000
