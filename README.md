@@ -89,7 +89,9 @@ preflight run . --entrypoint train.py -- --batch_size 16    # measure a few real
 preflight watch records/<share_token>.json train.py         # run it for real against its predicted bands
 ```
 
-Install from the GitHub URL: `pip install preflight` on PyPI is an unrelated package. Records land
+Install from the GitHub URL: `pip install preflight` on PyPI is an unrelated package. On a machine
+without an NVIDIA GPU, install PyTorch's CPU build first (`pip install torch --index-url
+https://download.pytorch.org/whl/cpu`); the default build pulls about 5 GB of CUDA libraries. Records land
 in `records/`; to fly the whole run in the cockpit, check the script in on the site.
 
 **Share a flight:** every record has a link, `https://preflight-cqn.pages.dev/s/<share token>`,
