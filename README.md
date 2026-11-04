@@ -71,6 +71,9 @@ export META_API_KEY=...  META_API_BASE=...        # from the Meta dashboard's AP
 PREFLIGHT_FLAGS='{"c.guide.live": true}' uv run uvicorn preflight_api.app:create_app --factory --port 8000
 ```
 
+Then open <http://localhost:5173/?flags=c.guide.live#/cockpit/lora-qwen>: the `?flags=` part turns the
+live guide on in the browser too, and the guide panel says "Muse Spark" instead of "Rule-based tour".
+
 Checking in your own code needs a GPU, so it runs on the hosted site, or on your own GPU with
 `preflight run` below.
 
@@ -172,7 +175,7 @@ back to Preflight's static reader, and the record says which one drew it.
 
 ## Validation
 
-Preflight was scored against real full runs it had never seen, with the engine frozen first. In short:
+Preflight was scored against real full runs of its bug-zoo scripts and one outside script, with the engine frozen before any of them was scored. In short:
 
 - **It catches the crash that costs the most.** It called out-of-memory right on 10 of 11 scripts (it ran out or it didn't), with no false alarms, and found 6 of 7 planted bugs.
 - **It's far closer than asking a model.** On the same scripts, Preflight's step time was off by 8% to 36%; Muse Spark reading the code alone was off by 1.6× to 18×. Peak memory within 10%: Preflight 2 of 4, Muse Spark 0 of 4.
