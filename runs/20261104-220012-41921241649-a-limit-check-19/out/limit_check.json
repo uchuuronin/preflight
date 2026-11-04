@@ -1,0 +1,40 @@
+{
+  "visitor": "ops-limit-check-6d35a4c2",
+  "limit": 5,
+  "accepted": [
+    "01M6M980JCCT67DYH21HR36PNA",
+    "01M6M987SQ4CRCE2N9S0B51A8F",
+    "01M6M98BMW67CRNZDPTH1Y04PJ",
+    "01M6M98FHKKA15PA6538BGSSW1",
+    "01M6M98KDYD6DSDVPPGCSN7PHW"
+  ],
+  "refused": {
+    "job": 6,
+    "type": "QueueFull",
+    "code": "limit.visitor_daily",
+    "retry_after_s": 25142,
+    "message": "You've run today's 5 probe jobs: samples only until midnight ET"
+  },
+  "accepted_ended": {
+    "01M6M980JCCT67DYH21HR36PNA": {
+      "status": "failed",
+      "error_code": "submission"
+    },
+    "01M6M987SQ4CRCE2N9S0B51A8F": {
+      "status": "failed",
+      "error_code": "submission"
+    },
+    "01M6M98BMW67CRNZDPTH1Y04PJ": {
+      "status": "failed",
+      "error_code": "submission"
+    },
+    "01M6M98FHKKA15PA6538BGSSW1": {
+      "status": "failed",
+      "error_code": "submission"
+    },
+    "01M6M98KDYD6DSDVPPGCSN7PHW": {
+      "status": "failed",
+      "error_code": "submission"
+    }
+  }
+}
