@@ -17,7 +17,10 @@ Caps checked in one reservation:
 - the day's LLM spend across all visitors (LLM_USD_PER_DAY),
 - one visitor's spend on one record (LLM_USD_PER_RUN; the run id is derived on the server),
 - turns per visitor per day and turns per IP per day,
-- a token bucket per IP against bursts (IP_BURST turns, refilled at IP_REFILL_PER_S).
+- a token bucket per IP against bursts (IP_BURST turns, refilled at IP_REFILL_PER_S),
+- for a job check-in (`job=True`), jobs per IP per day and jobs open at once per IP: a visitor who
+  drops the cookie is a new visitor to the job store, but not a new address (PM's audit, Nov 3).
+  A job's reservation stays open until the API sees the job end (`end_job`) or JOB_OPEN_TTL_S.
 """
 
 from __future__ import annotations
@@ -54,9 +57,18 @@ class Limits:
 	ip_refill_per_s: float = 0.5
 	# source: derived, well past the 12 s model timeout, so a reservation always outlives its call
 	reservation_ttl_s: float = 90.0
+	# source: PM's audit, Nov 3: one address could submit about 13 jobs, the day's GPU cap. Six a day
+	# and two at once leave room for a lab sharing one address, and keep one address under half the cap.
+	jobs_per_ip_day: int = 6
+	jobs_per_ip_open: int = 2
+	# source: derived, a probe job is about 4 minutes plus its queue wait; the event stream gives up
+	# at 15 minutes (routes/jobs.py STREAM_MAX_S). Twice that frees a slot the API never saw end.
+	job_open_ttl_s: float = 1800.0
 
 
-Refusal = Literal["daily_cap", "run_cap", "visitor_turns", "ip_turns", "ip_burst"]
+Refusal = Literal["daily_cap", "run_cap", "visitor_turns", "ip_turns", "ip_burst", "ip_jobs", "ip_jobs_open"]
+
+JOB = "job:"  # the run key of a job check-in's reservation: job:<job id> once bound, job:?<rid> before
 
 
 @dataclass
@@ -79,6 +91,12 @@ class Decision:
 	retry_after_s: float | None = None
 
 
+def _until_midnight_et(now: float) -> float:
+	moment = dt.datetime.fromtimestamp(now, ET)
+	midnight = dt.datetime.combine(moment.date() + dt.timedelta(days=1), dt.time(), ET)
+	return max(1.0, (midnight - moment).total_seconds())
+
+
 def today_et(now: float | None = None) -> str:
 	moment = dt.datetime.fromtimestamp(now if now is not None else time.time(), ET)
 	return moment.date().isoformat()
@@ -91,6 +109,7 @@ class _Day:
 	turns_visitor: dict[str, int] = field(default_factory=dict)
 	turns_ip: dict[str, int] = field(default_factory=dict)
 	run_usd: dict[str, float] = field(default_factory=dict)
+	jobs_ip: dict[str, int] = field(default_factory=dict)
 
 
 class LedgerCore:
@@ -151,9 +170,12 @@ class LedgerCore:
 		now: float | None = None,
 		run_cap: float | None = None,
 		ttl_s: float | None = None,
+		job: bool = False,
 	) -> Decision:
 		"""`run_cap` replaces the per-run cap for this run (the fix loop's per-address budget);
-		`ttl_s` keeps a reservation open longer than a guide turn (a fix race runs minutes)."""
+		`ttl_s` keeps a reservation open longer than a guide turn (a fix race runs minutes). `job`
+		is a job check-in: the IP's daily and open job caps apply, and the reservation stays open
+		as the job's slot until `end_job` (bind it to the job's id with `bind_job`)."""
 		now = time.time() if now is None else now
 		lim = self.limits
 		with self._lock:
@@ -169,14 +191,38 @@ class LedgerCore:
 				return Decision(False, reason="visitor_turns")
 			if d.turns_ip.get(ip, 0) >= lim.turns_per_ip_day:
 				return Decision(False, reason="ip_turns")
+			if job:
+				if d.jobs_ip.get(ip, 0) >= lim.jobs_per_ip_day:
+					return Decision(False, reason="ip_jobs", retry_after_s=_until_midnight_et(now))
+				if (
+					sum(1 for r in self._open.values() if r.ip == ip and r.run.startswith(JOB))
+					>= lim.jobs_per_ip_open
+				):
+					return Decision(False, reason="ip_jobs_open", retry_after_s=60.0)
 			wait = self._take_token(ip, now)
 			if wait is not None:
 				return Decision(False, reason="ip_burst", retry_after_s=round(wait, 1))
 			rid = secrets.token_urlsafe(12)
+			if job:
+				run, ttl_s = f"{JOB}?{rid}", lim.job_open_ttl_s
+				d.jobs_ip[ip] = d.jobs_ip.get(ip, 0) + 1
 			self._open[rid] = Reservation(rid, visitor, run, ip, usd, now, ttl_s)
 			d.turns_visitor[visitor] = d.turns_visitor.get(visitor, 0) + 1
 			d.turns_ip[ip] = d.turns_ip.get(ip, 0) + 1
 			return Decision(True, reservation=rid)
+
+	def bind_job(self, reservation: str, job_id: str) -> None:
+		"""Name a job check-in's open slot by its job, so `end_job` can close it."""
+		with self._lock:
+			r = self._open.get(reservation)
+			if r is not None and r.run.startswith(JOB):
+				r.run = f"{JOB}{job_id}"
+
+	def end_job(self, job_id: str) -> None:
+		"""The job ended (done, failed or cancelled): its address may start another. Idempotent."""
+		with self._lock:
+			for rid in [r.id for r in self._open.values() if r.run == f"{JOB}{job_id}"]:
+				self._close(rid, 0.0)
 
 	def settle(self, reservation: str, usd: float) -> None:
 		"""Replace a reservation with the billed amount. Idempotent; an unknown id is ignored."""
@@ -189,7 +235,10 @@ class LedgerCore:
 			r = self._open.pop(reservation, None)
 			if r is None:
 				return
-			for counts, key in ((self._d.turns_visitor, r.visitor), (self._d.turns_ip, r.ip)):
+			refunds = [(self._d.turns_visitor, r.visitor), (self._d.turns_ip, r.ip)]
+			if r.run.startswith(JOB):
+				refunds.append((self._d.jobs_ip, r.ip))
+			for counts, key in refunds:
 				if counts.get(key, 0) > 0:
 					counts[key] -= 1
 
@@ -221,6 +270,7 @@ class LedgerCore:
 			turns_visitor=dict(day.get("turns_visitor", {})),
 			turns_ip=dict(day.get("turns_ip", {})),
 			run_usd=dict(day.get("run_usd", {})),
+			jobs_ip=dict(day.get("jobs_ip", {})),
 		)
 		ttls = snap.get("open_ttl") or {}
 		core._open = {
@@ -241,8 +291,11 @@ class Ledger(Protocol):
 		usd: float,
 		run_cap: float | None = None,
 		ttl_s: float | None = None,
+		job: bool = False,
 	) -> Decision: ...
 	async def settle(self, reservation: str, usd: float) -> None: ...
+	async def bind_job(self, reservation: str, job_id: str) -> None: ...
+	async def end_job(self, job_id: str) -> None: ...
 	async def release(self, reservation: str) -> None: ...
 	async def spent_today(self) -> float: ...
 
@@ -262,11 +315,20 @@ class MemoryLedger:
 		usd: float,
 		run_cap: float | None = None,
 		ttl_s: float | None = None,
+		job: bool = False,
 	) -> Decision:
-		return self.core.reserve(visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s)
+		return self.core.reserve(
+			visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s, job=job
+		)
 
 	async def settle(self, reservation: str, usd: float) -> None:
 		self.core.settle(reservation, usd)
+
+	async def bind_job(self, reservation: str, job_id: str) -> None:
+		self.core.bind_job(reservation, job_id)
+
+	async def end_job(self, job_id: str) -> None:
+		self.core.end_job(job_id)
 
 	async def release(self, reservation: str) -> None:
 		self.core.release(reservation)
@@ -292,14 +354,22 @@ class ModalLedger:
 		usd: float,
 		run_cap: float | None = None,
 		ttl_s: float | None = None,
+		job: bool = False,
 	) -> Decision:
+		kw = {"job": True} if job else {}  # a guide turn's call stays the shape it always was
 		raw = await self._svc.reserve.remote.aio(
-			visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s
+			visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s, **kw
 		)
 		return Decision(**raw)
 
 	async def settle(self, reservation: str, usd: float) -> None:
 		await self._svc.settle.remote.aio(reservation, usd)
+
+	async def bind_job(self, reservation: str, job_id: str) -> None:
+		await self._svc.bind_job.remote.aio(reservation, job_id)
+
+	async def end_job(self, job_id: str) -> None:
+		await self._svc.end_job.remote.aio(job_id)
 
 	async def release(self, reservation: str) -> None:
 		await self._svc.release.remote.aio(reservation)

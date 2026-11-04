@@ -28,6 +28,7 @@ from .. import edge, repos
 from ..errors import ApiError
 from ..flags import flag
 from ..jobs import kind_of, limit_of, retry_after, visitor_of
+from ..ledger import Limits
 
 router = APIRouter(prefix="/v1")
 
@@ -218,28 +219,62 @@ async def create_job(request: Request) -> dict:
 		request_body["source"] = {**request_body["source"], "uri": resolved.uri, "commit": resolved.commit}
 
 	sid: str = request.state.session
-	# The store caps jobs per visitor; the IP bucket stops a visitor minting sessions to get round it.
+	# The store caps jobs per visitor; the ledger caps them per address too (jobs a day, jobs at
+	# once), so a visitor who drops the cookie to mint sessions doesn't get round it (PM, Nov 3).
 	ledger = request.app.state.ledger
 	gate = await ledger.reserve(
-		visitor=sid, run=f"jobs:{sid}", ip=edge.ip_key(edge.client_ip(request)), usd=0.0
+		visitor=sid, run=f"jobs:{sid}", ip=edge.ip_key(edge.client_ip(request)), usd=0.0, job=True
 	)
 	if not gate.ok:
-		raise ApiError(
-			429,
-			"rate_limited",
-			"Too many check-ins from here; try again shortly.",
-			retryable=True,
-			retry_after=_seconds(gate.retry_after_s),
-		)
-	await ledger.settle(gate.reservation, 0.0)
+		raise _gate_error(gate.reason, gate.retry_after_s)
 	try:
 		out = await store.submit(request_body, visitor=visitor_of(sid), idempotency_key=key)
 	except Exception as e:
+		await ledger.release(gate.reservation)  # no job started: the address keeps its slot
 		raise _store_error(e) from e
+	if out.get("created"):
+		with contextlib.suppress(Exception):
+			await ledger.bind_job(gate.reservation, out["job_id"])
+	else:
+		await ledger.release(gate.reservation)  # the same check-in again: not a new job
 	reply = {"job_id": out["job_id"], "created": bool(out.get("created")), "position": out.get("position")}
 	if resolved:
 		reply["source"] = {"uri": resolved.uri, "commit": resolved.commit, "ref": resolved.ref}
 	return reply
+
+
+def _gate_error(reason: str | None, wait: float | None) -> ApiError:
+	if reason == "ip_jobs":
+		n = Limits.jobs_per_ip_day
+		return ApiError(
+			429,
+			"ip_jobs_daily",
+			f"This address has checked in {n} jobs today, the most one address can. "
+			"Check in again after midnight ET, or open a sample meanwhile.",
+			retryable=True,
+			retry_after=_seconds(wait, 3600),
+		)
+	if reason == "ip_jobs_open":
+		return ApiError(
+			429,
+			"ip_jobs_open",
+			"Two jobs from this address are still running. Check in again when one finishes.",
+			retryable=True,
+			retry_after=_seconds(wait),
+		)
+	return ApiError(
+		429,
+		"rate_limited",
+		"Too many check-ins from here; try again shortly.",
+		retryable=True,
+		retry_after=_seconds(wait),
+	)
+
+
+async def _ended(request: Request, job_id: str) -> None:
+	"""The job is over: its address's slot is free for another (best effort; it frees itself later)."""
+	with contextlib.suppress(Exception):
+		await request.app.state.ledger.end_job(job_id)
 
 
 async def _claim(request: Request, token: object) -> None:
@@ -262,6 +297,8 @@ async def get_job(job_id: str, request: Request) -> dict:
 	except Exception as e:
 		raise _store_error(e) from e
 	await _claim(request, (out or {}).get("share_token"))
+	if (out or {}).get("status") in TERMINAL:
+		await _ended(request, job_id)
 	return out
 
 
@@ -274,6 +311,7 @@ async def cancel_job(job_id: str, request: Request) -> Response:
 		raise
 	except Exception as e:
 		raise _store_error(e) from e
+	await _ended(request, job_id)
 	return Response(status_code=204)
 
 
@@ -295,6 +333,7 @@ async def job_events(job_id: str, request: Request) -> Response:
 		first = await store.events(job_id, after)  # 404 before the stream starts, not inside it
 		if not first and (await store.status(job_id)).get("status") in TERMINAL:
 			# Nothing new and the job is over: 204 tells EventSource to stop reconnecting.
+			await _ended(request, job_id)
 			return Response(status_code=204)
 	except Exception as e:
 		raise _store_error(e) from e
@@ -310,6 +349,7 @@ async def job_events(job_id: str, request: Request) -> Response:
 					await _claim(request, ev["share_token"])
 				yield _sse(ev)
 				if ev.get("stage") in TERMINAL:
+					await _ended(request, job_id)
 					return
 			now = time.monotonic()
 			if now - started > STREAM_MAX_S or await request.is_disconnected():

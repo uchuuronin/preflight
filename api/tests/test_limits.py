@@ -398,3 +398,23 @@ def test_a_merge_past_64_ruled_out_values_is_refused_not_cut():
 		r = turn(c, start=True, setting=sent)
 		assert r.status_code == 422 and r.json()["error"]["code"] == "too_many_limits"
 		assert model.requests == []
+
+
+def test_a_job_slot_outlives_a_turn_and_frees_itself_when_never_seen_to_end():
+	from preflight_api.ledger import LedgerCore, Limits
+
+	core = LedgerCore(Limits(jobs_per_ip_open=1))
+	t0 = 1_800_000_000.0
+	a = core.reserve(visitor="v1", run="jobs:v1", ip="1.2.3.0", usd=0.0, job=True, now=t0)
+	assert a.ok
+	core.bind_job(a.reservation, "01JOB")
+	assert (
+		core.reserve(visitor="v2", run="jobs:v2", ip="1.2.3.0", usd=0.0, job=True, now=t0 + 600).reason
+		== "ip_jobs_open"
+	)
+	assert core.reserve(
+		visitor="v3", run="jobs:v3", ip="9.9.9.0", usd=0.0, job=True, now=t0 + 600
+	).ok  # another address
+	assert core.reserve(visitor="v2", run="jobs:v2", ip="1.2.3.0", usd=0.0, job=True, now=t0 + 1801).ok
+	# a snapshot keeps the day's job counts across a restart
+	assert LedgerCore.restore(core.snapshot()).snapshot()["day"]["jobs_ip"] == {"1.2.3.0": 2, "9.9.9.0": 1}
