@@ -95,7 +95,7 @@ export function Home() {
 				</section>
 				{/* The rules ask that judges can tell what was built during the event (PM, Nov 3). */}
 				<footer className="pf-home__foot">
-					{t("home.built_during")} ·{" "}
+					{t("home.built_during")} · <a href={href("checks")}>{t("home.checks_link")}</a> ·{" "}
 					<a href={REPO_URL} target="_blank" rel="noreferrer">
 						GitHub
 					</a>

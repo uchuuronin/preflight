@@ -38,6 +38,7 @@
 	"home.verify.body": "When the plan looks right, one short real run confirms it before the long one starts.",
 	"home.closing": "Catch the crash at the first eval before it costs you a night.",
 	"home.built_during": "Built during the Meta Global AI Developer Hackathon",
+	"home.checks_link": "Checks",
 	"newflight.eyebrow": "New flight",
 	"newflight.title": "Check in your job",
 	"newflight.lede": "Point Preflight at your code and say what you care about. It runs a few minutes of the real thing, then hands you the controls.",
