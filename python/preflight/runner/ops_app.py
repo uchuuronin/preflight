@@ -504,6 +504,32 @@ def startup_check():
 
 
 @ops.local_entrypoint()
+def store_probe(modal_env: str = "main", timeout_s: float = 45.0):
+	"""modal run --env main python/preflight/runner/ops_app.py::store_probe
+	Does the deployed job store answer? demand() and reap(), as tick calls them, each with a deadline; reports the
+	time each took, or that it hung (Nov 4: tick timing out after the 153ffa59 redeploy). Read-only apart from reap,
+	which tick runs every minute anyway. Writes out/store_probe.json."""
+	import time
+
+	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME, environment_name=modal_env or None)()
+	out: dict = {}
+	for name in ("demand", "reap", "demand"):
+		t0 = time.monotonic()
+		try:
+			call = getattr(svc, name).spawn()
+			res = call.get(timeout=timeout_s)
+			out[f"{name}_{len(out)}"] = {"s": round(time.monotonic() - t0, 2), "result": res}
+		except Exception as exc:
+			out[f"{name}_{len(out)}"] = {
+				"s": round(time.monotonic() - t0, 2),
+				"failed": f"{type(exc).__name__}: {exc}"[:400],
+			}
+		print(f"[store] {name}: {json.dumps(out[f'{name}_{len(out) - 1}'])[:600]}", flush=True)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/store_probe.json").write_text(json.dumps(out, indent=2))
+
+
+@ops.local_entrypoint()
 def limit_check(modal_env: str = ""):
 	"""Confirm the demo limit on the deployed runner: one visitor's (VISITOR_DAILY_JOBS + 1)th probe job of the ET day
 	is refused with limit.visitor_daily (the limit read from this checkout's queue.py, which the deploy carries: 5 since
