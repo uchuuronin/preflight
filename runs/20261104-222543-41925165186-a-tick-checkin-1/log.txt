@@ -1,0 +1,75 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-jgGreLbFOVxt1cc9Ru8Cx2
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function startup_check_probe_new.
+├── ✓ Created Function probe_user_check_probe_new_image.
+├── ✓ Created Function ground_truth_torch27_on_l4.
+├── ✓ Created Function ground_truth_torch27_on_a10.
+├── ✓ Created Function fill_dataset_cache.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function ground_truth_on_a100.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function _install_check.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function ground_truth_serving_on_a100.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function sandbox_stdin_check_hosted.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+├── ✓ Created Function private_triage_check_hosted.
+├── ✓ Created Function triage_agreement_hosted.
+└── ✓ Created Function _meta_variants.
+submitted {'job_id': '01M6MAPNDEQHD83B5R2ZYNPZX4', 'created': True, 'position': 0}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "seq": 0, "at": "2026-11-04T22:26:03.310334Z", "stage": "queued", "queue_position": 0, "level": "info"}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "seq": 1, "at": "2026-11-04T22:26:06.950360Z", "stage": "admitted", "message": "attempt 1", "level": "info"}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "seq": 2, "at": "2026-11-04T22:26:07.310880Z", "stage": "fetching", "level": "info"}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "seq": 3, "at": "2026-11-04T22:26:07.429944Z", "stage": "mapping", "level": "info"}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "share_token": "YxZA-ulmtAVlKeMR-JfJZA", "seq": 4, "at": "2026-11-04T22:26:08.885711Z", "stage": "skeleton", "message": "skeleton from the static reader", "level": "info", "record_rev": 1}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "share_token": "YxZA-ulmtAVlKeMR-JfJZA", "seq": 5, "at": "2026-11-04T22:26:27.789850Z", "stage": "skeleton", "message": "map refined by Muse Spark", "level": "info", "record_rev": 2}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "share_token": "YxZA-ulmtAVlKeMR-JfJZA", "seq": 6, "at": "2026-11-04T22:26:27.889018Z", "stage": "harnessing", "level": "info", "record_rev": 2}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "share_token": "YxZA-ulmtAVlKeMR-JfJZA", "seq": 7, "at": "2026-11-04T22:26:27.993761Z", "stage": "probing", "progress": 0.0, "level": "info", "probe_id": "p1", "record_rev": 2}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "seq": 8, "at": "2026-11-04T22:27:28.183359Z", "stage": "probing", "message": "waiting for a free L4 GPU (1 min so far)", "level": "info"}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "seq": 9, "at": "2026-11-04T22:28:28.188202Z", "stage": "probing", "message": "waiting for a free L4 GPU (2 min so far)", "level": "info"}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "seq": 10, "at": "2026-11-04T22:28:29.713516Z", "stage": "probing", "message": "A10 GPU ready after 2 min; probe running", "level": "info"}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "share_token": "YxZA-ulmtAVlKeMR-JfJZA", "seq": 11, "at": "2026-11-04T22:31:16.834999Z", "stage": "probing", "message": "no L4 could be scheduled; this job's points run on A10", "level": "warn", "record_rev": 2}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "share_token": "YxZA-ulmtAVlKeMR-JfJZA", "seq": 12, "at": "2026-11-04T22:31:17.177561Z", "stage": "probing", "progress": 0.333, "level": "info", "probe_id": "p2", "record_rev": 2}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "share_token": "YxZA-ulmtAVlKeMR-JfJZA", "seq": 13, "at": "2026-11-04T22:31:34.991324Z", "stage": "probing", "progress": 0.667, "level": "info", "probe_id": "p3", "record_rev": 2}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "share_token": "YxZA-ulmtAVlKeMR-JfJZA", "seq": 14, "at": "2026-11-04T22:33:16.895384Z", "stage": "predicting", "message": "measured; predicting", "level": "info"}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "share_token": "YxZA-ulmtAVlKeMR-JfJZA", "seq": 15, "at": "2026-11-04T22:33:19.639883Z", "stage": "predicting", "message": "predicted", "level": "info", "record_rev": 3}
+{"job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4", "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0", "seq": 16, "at": "2026-11-04T22:33:19.746668Z", "stage": "done", "progress": 1.0, "level": "info"}
+{
+  "waiting_for_gpu": null,
+  "job_id": "01M6MAPNDEQHD83B5R2ZYNPZX4",
+  "status": "done",
+  "position": null,
+  "record_id": "01M6MAPSGFXYE8E93VWAMFX6X0",
+  "share_token": "YxZA-ulmtAVlKeMR-JfJZA",
+  "error": null,
+  "retryable": null,
+  "error_code": null,
+  "last_seq": 16
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-jgGreLbFOVxt1cc9Ru8Cx2

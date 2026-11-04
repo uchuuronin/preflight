@@ -1,0 +1,11 @@
+{
+	"name": "20261104-222543-41925165186-a-tick-checkin-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41925165186",
+	"ref": "153ffa59f2aabf77d6cb75693ac8422db4df6f9a",
+	"sha": "153ffa59f2aabf77d6cb75693ac8422db4df6f9a",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/finetune_lora_hf --visitor tick-check --max-minutes 20",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T22:33:25Z"
+}
