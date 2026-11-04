@@ -66,3 +66,19 @@ export function FindingCitations({ finding }: { finding: Pick<Finding, "citation
 		</ul>
 	);
 }
+
+/**
+ * A model finding's detail in words (PM's audit, Nov 3): the diagnosis appends its claims' internals,
+ * "(plot: loss, steps 8-10, ...; number: probes[p1]...loss[9] = 1.5649...)", B's claim check appends
+ * "Spark Open checked it against probes[...] = ..." and "(10: unsupported: run a probe)". The sentence
+ * stays; the internals go; an unsupported number becomes one plain line (`unsupported`). Who checked it
+ * is the source line's ("checked by Muse Spark Open").
+ */
+export function plainDetail(detail: string | null | undefined): { text: string; unsupported: boolean } {
+	let d = (detail ?? "").trim();
+	const unsupported = /:\s*unsupported: run a probe/.test(d);
+	d = d.replace(/\s*\((?:[^()]*?: unsupported: run a probe(?:;\s*)?)+\)/g, "");
+	d = d.replace(/\s*\(plot:[^()]*\)/g, "");
+	d = d.replace(/\s*Spark Open checked it against [^()]*?(?=\s*\(|$)/g, "");
+	return { text: d.replace(/\s{2,}/g, " ").trim(), unsupported };
+}

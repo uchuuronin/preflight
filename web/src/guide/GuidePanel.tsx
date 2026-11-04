@@ -23,6 +23,7 @@ import { AddonBoundary } from "../components/AddonBoundary";
 import { FixRace } from "../fix/FixRace";
 import { limitsForServer } from "./limits";
 import { LimitsPanel } from "./LimitsPanel";
+import { plainDetail } from "../workspace/cockpit/findingSource";
 import { MoveChoices } from "./MoveChoices";
 
 /** Muse Code writes a finding's fix only once the fix loop is on; until then the tour moves on. */
@@ -413,7 +414,7 @@ export function GuidePanel() {
 			...(step?.combo ? comboWords(record, knobsNow, step.combo) : {}),
 			title: step?.finding?.title ?? "",
 			// A's detail can end without a full stop; the line reads it as a sentence
-			detail: sentence(step?.finding?.detail ?? ""),
+			detail: sentence(plainDetail(step?.finding?.detail).text),
 			...campaignVars(),
 			...rlVars(),
 			...((): Record<string, string> => {

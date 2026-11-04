@@ -547,6 +547,7 @@
 	"finding.source.spark_search": "Muse Spark searched the web",
 	"findings.citations": "Sources",
 	"finding.source.model": "Flagged by a prediction model",
+	"findings.claim_unsupported": "One number in it couldn't be matched to a probe: run a probe to check it.",
 	"findings.title": "Findings",
 	"findings.lede": "What the checks and models found that has no place on the map",
 	"findings.chip": "{n} findings off the map",
