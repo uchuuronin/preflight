@@ -156,7 +156,8 @@ class LedgerCore:
 			return
 		spent = r.usd if usd is None else max(0.0, usd)
 		self._d.usd += spent
-		self._d.run_usd[r.run] = self._d.run_usd.get(r.run, 0.0) + spent
+		if not r.run.startswith(JOB):  # a job's slot spends nothing: no row per job in the snapshot
+			self._d.run_usd[r.run] = self._d.run_usd.get(r.run, 0.0) + spent
 
 	# ---- public
 
@@ -218,11 +219,14 @@ class LedgerCore:
 			if r is not None and r.run.startswith(JOB):
 				r.run = f"{JOB}{job_id}"
 
-	def end_job(self, job_id: str) -> None:
-		"""The job ended (done, failed or cancelled): its address may start another. Idempotent."""
+	def end_job(self, job_id: str) -> bool:
+		"""The job ended (done, failed or cancelled): its address may start another. Idempotent;
+		True if a slot was open, so the service saves only on a change."""
 		with self._lock:
-			for rid in [r.id for r in self._open.values() if r.run == f"{JOB}{job_id}"]:
+			rids = [r.id for r in self._open.values() if r.run == f"{JOB}{job_id}"]
+			for rid in rids:
 				self._close(rid, 0.0)
+			return bool(rids)
 
 	def settle(self, reservation: str, usd: float) -> None:
 		"""Replace a reservation with the billed amount. Idempotent; an unknown id is ignored."""

@@ -24,22 +24,22 @@ export function Info({ label, children, align = "center" }: { label: string; chi
 	}, [open]);
 	// Opened, the text stays on the screen: shifted (CSS translate, on top of its alignment's transform) back inside a 12 px margin where its alignment would
 	// run it off an edge (PM's audit, Nov 3: the Map and Fit "i" were cut off at 390 px).
+	// Written to the element directly (not through React's style), so a resize that keeps the same shift
+	// never leaves it cleared.
 	const pop = useRef<HTMLSpanElement>(null);
-	const [dx, setDx] = useState(0);
 	useLayoutEffect(() => {
+		const el = pop.current;
+		if (!el) return;
 		if (!open) {
-			setDx(0);
+			el.style.translate = "";
 			return;
 		}
 		const fit = () => {
-			const el = pop.current;
-			if (!el) return;
 			el.style.translate = "0px 0px";
 			const r = el.getBoundingClientRect();
 			const vw = document.documentElement.clientWidth;
-			const shift = r.left < 12 ? 12 - r.left : r.right > vw - 12 ? Math.max(12 - r.left, vw - 12 - r.right) : 0;
-			el.style.translate = "";
-			setDx(Math.round(shift));
+			const shift = Math.round(r.left < 12 ? 12 - r.left : r.right > vw - 12 ? Math.max(12 - r.left, vw - 12 - r.right) : 0);
+			el.style.translate = shift ? `${shift}px 0px` : "";
 		};
 		fit();
 		window.addEventListener("resize", fit);
@@ -50,7 +50,7 @@ export function Info({ label, children, align = "center" }: { label: string; chi
 			<button type="button" className="pf-info__btn" aria-label={t("info.about", { what: label })} aria-describedby={id} aria-expanded={open} onClick={() => setOpen(!open)}>
 				i
 			</button>
-			<span id={id} ref={pop} role="tooltip" className="glass pf-info__pop" style={dx ? { translate: `${dx}px 0px` } : undefined}>
+			<span id={id} ref={pop} role="tooltip" className="glass pf-info__pop">
 				{children}
 			</span>
 		</span>

@@ -22,6 +22,8 @@ describe("the i popover on a phone (PM's audit, Nov 3)", () => {
 		const { container } = render(<Info label="Flight plan" align="end">text</Info>);
 		act(() => fireEvent.click(container.querySelector("button") as HTMLElement));
 		expect((container.querySelector(".pf-info__pop") as HTMLElement).style.translate).toBe("253px 0px");
+		act(() => window.dispatchEvent(new Event("resize"))); // the same shift again stays applied
+		expect((container.querySelector(".pf-info__pop") as HTMLElement).style.translate).toBe("253px 0px");
 	});
 	it("shifts a start-aligned popover that runs off the right edge back inside", () => {
 		width();

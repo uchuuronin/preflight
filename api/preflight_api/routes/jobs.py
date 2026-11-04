@@ -258,7 +258,8 @@ def _gate_error(reason: str | None, wait: float | None) -> ApiError:
 		return ApiError(
 			429,
 			"ip_jobs_open",
-			"Two jobs from this address are still running. Check in again when one finishes.",
+			f"{Limits.jobs_per_ip_open} jobs from this address are still running. "
+			"Check in again when one finishes.",
 			retryable=True,
 			retry_after=_seconds(wait),
 		)

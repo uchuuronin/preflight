@@ -68,3 +68,10 @@ describe("plainDetail (PM's audit, Nov 3)", () => {
 		expect(plainDetail("Eval runs with gradients kept, so it holds every layer's activations.")).toEqual({ text: "Eval runs with gradients kept, so it holds every layer's activations.", unsupported: false });
 	});
 });
+
+describe("a finding's detail in words, more shapes (review, Nov 3)", () => {
+	it("drops a plot region that holds parentheses, and an abstained check's reason", () => {
+		expect(plainDetail("Loss spikes after warmup. (plot: loss (smoothed), steps 8-10; number: probes[p1].loss[9] = 1.56)").text).toBe("Loss spikes after warmup.");
+		expect(plainDetail("Reserved climbs. (plot: memory, steps 1-4; number: p1.reserved = 9.1e9) Spark Open's check: no number in the probes matches.").text).toBe("Reserved climbs.");
+	});
+});

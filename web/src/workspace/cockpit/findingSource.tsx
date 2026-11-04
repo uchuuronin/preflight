@@ -78,7 +78,11 @@ export function plainDetail(detail: string | null | undefined): { text: string; 
 	let d = (detail ?? "").trim();
 	const unsupported = /:\s*unsupported: run a probe/.test(d);
 	d = d.replace(/\s*\((?:[^()]*?: unsupported: run a probe(?:;\s*)?)+\)/g, "");
+	// the plot region is the model's words and may hold parentheses; "; number: ...)" is the producer's
+	d = d.replace(/\s*\(plot: [\s\S]*?; number: [^;()]*\)/g, "");
 	d = d.replace(/\s*\(plot:[^()]*\)/g, "");
 	d = d.replace(/\s*Spark Open checked it against [^()]*?(?=\s*\(|$)/g, "");
+	// an abstained check's reason (B's diagnosis_check: " Spark Open's check: {reason}.") closes the detail
+	d = d.replace(/\s*Spark Open's check: [\s\S]*$/, "");
 	return { text: d.replace(/\s{2,}/g, " ").trim(), unsupported };
 }

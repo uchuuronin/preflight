@@ -152,8 +152,8 @@ class SpendLedger:
 
 	@modal.method()
 	def end_job(self, job_id: str) -> None:
-		self.core.end_job(job_id)
-		self._save()
+		if self.core.end_job(job_id):
+			self._save()
 
 	@modal.method()
 	def spent_today(self) -> float:
