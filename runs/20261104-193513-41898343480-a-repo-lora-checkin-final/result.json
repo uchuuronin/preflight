@@ -1,0 +1,11 @@
+{
+	"name": "20261104-193513-41898343480-a-repo-lora-checkin-final",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41898343480",
+	"ref": "a302af075c5e6f66a9c3333095e2876bd49d304e",
+	"sha": "a302af075c5e6f66a9c3333095e2876bd49d304e",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --repo https://github.com/uchuuronin/preflight --entrypoint zoo/finetune_lora_hf/train.py --visitor lora-repo-shot --max-minutes 25",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T19:45:26Z"
+}
