@@ -144,7 +144,7 @@ export function LiveGuideSection({
 			) : null}
 			{!view ? (
 				<>
-					<p className="pf-guide__say">{t("guide.live.intro")}</p>
+					<p className="pf-guide__say pf-guide__intro">{t("guide.live.intro")}</p>
 					<div className="pf-guide__actions">
 						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" disabled={busy} onClick={() => void run((g) => g.start())}>
 							{busy ? t("guide.ask.thinking") : t("guide.start")}
