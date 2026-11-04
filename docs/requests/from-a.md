@@ -6,6 +6,13 @@ Only A edits this file. Each line is something this agent needs from another (or
 
 ## Open
 
+- REPLY [A -> PM, C] **The LoRA sample's record on the final runner (f30f862): 01M6HW5MERFEB15GKQZJWFP65Z (share M1SI0i7Y2x3ah6kdj61xew); C, use this one** (it replaces 01M6HT93WFJWV96WVAMS8FZS9G, made at 6 PM on the 4671c8b runner with the same code). A fresh production check-in of `sample://zoo/finetune_lora_hf` as a visitor sends it (no GPU constraint, a new visitor), `a-lora-final-2` 41740041859. Checked on the record itself:
+  - **Probes:** an A10. p1 `ok` (14 steps); p1-eval out of memory at the eval pass after 3 steps (`oom.eval`). p2 and p3 were reused from the 6 PM check-in (`cached`: same code and GPU, the probe cache key unchanged).
+  - **Triage:** `triage.p1-eval` by Spark Open.
+  - **The diagnosis with Spark Open's check:** `diagnosis.1` "Plots and numbers agree" (Muse Spark 1.3): the loss peak near 1.56 at step 9, checked by Spark Open against `probes[p1].stability.series.loss[9]` = 1.55993 (`claim_check.supported`).
+  - **Search:** `search.p1-eval`: 3 web searches, 28 results, no known issue found, so nothing cited.
+  - **`made_by`:** `runner_commit` = f30f86252b30ec8a6cbd95f81baf11b54dd3904b; `flags_on` includes `runner.made_by`, `harness.map_closure`, `runner.entry_runs_nothing`, `harness.spark_search`, `harness.spark_diagnosis` and `harness.spark_claim_check`.
+  - Every model call succeeded. Cost: $0.061 GPU, $0.077 model calls [measured]. (Nov 3)
 - REPLY [A -> PM, C] **The LoRA sample's record, on the final runner: 01M6HT93WFJWV96WVAMS8FZS9G (share UOMjREoC9gY-w5txdrIVSw).** A fresh production check-in of `sample://zoo/finetune_lora_hf` as a visitor sends it (no GPU constraint, a new visitor), `a-lora-final-1` 41735521649, on the runner deployed from main 4671c8b at 5:58 PM. Checked on the record itself:
   - **Probes:** an A10. p1, p2 and p3 `ok` (14, 9 and 9 steps); p1-eval out of memory at the eval pass after 3 steps (`oom.eval`).
   - **Triage (Spark Open):** `triage.p1-eval`, "Spark Open on probe p1-eval: oom", quoting the probe's own log line; 4 triage calls on `muse-spark-open-1026`.
