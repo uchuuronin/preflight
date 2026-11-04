@@ -179,6 +179,7 @@ def prefetch(models: str = "") -> list[str]:
 
 # ---------------------------------------------------------------- startup check (no GPU)
 
+BIG_SPEC_PAD = 17_500_000  # over Modal's 16 MiB stdin buffer (startup_check_sandbox's repo-sized probe)
 _CHECK_LOOP = """
 import torch
 m = torch.nn.Sequential(torch.nn.Linear(16, 32), torch.nn.GELU(), torch.nn.Linear(32, 1))
@@ -338,6 +339,7 @@ def startup_check_sandbox() -> dict:
 	from preflight.probes.local import ProbeSpec
 	from preflight.runner.modal_app import _sandbox_factory
 	from preflight.runner.sandbox_runner import ENTRY, SandboxRunner
+	from preflight.runner.wire import spec_to_wire
 
 	owner = modal.App._get_container_app()
 	out: dict = {"entry": list(ENTRY)}
@@ -364,8 +366,16 @@ def startup_check_sandbox() -> dict:
 	with SandboxRunner(create) as runner:
 		r = runner(ProbeSpec(probe_id="check", files={"train.py": _CHECK_LOOP}, entrypoint="train.py", timeout_s=240),
 			"cpu", should_stop=lambda: False)  # fmt: skip
+		# a repo-sized spec through the same path (Nov 4: this repository's own check-in, a 16.96 MB spec, ended every
+		# probe "without a result" at Modal's 16 MiB stdin buffer; sandbox_runner.write_stdin): the script plus a
+		# generated file it never imports, so the spec on the wire passes that buffer
+		big = ProbeSpec(probe_id="check-big", files={"train.py": _CHECK_LOOP, "docs/pad.txt": "a" * BIG_SPEC_PAD},
+			entrypoint="train.py", timeout_s=300)  # fmt: skip
+		out["big_spec_bytes"] = len(spec_to_wire(big))
+		rb = runner(big, "cpu", should_stop=lambda: False)
 	out.update(probe_status=r.probe.status, probe_steps=r.probe.steps, probe_error=r.probe.error,
-		probe_error_code=r.probe.error_code)  # fmt: skip
+		probe_error_code=r.probe.error_code, big_probe_status=rb.probe.status, big_probe_steps=rb.probe.steps,
+		big_probe_error=rb.probe.error, big_probe_error_code=rb.probe.error_code)  # fmt: skip
 	return out
 
 
@@ -455,6 +465,7 @@ def startup_check():
 		and w.get("job_store_would_claim_here") is False and "runner_loaded_as" in w
 		and "failed" not in p and p.get("status") == "ok" and p.get("steps", 0) > 0 and p.get("reachable_by_probe_uid")
 		and "failed" not in sb and sb.get("import_exit") == 0 and sb.get("probe_status") == "ok"
+		and sb.get("big_probe_status") == "ok" and sb.get("big_probe_steps", 0) > 0
 		and result["probe_user_ok"] and result["serving_user_ok"]
 	)  # fmt: skip
 	Path("out").mkdir(exist_ok=True)

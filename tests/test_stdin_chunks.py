@@ -70,3 +70,33 @@ def test_an_agent_runs_job_goes_in_pieces_too():
 	job = {"timeout_s": 60, "files": {"big.py": "a" * 17_000_000}}
 	_SandboxProc(sb, job)
 	assert stdin.eof and len("".join(stdin.received)) > 17_000_000
+
+
+def test_the_deploy_gates_sandbox_check_requires_a_repo_sized_probe_to_measure():
+	"""The startup check's ok needs both its tiny probe and its repo-sized one (over Modal's 16 MiB buffer) to measure."""
+	import ast
+	from pathlib import Path
+
+	src = (Path(__file__).resolve().parents[1] / "python/preflight/runner/ops_app.py").read_text()
+	tree = ast.parse(src)
+	pad = next(n.value for n in ast.walk(tree) if isinstance(n, ast.Assign)
+		and any(getattr(t, "id", None) == "BIG_SPEC_PAD" for t in n.targets))  # fmt: skip
+	assert ast.literal_eval(pad) > LIMIT
+	fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "startup_check")
+	body = ast.get_source_segment(src, fn)
+	assert 'sb.get("big_probe_status") == "ok"' in body and 'sb.get("big_probe_steps", 0) > 0' in body
+
+
+def test_a_repo_sized_spec_runs_through_the_sandbox_runner_in_pieces():
+	"""SandboxRunner's own call path with a Modal-like stdin: the big spec arrives whole and the probe's result is read."""
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner import sandbox_runner as SR
+	from preflight.runner.wire import spec_to_wire
+
+	stdin = ModalLikeStdin()
+	spec = ProbeSpec(
+		probe_id="big", files={"train.py": "x = 1\n", "docs/pad.txt": "a" * 17_500_000}, entrypoint="train.py"
+	)
+	assert len(spec_to_wire(spec)) > LIMIT
+	SR.write_stdin(stdin, spec_to_wire(spec))
+	assert "".join(stdin.received) == spec_to_wire(spec) and stdin.eof
