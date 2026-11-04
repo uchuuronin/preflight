@@ -1,9 +1,8 @@
 /**
  * Checks: the same code, asked to Muse Spark without probes (B's vs_model.json, from
- * docs/validation/preflight-vs-model.md). Read first as three tiles, then as a dot plot of each
- * prediction over what the full run did, both sides on one log scale (step time and peak memory as
- * two small multiples, never two axes), Preflight a circle and Muse Spark a diamond so colour is
- * never the only cue. The numbers, the out-of-memory calls and B's caveats follow, as written.
+ * docs/validation/preflight-vs-model.md). Read first as B's three tiles, then as two miss charts
+ * (step time, peak memory) that say each miss in words, Preflight a circle and Muse Spark a diamond
+ * so colour is never the only cue. The numbers, the out-of-memory calls and B's caveats follow, folded.
  */
 import vsRaw from "../../coverage/vs_model.json";
 import { fmt } from "../../lib/fmt";
@@ -32,25 +31,31 @@ export function ratio(x: number): string {
 	return `${sig3.format(x)}×`;
 }
 
-/** How far off, in words a stranger reads: "8% low", "36% high", "18× too high". */
-function off(x: number): string {
-	if (x >= 2) return t("checks.ask.off_times_high", { v: one.format(x) });
-	if (x <= 0.5) return t("checks.ask.off_times_low", { v: one.format(1 / x) });
-	const pct = Math.round(Math.abs(x - 1) * 100);
-	return t(x >= 1 ? "checks.ask.off_pct_high" : "checks.ask.off_pct_low", { v: pct });
-}
+// ---------------------------------------------------------------- the miss chart
 
-// ---------------------------------------------------------------- the dot plot
-
-/** One shared log scale: Muse Spark's gnn step interval reaches 36×, Preflight's retrieval peak 0.43×. */
-const LO = 0.25;
-const HI = 64;
-const TICKS = [0.25, 0.5, 1, 2, 4, 8, 16, 32, 64];
-const pos = (x: number) => (100 * (Math.log(Math.min(HI, Math.max(LO, x))) - Math.log(LO))) / (Math.log(HI) - Math.log(LO));
-const tickLabel = (x: number) => (x < 1 ? `${x === 0.25 ? "¼" : "½"}×` : `${x}×`);
-
+/**
+ * How far off each guess was, read at a glance (Chiya, Nov 3: B's dot plot read as a log axis). The
+ * centre line is what the full run did. Each guess is a bar out from it: right for too slow (or too
+ * high), left for too fast (or too low), its length the size of the miss on a scale that reads the
+ * same both ways (2x too slow is as far right as half the time is left; see `reach`). The miss is said in
+ * words at the end of every lane, so nothing has to be read off an axis; the shaded strip is the
+ * target. Preflight's bar ends in a circle, Muse Spark's in a diamond, so colour is never the only cue.
+ */
 type Metric = "step" | "peak";
 const TARGET: Record<Metric, number> = { step: 0.15, peak: 0.1 };
+/** The scale's edge, either way: Muse Spark's 18x step miss sits inside it. */
+const EDGE = 24;
+const GUIDES = [2, 10];
+/**
+ * Half the track, as a fraction: 0 at the full run, 1 at EDGE times off either way. The square root of
+ * the log stretches the small misses so a 20% one is visible beside an 18x one; the 2x and 10x guides
+ * mark the scale, and the words carry the number.
+ */
+const reach = (x: number) => {
+	const r = Math.min(1, Math.abs(Math.log(x)) / Math.log(EDGE));
+	return Math.sign(Math.log(x)) * Math.sqrt(r);
+};
+const at = (x: number) => 50 + 50 * reach(x);
 
 function estOf(side: Side, m: Metric): Est {
 	return m === "step" ? side.step_s : side.peak_gib;
@@ -72,94 +77,106 @@ function whyNot(r: Row, who: "preflight" | "muse", m: Metric): string {
 	return (m === "step" ? (side.step_why ?? side.why) : side.why) ?? t("checks.ask.no_answer");
 }
 
-function Mark({ r, who, m }: { r: Row; who: "preflight" | "muse"; m: Metric }) {
+/** The miss in words: "8% too fast", "18× too slow", "within 10%" for a peak inside the target. */
+export function missWords(x: number, m: Metric): string {
+	const high = x >= 1;
+	const dir = m === "step" ? (high ? "slow" : "fast") : high ? "high" : "low";
+	if (x >= 2 || x <= 0.5) return t(`checks.ask.miss.times_${dir}`, { v: one.format(high ? x : 1 / x) });
+	return t(`checks.ask.miss.pct_${dir}`, { v: Math.round(Math.abs(x - 1) * 100) });
+}
+
+function Lane({ r, who, m }: { r: Row; who: "preflight" | "muse"; m: Metric }) {
 	const x = ratioOf(r, who, m);
-	if (x === null) return null;
+	const name = t(who === "preflight" ? "checks.ask.side.preflight" : "checks.ask.side.muse");
+	if (x === null) {
+		return (
+			<li className={`pf-miss__lane pf-miss__lane--${who} is-empty`}>
+				<span className={`pf-ask__key pf-ask__key--${who}`} aria-hidden="true" />
+				<span className="pf-miss__why">
+					<span className="pf-visually-hidden">{name}: </span>
+					{whyNot(r, who, m)}
+				</span>
+			</li>
+		);
+	}
 	const e = estOf(who === "preflight" ? r.preflight : r.muse_spark, m);
 	const act = actualOf(r, m);
-	const lo = e?.lo !== undefined && act ? e.lo / act : null;
-	const hi = e?.hi !== undefined && act ? e.hi / act : null;
-	const name = t(who === "preflight" ? "checks.ask.side.preflight" : "checks.ask.side.muse");
 	const unit = m === "step" ? "s" : "GiB";
 	const num = (v: number) => (m === "step" ? sig3.format(v) : one.format(v));
-	const tip = t("checks.ask.tip", {
+	const detail = t("checks.ask.tip", {
 		who: name,
 		pred: `${num(e?.point ?? 0)} ${unit}`,
 		range: e?.lo !== undefined && e?.hi !== undefined ? t("checks.ask.tip_range", { lo: num(e.lo), hi: num(e.hi), unit }) : "",
 		actual: act ? `${num(act)} ${unit}` : "",
-		off: off(x),
+		off: missWords(x, m),
 	});
+	const right = x >= 1;
+	const left = Math.min(50, at(x));
+	const width = Math.max(0.8, Math.abs(at(x) - 50));
+	const onTarget = Math.abs(x - 1) <= TARGET[m];
 	return (
-		<span className={`pf-ask__lane pf-ask__lane--${who}`}>
-			{lo !== null && hi !== null ? <span className="pf-ask__whisker" style={{ left: `${pos(lo)}%`, width: `${Math.max(0.6, pos(hi) - pos(lo))}%` }} aria-hidden="true" /> : null}
-			<span className="pf-ask__dot" style={{ left: `${pos(x)}%` }} role="img" tabIndex={0} aria-label={tip} data-tip={tip}>
-				<span className={`pf-ask__shape pf-ask__shape--${who}`} aria-hidden="true" />
+		<li className={`pf-miss__lane pf-miss__lane--${who}${onTarget ? " is-on" : ""}`} title={detail}>
+			<span className={`pf-ask__key pf-ask__key--${who}`} aria-hidden="true" />
+			<span className="pf-miss__track" aria-hidden="true">
+				<span className={`pf-miss__bar${right ? " is-right" : " is-left"}`} style={{ left: `${left}%`, width: `${width}%` }}>
+					<span className="pf-miss__end" />
+				</span>
 			</span>
-			{x >= 2 || x <= 0.5 ? (
-				// selective direct labels: only the far ones, past the end of their range line
-				x >= 1 ? (
-					<span className="pf-ask__direct" style={{ left: `${pos(Math.max(x, hi ?? x))}%` }} aria-hidden="true">
-						{ratio(x)}
-					</span>
-				) : (
-					<span className="pf-ask__direct pf-ask__direct--left" style={{ left: `${pos(Math.min(x, lo ?? x))}%` }} aria-hidden="true">
-						{ratio(x)}
-					</span>
-				)
-			) : null}
-		</span>
+			<span className="pf-miss__words">
+				<span className="pf-visually-hidden">{name}: </span>
+				{missWords(x, m)}
+			</span>
+		</li>
 	);
 }
 
-function Plot({ m }: { m: Metric }) {
-	const shown = vs.rows.filter((r) => ratioOf(r, "preflight", m) !== null || ratioOf(r, "muse", m) !== null);
-	// what isn't plotted, once per script: one line when both sides miss for the same reason
-	const gaps = vs.rows.flatMap((r) => {
-		const missing = (["preflight", "muse"] as const).filter((w) => ratioOf(r, w, m) === null);
-		if (!missing.length) return [];
-		const whys = missing.map((w) => whyNot(r, w, m));
-		if (missing.length === 2 && whys[0] === whys[1]) return [{ key: r.script, text: t("checks.ask.gap_both", { script: r.label, why: whys[0] }) }];
-		return missing.map((w, i) => ({ key: `${r.script}-${w}`, text: t("checks.ask.gap", { who: t(w === "preflight" ? "checks.ask.side.preflight" : "checks.ask.side.muse"), script: r.label, why: whys[i] }) }));
-	});
+function MissChart({ m }: { m: Metric }) {
 	const band = TARGET[m];
+	const rows = vs.rows.filter((r) => !(m === "peak" && r.full_run.ran_out_of_memory));
+	const ranOut = m === "peak" ? vs.rows.filter((r) => r.full_run.ran_out_of_memory) : [];
+	const lo = m === "step" ? "checks.ask.dir.fast" : "checks.ask.dir.low";
+	const hi = m === "step" ? "checks.ask.dir.slow" : "checks.ask.dir.high";
 	return (
-		<figure className="pf-ask__plot">
-			<figcaption className="pf-ask__cap">
-				<b>{t(m === "step" ? "checks.ask.col.step" : "checks.ask.col.peak")}</b>
-				<small className="pf-dim">{t("checks.ask.band", { pct: Math.round(band * 100) })}</small>
+		<figure className="glass pf-miss">
+			<figcaption className="pf-miss__cap">
+				<b>{t(m === "step" ? "checks.ask.miss.step" : "checks.ask.miss.peak")}</b>
+				<small>{t("checks.ask.band", { pct: Math.round(band * 100) })}</small>
 			</figcaption>
-			<div className="pf-ask__grid" aria-hidden="true">
-				<span className="pf-ask__name" />
-				<span className="pf-ask__ticks">
-					{TICKS.map((x) => (
-						<span key={x} className={x === 1 ? "pf-ask__tick is-one" : "pf-ask__tick"} style={{ left: `${pos(x)}%` }}>
-							{tickLabel(x)}
-						</span>
-					))}
+			<div className="pf-miss__scale" aria-hidden="true">
+				<span className="pf-miss__key" />
+				<span className="pf-miss__track pf-miss__track--scale">
+					<span className="pf-miss__dir is-left">{t(lo)}</span>
+					<span className="pf-miss__dir is-mid">{t("checks.ask.dir.real")}</span>
+					<span className="pf-miss__dir is-right">{t(hi)}</span>
 				</span>
+				<span className="pf-miss__words" />
 			</div>
-			<ul className="pf-ask__rows">
-				{shown.map((r) => (
-					<li key={r.script} className="pf-ask__grid">
-						<span className="pf-ask__name">
+			<ul className="pf-miss__rows">
+				{rows.map((r) => (
+					<li key={r.script} className="pf-miss__row">
+						<span className="pf-miss__name">
 							{r.label}
-							{r.device.replace(/^NVIDIA /, "") !== r.gpu ? <small className="pf-dim"> · {t("checks.ask.ran_on", { ran: r.device.replace(/^NVIDIA /, "") })}</small> : null}
+							{r.device.replace(/^NVIDIA /, "") !== r.gpu ? <small> · {t("checks.ask.ran_on", { ran: r.device.replace(/^NVIDIA /, "") })}</small> : null}
 						</span>
-						<span className="pf-ask__track">
-							<span className="pf-ask__target" style={{ left: `${pos(1 - band)}%`, width: `${pos(1 + band) - pos(1 - band)}%` }} aria-hidden="true" />
-							<span className="pf-ask__one" style={{ left: `${pos(1)}%` }} aria-hidden="true" />
-							<Mark r={r} who="preflight" m={m} />
-							<Mark r={r} who="muse" m={m} />
-						</span>
+						<ul className="pf-miss__lanes" style={{ ["--band-l" as string]: `${at(1 - band)}%`, ["--band-w" as string]: `${at(1 + band) - at(1 - band)}%` }}>
+							<Lane r={r} who="preflight" m={m} />
+							<Lane r={r} who="muse" m={m} />
+						</ul>
 					</li>
 				))}
 			</ul>
-			{gaps.length ? (
-				<ul className="pf-ask__gaps pf-dim">
-					{gaps.map((g) => (
-						<li key={g.key}>{g.text}</li>
-					))}
-				</ul>
+			<div className="pf-miss__guides" aria-hidden="true">
+				<span className="pf-miss__key" />
+				<span className="pf-miss__track pf-miss__track--scale">
+					{GUIDES.flatMap((g) => [
+						<span key={`l${g}`} style={{ left: `${at(1 / g)}%` }}>{`${g}×`}</span>,
+						<span key={`r${g}`} style={{ left: `${at(g)}%` }}>{`${g}×`}</span>,
+					])}
+				</span>
+				<span className="pf-miss__words" />
+			</div>
+			{ranOut.length ? (
+				<p className="pf-miss__note">{ranOut.map((r) => t("checks.ask.gap_both", { script: r.label, why: whyNot(r, "preflight", "peak") })).join(". ")}.</p>
 			) : null}
 		</figure>
 	);
@@ -226,20 +243,18 @@ export function ChecksAsk() {
 				<Tile title={t("checks.ask.tile.peak")} pf={within("preflight")} ms={within("muse")} />
 				<Tile title={t("checks.ask.tile.oom", { n: ran.length })} pf={oomCalls("preflight")} ms={oomCalls("muse")} />
 			</div>
-			<div className="glass pf-ask__chart">
-				<div className="pf-ask__legend">
-					<span>
-						<span className="pf-ask__key pf-ask__key--preflight" aria-hidden="true" /> {t("checks.ask.legend.preflight")}
-					</span>
-					<span>
-						<span className="pf-ask__key pf-ask__key--muse" aria-hidden="true" /> {t("checks.ask.legend.muse")}
-					</span>
-					<small className="pf-dim">{t("checks.ask.how")}</small>
-				</div>
-				<div className="pf-ask__plots">
-					<Plot m="step" />
-					<Plot m="peak" />
-				</div>
+			<div className="pf-ask__legend">
+				<span>
+					<span className="pf-ask__key pf-ask__key--preflight" aria-hidden="true" /> {t("checks.ask.legend.preflight")}
+				</span>
+				<span>
+					<span className="pf-ask__key pf-ask__key--muse" aria-hidden="true" /> {t("checks.ask.legend.muse")}
+				</span>
+				<small>{t("checks.ask.how")}</small>
+			</div>
+			<div className="pf-ask__plots">
+				<MissChart m="step" />
+				<MissChart m="peak" />
 			</div>
 			<p className="pf-dim pf-ask__summary">{vs.summary}</p>
 			<details className="pf-ask__more">

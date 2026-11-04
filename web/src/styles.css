@@ -2282,63 +2282,62 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-ask__key { display: inline-block; width: 10px; height: 10px; vertical-align: middle; }
 .pf-ask__key--preflight { border-radius: 50%; background: var(--pf-series-a); }
 .pf-ask__key--muse { background: var(--pf-series-b); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); width: 12px; height: 12px; }
-.pf-ask__chart { padding: var(--pf-space-4) var(--pf-space-5) var(--pf-space-5); border-radius: var(--pf-radius-md); display: flex; flex-direction: column; gap: var(--pf-space-4); }
 .pf-ask__legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pf-space-2) var(--pf-space-5); font-size: var(--pf-text-sm); }
-.pf-ask__legend small { flex-basis: 100%; }
-.pf-ask__plots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--pf-space-6); }
-.pf-ask__plot { margin: 0; display: flex; flex-direction: column; gap: var(--pf-space-2); min-width: 0; }
-.pf-ask__cap { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--pf-space-1) var(--pf-space-3); font-size: var(--pf-text-md); }
-.pf-ask__cap small { font-size: var(--pf-text-xs); }
-.pf-ask__grid { display: grid; grid-template-columns: minmax(0, 9.5em) minmax(0, 1fr); gap: var(--pf-space-3); align-items: center; }
-.pf-ask__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.pf-ask__rows > li { padding: var(--pf-space-2) 0; border-top: 1px solid var(--pf-stroke); }
-.pf-ask__name { font-size: var(--pf-text-sm); line-height: 1.3; overflow-wrap: anywhere; }
-.pf-ask__name small { font-size: var(--pf-text-xs); }
-.pf-ask__ticks { position: relative; height: 16px; font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
-.pf-ask__tick { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
-.pf-ask__tick:first-child { transform: none; }
-.pf-ask__tick:last-child { transform: translateX(-100%); }
-.pf-ask__tick.is-one { color: var(--pf-fg); }
-.pf-ask__track { position: relative; height: 34px; background: linear-gradient(var(--pf-track), var(--pf-track)) center / 100% 1px no-repeat; }
-.pf-ask__target { position: absolute; top: 0; bottom: 0; background: var(--pf-track); opacity: 0.7; }
-.pf-ask__one { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--pf-stroke-strong); }
-.pf-ask__lane { position: absolute; left: 0; right: 0; height: 0; }
-.pf-ask__lane--preflight { top: 10px; }
-.pf-ask__lane--muse { top: 24px; }
-.pf-ask__whisker { position: absolute; top: -1px; height: 2px; border-radius: 2px; opacity: 0.55; }
-.pf-ask__lane--preflight .pf-ask__whisker { background: var(--pf-series-a); }
-.pf-ask__lane--muse .pf-ask__whisker { background: var(--pf-series-b); }
-.pf-ask__dot { position: absolute; top: -6px; width: 12px; height: 12px; margin-left: -6px; cursor: default; outline: none; border-radius: 3px; }
-.pf-ask__shape { position: absolute; inset: 0; }
-.pf-ask__shape--preflight { inset: 1px; border-radius: 50%; background: var(--pf-series-a); box-shadow: 0 0 0 2px var(--pf-glass-solid); }
-.pf-ask__shape--muse { background: var(--pf-series-b); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.pf-ask__dot:focus-visible { box-shadow: 0 0 0 2px var(--pf-focus); }
-/* A per-mark tooltip on hover and keyboard focus; the hit target is bigger than the mark. */
-.pf-ask__dot::before { content: ""; position: absolute; inset: -8px; }
-.pf-ask__dot::after {
-	content: attr(data-tip); position: absolute; bottom: calc(100% + 10px); left: 50%; z-index: 3;
-	width: max-content; max-width: 260px; padding: 8px 10px; border-radius: var(--pf-radius-sm);
-	background: var(--pf-glass-solid); color: var(--pf-fg); border: 1px solid var(--pf-stroke-strong); box-shadow: var(--pf-shadow);
-	font-size: var(--pf-text-xs); line-height: 1.45; text-align: left; white-space: normal;
-	opacity: 0; pointer-events: none; transform: translate(-50%, 4px); transition: opacity var(--pf-dur-quick) var(--pf-ease), transform var(--pf-dur-quick) var(--pf-ease);
-}
-.pf-ask__dot:hover::after, .pf-ask__dot:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
-.pf-ask__direct { position: absolute; top: -8px; margin-left: 8px; font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); color: var(--pf-fg-dim); white-space: nowrap; pointer-events: none; }
-.pf-ask__direct--left { margin-left: -8px; transform: translateX(-100%); }
-.pf-ask__gaps { margin: var(--pf-space-1) 0 0; padding-left: 18px; font-size: var(--pf-text-xs); line-height: 1.5; display: flex; flex-direction: column; gap: 2px; }
+.pf-ask__legend small { flex-basis: 100%; color: var(--pf-fg-dim); font-size: var(--pf-text-sm); }
+.pf-ask__plots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--pf-space-4); }
+
+/* The miss chart (C, Nov 3, after Chiya's read of the dot plot): the full run is the centre line,
+   each guess a bar out from it, the miss said in words at the lane's end. One column grid shared by
+   the scale, every lane and the guides, so the centre line is the same x everywhere. */
+.pf-miss { margin: 0; padding: var(--pf-space-4) var(--pf-space-5) var(--pf-space-4); border-radius: var(--pf-radius-md); display: flex; flex-direction: column; gap: var(--pf-space-2); min-width: 0; --miss-words: 8.5em; }
+.pf-miss__cap { display: flex; flex-direction: column; gap: 2px; font-size: var(--pf-text-md); }
+.pf-miss__cap small { font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
+.pf-miss__scale, .pf-miss__guides, .pf-miss__lane { display: grid; grid-template-columns: 12px minmax(0, 1fr) var(--miss-words); gap: var(--pf-space-2); align-items: center; }
+.pf-miss__track { position: relative; height: 14px; min-width: 0; }
+.pf-miss__track--scale { height: 16px; font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
+.pf-miss__dir { position: absolute; top: 0; white-space: nowrap; }
+.pf-miss__dir.is-left { left: 0; }
+.pf-miss__dir.is-right { right: 0; }
+.pf-miss__dir.is-mid { left: 50%; transform: translateX(-50%); color: var(--pf-fg); }
+.pf-miss__guides .pf-miss__track span { position: absolute; top: 0; transform: translateX(-50%); font-family: var(--pf-font-mono); }
+.pf-miss__rows, .pf-miss__lanes { list-style: none; margin: 0; padding: 0; }
+.pf-miss__row { display: flex; flex-direction: column; gap: 4px; padding: var(--pf-space-2) 0; border-top: 1px solid var(--pf-stroke); }
+.pf-miss__name { font-size: var(--pf-text-sm); line-height: 1.3; }
+.pf-miss__name small { color: var(--pf-fg-dim); font-size: var(--pf-text-xs); }
+.pf-miss__lanes { position: relative; display: flex; flex-direction: column; }
+/* the target strip and the real run's line, behind both lanes of a row */
+.pf-miss__lane { min-height: 22px; }
+.pf-miss__lane .pf-miss__track { align-self: stretch; height: auto; }
+.pf-miss__lane .pf-miss__track::before { content: ""; position: absolute; top: 0; bottom: 0; left: var(--band-l); width: var(--band-w); background: color-mix(in srgb, var(--pf-ok-tint) 24%, transparent); }
+.pf-miss__lane:first-child .pf-miss__track::before { border-radius: 4px 4px 0 0; }
+.pf-miss__lane:last-child .pf-miss__track::before { border-radius: 0 0 4px 4px; }
+.pf-miss__lane .pf-miss__track::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: var(--pf-fg); opacity: 0.75; }
+.pf-miss__bar { position: absolute; top: 50%; margin-top: -4px; height: 8px; border-radius: 4px; transform-origin: right center; animation: pf-miss-grow 700ms var(--pf-ease) both; }
+.pf-miss__bar.is-right { transform-origin: left center; }
+.pf-miss__lane--preflight .pf-miss__bar { background: color-mix(in srgb, var(--pf-series-a) 70%, transparent); }
+.pf-miss__lane--muse .pf-miss__bar { background: color-mix(in srgb, var(--pf-series-b) 70%, transparent); }
+.pf-miss__end { position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; }
+.pf-miss__bar.is-right .pf-miss__end { right: -7px; }
+.pf-miss__bar.is-left .pf-miss__end { left: -7px; }
+.pf-miss__lane--preflight .pf-miss__end { border-radius: 50%; background: var(--pf-series-a); box-shadow: 0 0 0 2px var(--pf-glass-solid); }
+.pf-miss__lane--muse .pf-miss__end { background: var(--pf-series-b); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.pf-miss__words { font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-miss__lane.is-on .pf-miss__words { color: var(--pf-ok); }
+.pf-miss__lane.is-empty { grid-template-columns: 12px minmax(0, 1fr); }
+.pf-miss__why { font-size: var(--pf-text-xs); line-height: 1.4; color: var(--pf-fg-dim); }
+.pf-miss__note { margin: var(--pf-space-1) 0 0; font-size: var(--pf-text-xs); line-height: 1.5; color: var(--pf-fg-dim); }
+@keyframes pf-miss-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .pf-miss__bar { animation: none; } }
 .pf-ask__more > summary { cursor: pointer; font-size: var(--pf-text-sm); color: var(--pf-fg-dim); padding: var(--pf-space-1) 0; }
 .pf-ask__more > summary:hover { color: var(--pf-fg); }
 .pf-ask__more[open] > summary { margin-bottom: var(--pf-space-2); }
 @media (max-width: 900px) {
 	.pf-ask__tiles { grid-template-columns: minmax(0, 1fr); }
-	.pf-ask__plots { grid-template-columns: minmax(0, 1fr); gap: var(--pf-space-5); }
+	.pf-ask__plots { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 520px) {
-	.pf-ask__chart { padding: var(--pf-space-3); }
-	.pf-ask__grid { grid-template-columns: minmax(0, 1fr); gap: var(--pf-space-1); }
-	.pf-ask__grid > .pf-ask__name:empty { display: none; }
+	.pf-miss { padding: var(--pf-space-3); --miss-words: 7.5em; }
 }
-@media (prefers-reduced-motion: reduce) { .pf-ask__dot::after { transition: none; } }
 .pf-checks__row--head { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pf-fg-dim); }
 .pf-checks__row > * { min-width: 0; overflow-wrap: anywhere; }
 .pf-checks__list .pf-chips { display: flex; flex-direction: column; gap: 8px; }

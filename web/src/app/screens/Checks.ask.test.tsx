@@ -22,7 +22,7 @@ describe("the checks page's same-code comparison (B's vs_model.json)", () => {
 		for (const c of vs.caveats) expect(screen.getByText(c)).toBeTruthy();
 	});
 
-	it("reads first as three tiles and a dot plot, each mark named in words, never by colour alone", () => {
+	it("reads first as three tiles and two miss charts, each miss said in words, never by colour alone", () => {
 		render(<Checks />);
 		const tiles = document.querySelectorAll(".pf-ask__tile");
 		expect(tiles.length).toBe(3);
@@ -32,12 +32,14 @@ describe("the checks page's same-code comparison (B's vs_model.json)", () => {
 		expect(tiles[1].textContent).toContain("0 of 4");
 		expect(tiles[2].textContent).toContain("1 caught, 1 no answer");
 		expect(tiles[2].textContent).toContain("1 caught, 1 missed");
-		// every plotted ratio is a mark whose label says who, what, the full run and how far off
-		const marks = screen.getAllByRole("img").filter((m) => m.classList.contains("pf-ask__dot"));
+		// every plotted ratio is a lane whose words say how far off and which way, beside a named shape
+		const lanes = [...document.querySelectorAll(".pf-miss__lane:not(.is-empty)")];
 		const plotted = vs.rows.flatMap((r) => [r.ratio.preflight_step, r.ratio.muse_step, r.ratio.preflight_peak, r.ratio.muse_peak]).filter((x) => x !== null).length;
-		expect(marks.length).toBe(plotted);
-		expect(marks.some((m) => /^Muse Spark: 1\.10 s predicted .*full run: 0\.0612 s; 18× too high$/.test(m.getAttribute("aria-label") ?? ""))).toBe(true);
-		// what isn't plotted is said once per script
-		expect(screen.getByText("Retrieval (BEIR): ran out of memory at 21.5 GiB reserved, so its full peak was never seen")).toBeTruthy();
+		expect(lanes.length).toBe(plotted);
+		expect(lanes.some((l) => l.textContent === "Muse Spark: 18× too slow" && /full run: 0\.0612 s/.test(l.getAttribute("title") ?? ""))).toBe(true);
+		expect(lanes.some((l) => l.textContent === "Preflight: 8% too fast" && l.classList.contains("is-on"))).toBe(true);
+		// what isn't plotted is said in place, in B's words
+		expect(screen.getByText(/Retrieval \(BEIR\): ran out of memory at 21\.5 GiB reserved, so its full peak was never seen/)).toBeTruthy();
+		expect(screen.getByText("no probe ran: no answer, not a miss")).toBeTruthy();
 	});
 });
