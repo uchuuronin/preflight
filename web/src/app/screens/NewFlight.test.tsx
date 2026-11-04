@@ -369,3 +369,20 @@ describe("a repo link with a commit pin (D's walkthrough, Nov 3)", () => {
 		expect(repoUri(`https://github.com/karpathy/nanoGPT/commit/${sha}`)).toBe(`https://github.com/karpathy/nanoGPT/commit/${sha}`);
 	});
 });
+
+describe("Optional flight details (Chiya, Nov 3)", () => {
+	it("folds the entry point, arguments and extra packages away, and opens itself when one of them has a message", () => {
+		render(<NewFlight onSample={() => {}} />);
+		const fold = document.querySelector("details.pf-desk__more") as HTMLDetailsElement;
+		expect(fold).toBeTruthy();
+		expect(fold.open).toBe(false);
+		expect(fold.querySelector("summary")!.textContent).toContain(en["newflight.more.title"]);
+		for (const label of [/^Entry point/, /^Arguments/, /^Extra packages/]) expect(fold.contains(screen.getByLabelText(label))).toBe(true);
+		fireEvent.change(screen.getByLabelText(/^Extra packages/), { target: { value: "torch==2.4" } });
+		expect(fold.open).toBe(true);
+		// and stays open while it does: closing it would hide why Check in is grey
+		fold.open = false;
+		fireEvent(fold, new Event("toggle"));
+		expect(fold.open).toBe(true);
+	});
+});

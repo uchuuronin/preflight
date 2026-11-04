@@ -148,7 +148,7 @@ SAMPLES: dict[str, str] = {
 	"lora-7b": "web/src/workspace/fixtures/dev-finetune.record.json",
 	"agent": "schema/examples/agent.json",
 	# The live record of zoo/finetune_lora_hf on an L4, its share token removed (PF102, Nov 1).
-	"lora-qwen": "web/src/workspace/fixtures/lora-live-nov1.record.json",
+	"lora-qwen": "web/src/workspace/fixtures/lora-live-nov3.record.json",
 	"pretrain": "web/src/workspace/fixtures/pretrain_nanogpt-a10-nov2.record.json",
 	"agent-eval": "web/src/workspace/fixtures/agent-eval-oct31.record.json",
 	"campaign-grid": "web/src/workspace/fixtures/campaign-grid.record.json",

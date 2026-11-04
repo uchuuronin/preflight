@@ -41,9 +41,12 @@ export const SAMPLES: Sample[] = [
 		code: "PF102",
 		titleKey: "sample.lora_qwen",
 		lens: "finetune",
-		gpu: "L4",
+		gpu: "A10",
 		numbers: "measured",
-		load: () => import("../fixtures/lora-live-nov1.record.json").then((m) => m.default as unknown as FlightRecord),
+		// A's fresh production check-in on the final runner (a-lora-final-1, GitHub 41735521649, Nov 3, from main
+		// 4671c8b): probes on an A10, Spark Open's triage, Muse Spark's diagnosis with Spark Open's number check,
+		// the search's trace, made_by. Read back by api/record_dump_app.py; share token removed.
+		load: () => import("../fixtures/lora-live-nov3.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
 		// B's A10 check-in of zoo/pretrain_nanogpt (Nov 2, the after-freeze ground-truth set:

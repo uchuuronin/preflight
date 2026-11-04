@@ -77,6 +77,8 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	// Which script in the repo, and its flags (contract source.entrypoint and source.args; PM, Nov 3).
 	const [repoEntry, setRepoEntry] = useState("");
 	const [repoArgs, setRepoArgs] = useState("");
+	// "Optional flight details": closed until the visitor opens it (or a field in it needs them).
+	const [moreOpen, setMoreOpen] = useState(false);
 	const [goal, setGoal] = useState<ObjectiveKind>(DEFAULT_GOAL);
 	// "Not sure" by default: the runner picks the GPU (pipeline.choose_probe_gpu; PM, Nov 1: the
 	// demo probes go no higher than an L40S).
@@ -186,6 +188,10 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const pkgs = parsePackages(packages);
 	const pkgAsked = new Set(packages.split(/[\s,]+/).filter(Boolean).map((p) => p.toLowerCase())).size;
 	const pkgBad = pkgs.bad.length > 0 || pkgAsked > MAX_EXTRA_PACKAGES;
+	// A message in the fold opens it, so Check in is never grey for a reason the visitor can't see.
+	useEffect(() => {
+		if (entryBad || argsBad || pkgBad) setMoreOpen(true);
+	}, [entryBad, argsBad, pkgBad]);
 	const canSubmit =
 		!pkgBad &&
 		(intake === "repo" ? repoOk && repoEntryCheck.ok && repoArgWords.ok : intake === "upload" ? uploadsOpen && check.ok : intake === "command" ? cmd.ok : uploadsOpen && handedSource !== null && !handedTooBig);
@@ -320,62 +326,6 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									<p id={ids.repoHint} className="pf-hint">
 										{t("newflight.repo.hint")}
 									</p>
-									<div className="pf-field">
-										<label htmlFor={ids.repoEntry}>
-											{t("newflight.entry.label")} <span className="pf-dim">{t("newflight.optional")}</span>
-										</label>
-										<input
-											id={ids.repoEntry}
-											type="text"
-											spellCheck={false}
-											autoCapitalize="off"
-											autoCorrect="off"
-											placeholder={t("newflight.entry.placeholder")}
-											value={repoEntry}
-											aria-invalid={entryBad || undefined}
-											aria-describedby={entryBad ? `${ids.repoEntryError} ${ids.repoEntryHint}` : ids.repoEntryHint}
-											onChange={(e) => setRepoEntry(e.currentTarget.value)}
-											onBlur={() => setEntrySettled(true)}
-										/>
-									</div>
-									<div role="status" aria-live="polite">
-										{entryBad && !repoEntryCheck.ok ? (
-											<p id={ids.repoEntryError} className="pf-error pf-field__error">
-												{t(`newflight.entry.${repoEntryCheck.reason}`)}
-											</p>
-										) : null}
-									</div>
-									<p id={ids.repoEntryHint} className="pf-hint">
-										{t("newflight.entry.hint")}
-									</p>
-									<div className="pf-field">
-										<label htmlFor={ids.repoArgs}>
-											{t("newflight.args.label")} <span className="pf-dim">{t("newflight.optional")}</span>
-										</label>
-										<input
-											id={ids.repoArgs}
-											type="text"
-											spellCheck={false}
-											autoCapitalize="off"
-											autoCorrect="off"
-											placeholder={t("newflight.args.placeholder")}
-											value={repoArgs}
-											aria-invalid={argsBad || undefined}
-											aria-describedby={argsBad ? `${ids.repoArgsError} ${ids.repoArgsHint}` : ids.repoArgsHint}
-											onChange={(e) => setRepoArgs(e.currentTarget.value)}
-											onBlur={() => setArgsSettled(true)}
-										/>
-									</div>
-									<div role="status" aria-live="polite">
-										{argsBad && !repoArgWords.ok ? (
-											<p id={ids.repoArgsError} className="pf-error pf-field__error">
-												{t(`newflight.args.${repoArgWords.reason}`, { word: repoArgWords.word ?? "" })}
-											</p>
-										) : null}
-									</div>
-									<p id={ids.repoArgsHint} className="pf-hint">
-										{t("newflight.args.hint")}
-									</p>
 								</div>
 							) : intake === "command" ? (
 								<div className="pf-pane">
@@ -497,34 +447,116 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									))
 							)}
 						</div>
-						<div className="pf-field">
-							<label htmlFor={ids.packages}>
-								{t("newflight.packages.label")} <span className="pf-dim">{t("newflight.optional")}</span>
-							</label>
-							<input
-								id={ids.packages}
-								placeholder={t("newflight.packages.placeholder")}
-								value={packages}
-								spellCheck={false}
-								autoComplete="off"
-								autoCapitalize="off"
-								aria-invalid={pkgBad || undefined}
-								aria-describedby={pkgBad ? `${ids.packages}-bad ${ids.packages}-hint` : `${ids.packages}-hint`}
-								onChange={(e) => setPackages(e.currentTarget.value)}
-							/>
-							{pkgs.bad.length ? (
-								<p id={`${ids.packages}-bad`} className="pf-error pf-field__error">
-									{t("checkin.bad_names", { names: pkgs.bad.join(", ") })}
-								</p>
-							) : pkgAsked > MAX_EXTRA_PACKAGES ? (
-								<p id={`${ids.packages}-bad`} className="pf-error pf-field__error">
-									{t("checkin.too_many", { n: String(MAX_EXTRA_PACKAGES) })}
-								</p>
-							) : null}
-							<p id={`${ids.packages}-hint`} className="pf-hint">
-								{t("newflight.packages.hint", { n: String(MAX_EXTRA_PACKAGES) })}
-							</p>
-						</div>
+						{/* What most check-ins leave empty, folded away (Chiya, Nov 3: less clutter): open by the visitor, or by
+						    itself when a field in it has something to say. */}
+						<details
+							className="pf-desk__more"
+							open={moreOpen}
+							onToggle={(e) => {
+								// Stays open while a field in it has a message: closed, Check in would be grey for a hidden reason (review).
+								const el = e.currentTarget;
+								if (!el.open && (entryBad || argsBad || pkgBad)) {
+									el.open = true;
+									return;
+								}
+								setMoreOpen(el.open);
+							}}
+						>
+							<summary>
+								<span>{t("newflight.more.title")}</span>
+								<span className="pf-dim">{t(intake === "repo" ? "newflight.more.what_repo" : "newflight.more.what")}</span>
+							</summary>
+							<div className="pf-desk__more-body">
+								{intake === "repo" ? (
+									<>
+									<div className="pf-field">
+										<label htmlFor={ids.repoEntry}>
+											{t("newflight.entry.label")}
+										</label>
+										<input
+											id={ids.repoEntry}
+											type="text"
+											spellCheck={false}
+											autoCapitalize="off"
+											autoCorrect="off"
+											placeholder={t("newflight.entry.placeholder")}
+											value={repoEntry}
+											aria-invalid={entryBad || undefined}
+											aria-describedby={entryBad ? `${ids.repoEntryError} ${ids.repoEntryHint}` : ids.repoEntryHint}
+											onChange={(e) => setRepoEntry(e.currentTarget.value)}
+											onBlur={() => setEntrySettled(true)}
+										/>
+									</div>
+									<div role="status" aria-live="polite">
+										{entryBad && !repoEntryCheck.ok ? (
+											<p id={ids.repoEntryError} className="pf-error pf-field__error">
+												{t(`newflight.entry.${repoEntryCheck.reason}`)}
+											</p>
+										) : null}
+									</div>
+									<p id={ids.repoEntryHint} className="pf-hint">
+										{t("newflight.entry.hint")}
+									</p>
+									<div className="pf-field">
+										<label htmlFor={ids.repoArgs}>
+											{t("newflight.args.label")}
+										</label>
+										<input
+											id={ids.repoArgs}
+											type="text"
+											spellCheck={false}
+											autoCapitalize="off"
+											autoCorrect="off"
+											placeholder={t("newflight.args.placeholder")}
+											value={repoArgs}
+											aria-invalid={argsBad || undefined}
+											aria-describedby={argsBad ? `${ids.repoArgsError} ${ids.repoArgsHint}` : ids.repoArgsHint}
+											onChange={(e) => setRepoArgs(e.currentTarget.value)}
+											onBlur={() => setArgsSettled(true)}
+										/>
+									</div>
+									<div role="status" aria-live="polite">
+										{argsBad && !repoArgWords.ok ? (
+											<p id={ids.repoArgsError} className="pf-error pf-field__error">
+												{t(`newflight.args.${repoArgWords.reason}`, { word: repoArgWords.word ?? "" })}
+											</p>
+										) : null}
+									</div>
+									<p id={ids.repoArgsHint} className="pf-hint">
+										{t("newflight.args.hint")}
+									</p>
+									</>
+								) : null}
+									<div className="pf-field">
+										<label htmlFor={ids.packages}>
+											{t("newflight.packages.label")}
+										</label>
+										<input
+											id={ids.packages}
+											placeholder={t("newflight.packages.placeholder")}
+											value={packages}
+											spellCheck={false}
+											autoComplete="off"
+											autoCapitalize="off"
+											aria-invalid={pkgBad || undefined}
+											aria-describedby={pkgBad ? `${ids.packages}-bad ${ids.packages}-hint` : `${ids.packages}-hint`}
+											onChange={(e) => setPackages(e.currentTarget.value)}
+										/>
+										{pkgs.bad.length ? (
+											<p id={`${ids.packages}-bad`} className="pf-error pf-field__error">
+												{t("checkin.bad_names", { names: pkgs.bad.join(", ") })}
+											</p>
+										) : pkgAsked > MAX_EXTRA_PACKAGES ? (
+											<p id={`${ids.packages}-bad`} className="pf-error pf-field__error">
+												{t("checkin.too_many", { n: String(MAX_EXTRA_PACKAGES) })}
+											</p>
+										) : null}
+										<p id={`${ids.packages}-hint`} className="pf-hint">
+											{t("newflight.packages.hint", { n: String(MAX_EXTRA_PACKAGES) })}
+										</p>
+									</div>
+							</div>
+						</details>
 						{/* Goal and GPU share a row where the desk is wide enough (Chiya, Nov 2: less scrolling). */}
 						<div className="pf-desk__pair">
 							{/* The aim, the GPU choices beside it, and under the aim what you're trying to do (Chiya's mockup,
