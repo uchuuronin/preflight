@@ -1,0 +1,22 @@
+{
+  "demand_0": {
+    "s": 0.33,
+    "result": {
+      "queued": 0,
+      "running": 0,
+      "oldest_queued_s": 0.0
+    }
+  },
+  "reap_1": {
+    "s": 0.17,
+    "result": []
+  },
+  "demand_2": {
+    "s": 0.17,
+    "result": {
+      "queued": 0,
+      "running": 0,
+      "oldest_queued_s": 0.0
+    }
+  }
+}
