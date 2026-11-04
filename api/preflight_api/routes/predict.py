@@ -77,7 +77,7 @@ def _clean(knobs: dict, ids: set[str]) -> dict:
 	out = {}
 	for k, v in knobs.items():
 		if k not in ids:
-			raise ApiError(422, "invalid_request", f"This record has no knob {k!r}.")
+			raise ApiError(422, "invalid_request", f"This record has no knob {k[:40]!r}.")
 		if isinstance(v, float) and not math.isfinite(v):
 			raise ApiError(422, "invalid_request", f"{k} needs a finite value.")
 		if isinstance(v, str) and len(v) > 64:
@@ -153,25 +153,30 @@ async def predict_inline(request: Request) -> dict:
 	"""The engine on a record sent with the request (a local one), read in memory and dropped after."""
 	if not (flag("c.engine_fallback") and flag("c.local_predict")):
 		raise ApiError(404, "not_found", "Not found.")
+	ip = edge.ip_key(edge.client_ip(request))
+	busy = ApiError(
+		429, "rate_limited", "Too many requests from here; try again shortly.", retryable=True, retry_after=2
+	)
+	# the read and parse are charged before they happen, so a body that never parses still costs its tokens
+	if not _take(ip, INLINE_COST):
+		raise busy
+	too_large = ApiError(413, "too_large", "That record is larger than this check reads (2 MB).")
 	if int(request.headers.get("content-length") or 0) > MAX_INLINE_BYTES:
-		raise ApiError(413, "too_large", "That record is larger than this check reads (2 MB).")
-	raw = await request.body()
-	if len(raw) > MAX_INLINE_BYTES:
-		raise ApiError(413, "too_large", "That record is larger than this check reads (2 MB).")
+		raise too_large
+	chunks, size = [], 0
+	async for chunk in request.stream():  # a chunked upload has no length to check first
+		size += len(chunk)
+		if size > MAX_INLINE_BYTES:
+			raise too_large
+		chunks.append(chunk)
 	try:
-		body = InlineBody.model_validate_json(raw)
+		body = await asyncio.to_thread(InlineBody.model_validate_json, b"".join(chunks))
 	except ValueError as e:
 		raise ApiError(
 			422, "invalid_request", f"Send the record and up to {MAX_CELLS} settings as cells."
 		) from e
-	if not _take(edge.ip_key(edge.client_ip(request)), INLINE_COST + len(body.cells)):
-		raise ApiError(
-			429,
-			"rate_limited",
-			"Too many requests from here; try again shortly.",
-			retryable=True,
-			retry_after=2,
-		)
+	if not _take(ip, len(body.cells)):
+		raise busy
 	try:
 		cells = await asyncio.to_thread(_predict_all, body.record, body.cells)
 	except ApiError:

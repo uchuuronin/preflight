@@ -170,10 +170,10 @@ def test_inline_is_off_by_default_capped_and_charged_for_its_record(monkeypatch)
 			c.post("/v1/predict", json={"record": {"not": "a record"}, "cells": [{"lr": 1}]}).status_code
 			== 422
 		)
-		# each request costs its record's parse plus its settings (five tokens here): of 30, the unreadable
-		# record took five, so five more one-setting requests go through and the sixth waits
+		# the read is charged before it happens (four tokens), then a token a setting: of 30, the too-large
+		# body took four and the unreadable record five, so four more one-setting requests go through
 		codes = [
 			c.post("/v1/predict", json={"record": _lora_raw(), "cells": [{"lr": 0.0002}]}).status_code
-			for _ in range(6)
+			for _ in range(5)
 		]
-	assert codes[:5] == [200] * 5 and codes[5] == 429
+	assert codes[:4] == [200] * 4 and codes[4] == 429
