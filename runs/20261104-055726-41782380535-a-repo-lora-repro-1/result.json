@@ -1,0 +1,11 @@
+{
+	"name": "20261104-055726-41782380535-a-repo-lora-repro-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41782380535",
+	"ref": "e905ac384cb05707d23bd886a5c18d79470f2d76",
+	"sha": "e905ac384cb05707d23bd886a5c18d79470f2d76",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --repo https://github.com/uchuuronin/preflight --entrypoint zoo/finetune_lora_hf/train.py --visitor repro-lora --max-minutes 20",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T06:00:52Z"
+}
