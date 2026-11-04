@@ -369,6 +369,56 @@ def startup_check_sandbox() -> dict:
 	return out
 
 
+@ops.function(image=worker_image, timeout=900)
+def sandbox_stdin_check_hosted(sizes: list[int]) -> list[dict]:
+	"""Nov 4 (a repo check-in whose probes all ended "without a result"): write a payload of each size to a CPU probe
+	sandbox's stdin exactly as SandboxRunner does (write, write_eof, drain, read), with a command that only counts the
+	bytes, and report what came back or the exception. No visitor data: the payloads are generated here."""
+	import traceback
+
+	from preflight.runner.modal_app import _sandbox_factory
+
+	owner = modal.App._get_container_app()
+	create = _sandbox_factory(owner)
+	out = []
+	sb = None
+	try:
+		sb = create("cpu")
+		for n in sizes:
+			row: dict = {"bytes": n}
+			try:
+				proc = sb.exec("python", "-c", "import sys; print('GOT', len(sys.stdin.read()))", timeout=300)
+				proc.stdin.write('{"x": "' + "a" * max(0, n - 9) + '"}')
+				proc.stdin.write_eof()
+				proc.stdin.drain()
+				row["stdout"] = proc.stdout.read()[-200:]
+				proc.wait()
+				row["exit"] = proc.returncode
+			except Exception as exc:
+				row["failed"] = f"{type(exc).__name__}: {exc}"[:1500]
+				row["traceback"] = traceback.format_exc()[-2500:]
+			out.append(row)
+	finally:
+		if sb is not None:
+			with contextlib.suppress(Exception):
+				sb.terminate()
+	return out
+
+
+@ops.local_entrypoint()
+def sandbox_stdin_check(sizes: str = "1000000,8000000,16000000,16777000,16957300,24000000"):
+	"""modal run --env main python/preflight/runner/ops_app.py::sandbox_stdin_check
+	Which stdin sizes a probe sandbox takes (sandbox_stdin_check_hosted). Writes out/stdin_check.json."""
+	res = sandbox_stdin_check_hosted.remote([int(x) for x in sizes.split(",") if x])
+	Path("out").mkdir(exist_ok=True)
+	Path("out/stdin_check.json").write_text(json.dumps(res, indent=2))
+	for r in res:
+		print(
+			f"[stdin] {r['bytes']:>10,} bytes: {r.get('stdout', '').strip() or r.get('failed', '')[:300]}",
+			flush=True,
+		)
+
+
 @ops.local_entrypoint()
 def startup_check():
 	"""Before any deploy: import and start both images' code as Modal runs it, with no GPU.
