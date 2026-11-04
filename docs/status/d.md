@@ -76,6 +76,19 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Wed Nov 4, 00:10 ET (shot 9b in the video; measuring a new variation)
+
+Chiya's laptop take (Nov 3, 23:53, RTX 4070 Laptop, native Windows): `preflight watch` followed by
+the cockpit, live, "Step time 6.33 ms (predicted 6.36 ms to 10.3 ms)" [measured: her recording].
+It replaces the in-flight placeholder in all three cuts, cut to the Logbook's Choose the live record,
+the live panel and the terminal's notes, with the "Not measured here" parts left out, as she asked.
+The three cuts are re-rendering on `main` `4654eafd` (the paged node sheet). `shot-9b-laptop.md`
+gains "Measure a new variation, and see it in the cockpit", from Chiya's note, checked against the
+CLI (`preflight run` takes the script file; a folder reads everything in it) and the picker
+(`asLiveRecord` refuses a plain run record).
+
+This push sends: `docs/demo/shot-9b-laptop.md`, this file.
+
 ## Tue Nov 3, 21:40 ET (the video: the campaign shot, the type, shot 9b's CUDA run)
 
 The PM, 21:21: PF420 has been measured since Nov 2 (C's D51), so the plan's "illustrative" reason
