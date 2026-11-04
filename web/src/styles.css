@@ -545,7 +545,7 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	transition: opacity 0.7s var(--pf-ease), transform 0.8s var(--pf-ease), filter 0.7s var(--pf-ease);
 }
 .pf-beat.is-in { opacity: 1; transform: none; filter: none; }
-.pf-beat h3 { margin: 0; font-family: var(--pf-font-serif); font-weight: 400; font-size: 40px; line-height: 1; }
+.pf-beat :is(h2, h3) { margin: 0; font-family: var(--pf-font-serif); font-weight: 400; font-size: 40px; line-height: 1; }
 .pf-beat p { margin: 0; font-size: var(--pf-text-md); line-height: 1.55; color: var(--pf-fg-dim); }
 .pf-beat__num { font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); letter-spacing: 0.1em; color: var(--pf-fg-dim); }
 
@@ -2229,6 +2229,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 }
 @media (max-width: 760px) {
 	.pf-statusline { font-size: 14px; }
+	/* On a phone the line sits on the page's gradient: a glass backing keeps the red legible (PM's audit, Nov 3). */
+	.pf-statusline.is-fails { padding: 6px 10px; border-radius: var(--pf-radius-sm); border: 1px solid var(--pf-fail-soft); background: var(--pf-glass); -webkit-backdrop-filter: blur(var(--pf-blur)); backdrop-filter: blur(var(--pf-blur)); }
 	.pf-fit { aspect-ratio: auto; }
 	.pf-drawer { top: auto; left: 12px; right: 12px; bottom: 12px; width: auto; max-height: 70vh; transform: translateY(calc(100% + 24px)); }
 	.pf-drawer.is-open { transform: none; }
@@ -2359,6 +2361,7 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-limits[open] { display: flex; flex-direction: column; gap: 10px; }
 .pf-limits > summary { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; cursor: pointer; list-style: none; }
 .pf-limits > summary::-webkit-details-marker { display: none; }
+.pf-limits ::placeholder { color: var(--pf-fg-dim); }
 .pf-limits > summary::after { content: "▾"; color: var(--pf-fg-dim); }
 .pf-limits[open] > summary::after { content: "▴"; }
 .pf-limits > summary .pf-dim { margin-left: auto; font-size: 12px; }
