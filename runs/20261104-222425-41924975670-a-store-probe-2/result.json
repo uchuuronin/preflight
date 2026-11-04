@@ -1,0 +1,11 @@
+{
+	"name": "20261104-222425-41924975670-a-store-probe-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41924975670",
+	"ref": "671b4510737656c7712aec7b0adc46a5d837dc7d",
+	"sha": "671b4510737656c7712aec7b0adc46a5d837dc7d",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::store_probe",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-04T22:24:54Z"
+}

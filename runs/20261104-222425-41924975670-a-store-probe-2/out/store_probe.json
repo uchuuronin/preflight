@@ -1,0 +1,33 @@
+{
+  "demand_0": {
+    "s": 0.37,
+    "result": {
+      "queued": 0,
+      "running": 0,
+      "oldest_queued_s": 0.0
+    }
+  },
+  "reap_1": {
+    "s": 0.19,
+    "result": []
+  },
+  "demand_2": {
+    "s": 0.2,
+    "result": {
+      "queued": 0,
+      "running": 0,
+      "oldest_queued_s": 0.0
+    }
+  },
+  "tick": {
+    "s": 2.28,
+    "result": {
+      "reaped": [],
+      "cleanup_started": false,
+      "warm_workers_set": null,
+      "queued": 0,
+      "running": 0,
+      "oldest_queued_s": 0.0
+    }
+  }
+}
