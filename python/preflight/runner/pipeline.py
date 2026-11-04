@@ -91,6 +91,17 @@ PROBE_TIMEOUT_S = (
 )  # guess: one probe point with model download and the profiled window; zoo runs set it (Oct 28-29)
 
 
+MIN_ATTEMPT_S = 60  # guess: an attempt with less than a minute of the job's dollars left isn't started
+
+
+def _attempt_cap_s(budget: "Budget", usd_per_h: float) -> float:
+	"""The longest an attempt may run: the job's time left, and what its dollars left buy at usd_per_h."""
+	left = budget.left_s()
+	if usd_per_h > 0:
+		left = min(left, max(0.0, budget.usd - budget.spent_usd) / (usd_per_h / 3600))
+	return left
+
+
 @dataclass
 class Budget:
 	usd: float = JOB_BUDGET_USD
@@ -98,6 +109,10 @@ class Budget:
 	spent_usd: float = 0.0  # what the cap is checked against: GPU and the sandbox overhead estimate
 	gpu_usd: float = 0.0  # GPU at measured probe time, every attempt
 	overhead_usd: float = 0.0  # the sandbox CPU and memory estimate alone
+	# the runner's own bill (sandbox lifetimes), when it knows it: reported if larger; `bill` reads it live (a job that
+	# fails partway still reports it)
+	billed_usd: float | None = None
+	bill: Callable[[], float] | None = None
 	started: float = field(default_factory=time.monotonic)
 	# time spent waiting for a GPU to schedule: not the job's probe time (Chiya, Nov 1: the wall
 	# counts from when a probe starts on its GPU; the wait has its own cap, in the runner)
@@ -712,6 +727,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	budget = deps.budget()
 	with contextlib.suppress(AttributeError, TypeError):
 		ctx.budget = budget  # the worker reports what the job spent to the day's GPU cap (queue.py)
+	if hasattr(
+		deps.runner, "billed_usd"
+	):  # the job's own runner's bill, read when the worker reports, failed or not
+		budget.bill = lambda: deps.runner.billed_usd(_price)
 	budget.waited = lambda: float(getattr(deps.runner, "queued_s", 0.0) or 0.0)
 	from .queue import GPU_WAIT_PREFIX
 
@@ -753,6 +772,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		if lr_probe is not None:
 			probes.append(lr_probe)  # in the record only: not a result, so never triaged or searched
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
+	budget.billed_usd = billed  # the worker reports the larger of this and the estimate to the day's cap
 	# review, Nov 2: a probe-more from the record page sends no `private`, so a record a private job touched keeps
 	# its new logs off Baseten and Meta too
 	held = req.private or _private_history(rec)
@@ -1452,6 +1472,17 @@ def _probe_points(
 			fb = _fallbacks(g, allowed, pinned)
 			if judged and first and g == "A10" and (allowed is None or "L4" in allowed):
 				fb = ("L4",)  # judging's A10 start, before any point ran (GPU_FALLBACK's note)
+			# every attempt (the first point, each step-up, the eval-off re-run) is bounded by the dollars and the
+			# time the job has left, priced at the dearest GPU it may land on (the PM's audit, Nov 3: one job held
+			# $0.60 of the day's cap and could spend about $1.45)
+			cap_s = _attempt_cap_s(budget, max(_price(x) for x in (g, *fb)) + over)
+			if cap_s < MIN_ATTEMPT_S:
+				out = _CachedResult(Probe(id=spec.probe_id, knobs=spec.knobs, status="error", steps=0,
+					error=f"skipped: the job's probe budget (${budget.usd:.2f}, {budget.wall_s / 60:.0f} min) is spent",
+					error_code="budget"))  # fmt: skip
+				attempts.append(out)
+				return out
+			spec = replace(spec, timeout_s=min(spec.timeout_s, cap_s))
 			result, cached = _run_point(replace(spec, gpu_fallback=fb), g, deps, ctx)
 			out = result if result is not None else _CachedResult(cached)
 			if result is not None:
@@ -1465,10 +1496,13 @@ def _probe_points(
 		def may_step_up(
 			g, est_s=est_s, over=over
 		):  # another GPU only while the job is live and the budget holds it
+			dearest = max(_price(x) for x in (g, *_fallbacks(g, allowed, pinned))) + over
 			return (
 				not pinned
 				and not ctx.should_stop()
 				and budget.allows((_price(g) + over) * est_s / 3600, est_s)
+				# the bound run() applies: a step-up it would refuse keeps the measured OOM (review, Nov 3)
+				and _attempt_cap_s(budget, dearest) >= MIN_ATTEMPT_S
 			)
 
 		steps = max_steps_up(need) if i == 0 else 1

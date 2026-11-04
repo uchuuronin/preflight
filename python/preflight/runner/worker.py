@@ -171,7 +171,16 @@ def _spent(ctx) -> float:
 	b = getattr(ctx, "budget", None)
 	if b is None:
 		return 0.0
-	return round(float(getattr(b, "gpu_usd", 0.0) or 0.0) + float(getattr(b, "overhead_usd", 0.0) or 0.0), 6)
+	over = float(getattr(b, "overhead_usd", 0.0) or 0.0)
+	est = float(getattr(b, "gpu_usd", 0.0) or 0.0) + over
+	# the sandboxes' lifetimes, start-up and idle included (the audit, Nov 3), read live so a job that failed partway
+	# reports it too; the bill is GPU only, so the overhead estimate goes beside it
+	billed = getattr(b, "billed_usd", None)
+	bill = getattr(b, "bill", None)
+	if callable(bill):
+		with contextlib.suppress(Exception):
+			billed = float(bill())
+	return round(max(est, float(billed) + over) if isinstance(billed, int | float) else est, 6)
 
 
 def _safe_fail(
