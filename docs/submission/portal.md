@@ -26,7 +26,7 @@ Indie Developer. Build for Your World.
 
 ## Team
 
-Chiya fills this in: every team member, as on the registration.
+Solo: Chiya (Shreya Sharma). The rules allow solo entries; the agents that helped build it are tools, disclosed in the README's Agentic workflow section.
 
 ## Short description (332 characters)
 

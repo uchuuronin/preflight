@@ -20,7 +20,7 @@ missing to this list.
 | Tagline | "A flight simulator for ML jobs, before you pay for the GPU" (58 characters) | D | Ready (`portal.md`) |
 | Track | Indie Developer | Chiya | Ready |
 | Theme | Build for Your World | Chiya | Ready |
-| Team members | Everyone on the team, as on the registration (the rule allows four or fewer; ours is up to three) | Chiya | Chiya fills it |
+| Team members | Solo: Chiya (Shreya Sharma). The rules allow solo entries; the build agents are tools, disclosed in the README, not teammates | Chiya | Ready |
 | Short description | `portal.md`, "Short description" (332 characters) | D | Ready |
 | Full description | `portal.md`, "Full description" | D | Ready; re-read after the video is cut so the two say the same |
 | How Meta's models are used | `portal.md`, "How we used Meta's models"; the table in `meta-and-partners.md` | D | Ready |
@@ -76,7 +76,7 @@ missing to this list.
 | New work only, and said so | The README's second paragraph and the video's opening line |
 | The demo shows only our work | The video plan labels every Meta model and partner tool on screen and shows only our screens |
 | Public repo, video and live product reachable | The checklist above |
-| Team of four or fewer, everyone listed | Ours is up to three; Chiya lists everyone |
+| Team of four or fewer, everyone listed | Solo entry (allowed); Chiya lists herself |
 | A 3-minute video | `docs/demo/video-plan.md` |
 | Rights and licences | Apache 2.0; `docs/licences.md`; the README's licence section; CI's copyleft check |
 | Not an anti-project | Preflight is a tool for people training and evaluating models: none of the excluded kinds |
