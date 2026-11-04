@@ -1,0 +1,14 @@
+[
+  {
+    "bytes": 1999980,
+    "stdout": "_steps\": 1}], \"cost\": {\"gpu_seconds\": 4.778, \"usd\": 0.0}}, \"env\": {\"backend\": \"cpu\", \"provider\": \"local\", \"nodes\": 1, \"libraries\": {\"torch\": \"2.5.1\", \"transformers\": \"4.46.3\", \"peft\": \"0.13.2\", \"trl\": \"0.14.0\", \"accelerate\": \"1.1.1\", \"datasets\": \"3.1.0\"}, \"python\": \"3.11.12\"}, \"arch\": {\"source\": \"modules\"}, \"log_tail\": \"/opt/preflight/preflight/recorder/runtime.py:1560: FutureWarning: `torch.distributed.reduce_op` is deprecated, please use `torch.distributed.ReduceOp` instead\\n  mods = [o for o in gc.get_objects() if isinstance(o, nn.Module)]\\n\", \"kernels_error\": null, \"gpu_unresolved\": null}\n",
+    "stderr": "",
+    "exit": 0
+  },
+  {
+    "bytes": 17499980,
+    "stdout": "",
+    "stderr": "Traceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/opt/preflight/preflight/probes/remote.py\", line 83, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File \"/opt/preflight/preflight/probes/remote.py\", line 71, in main\n    result = run_probe(spec)\n             ^^^^^^^^^^^^^^^\n  File \"/opt/preflight/preflight/probes/local.py\", line 1061, in run_probe\n    validate_files(spec.files, entrypoint=spec.entrypoint)\n  File \"/opt/preflight/preflight/probes/local.py\", line 310, in validate_files\n    raise InvalidSubmission(\npreflight.probes.local.InvalidSubmission: docs/pad.txt is 16.7 MB; files are capped at 8 MB\n",
+    "exit": 1
+  }
+]
