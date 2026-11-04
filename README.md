@@ -257,6 +257,8 @@ results, and I checked the work throughout to keep everything aligned.
   tokenizer and `c4_test` slice, from its v0.1.0 tag, under BSD-3-Clause (`LICENSE.txt` beside
   them). The `c4_test` slice is text from C4 by AllenAI, released under ODC-BY 1.0; Common
   Crawl's terms of use apply to its content.
+- **Hugging Face's text-classification notebook** (`validation/fresh/f2/`): unchanged, Apache-2.0,
+  © Hugging Face; kept only so a check-in can send it the way a visitor's upload would.
 - **Bug-zoo scripts:** written for Preflight. They download public models and data at run time
   and bundle none of them:
 

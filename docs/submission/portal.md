@@ -18,11 +18,11 @@ Indie Developer. Build for Your World.
 ## Links
 
 - Live app: https://preflight-cqn.pages.dev
-- Repository: https://github.com/uchuuronin/preflight (public at submission)
+- Repository: https://github.com/uchuuronin/preflight (public)
 - Demo video (3 minutes): Chiya adds the link on Wed Nov 4
 - X post (45 seconds): Chiya adds the link on Wed Nov 4
 - A shared flight record: https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg
-- The corpus, with its datasheet: https://huggingface.co/datasets/chaoschia/preflight-corpus (public with the repository)
+- The corpus, with its datasheet: https://huggingface.co/datasets/chaoschia/preflight-corpus (public)
 
 ## Team
 
@@ -66,7 +66,7 @@ on purpose, and ran them for real:
   wrong.
 
 **How it works.** Probes run in Modal GPU sandboxes; an agent proxy counts every model call's
-tokens. A prediction engine (analytical models, learned corrections, conformal intervals and
+tokens. A prediction engine (formulas and small models fitted on the corpus, conformal intervals and
 abstention) turns the probes into a flight record. Everything a visitor explores afterwards is
 computed in the browser from that record. A campaign mode plans a whole grid of runs on a shared
 cluster's calendar.
@@ -80,8 +80,8 @@ types (A10, H100, L4, L40S, T4), step time on a GPU Preflight never measured lan
 step time from its own probe lands within 15% (2 of 2 runs), but from NVIDIA corpus rows it is 22% within 20%
 (NVIDIA torch 2.8.0 to MI300X torch 2.5.1+rocm6.2: card and software differ), 254 of 1,147 pairs, so a move across vendors isn't shown.
 
-**The corpus published with a datasheet.** The 4,255 rows of GPU measurements behind the learned
-models and the held-out checks (corpus 0.4.0, an MI300X slice included) are a dataset on Hugging
+**The corpus published with a datasheet.** The 4,255 rows of GPU measurements behind the engine's
+fits and the held-out checks (corpus 0.4.0, an MI300X slice included) are a dataset on Hugging
 Face, public with the repository (https://huggingface.co/datasets/chaoschia/preflight-corpus),
 with a datasheet that says how they were made, what they cover and where they are biased. Muse
 Spark Open was asked to label every row of the first 2,339 (which part of memory dominates its peak, or whether and how a run diverged) for
