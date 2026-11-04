@@ -171,7 +171,11 @@ def _spent(ctx) -> float:
 	b = getattr(ctx, "budget", None)
 	if b is None:
 		return 0.0
-	return round(float(getattr(b, "gpu_usd", 0.0) or 0.0) + float(getattr(b, "overhead_usd", 0.0) or 0.0), 6)
+	est = float(getattr(b, "gpu_usd", 0.0) or 0.0) + float(getattr(b, "overhead_usd", 0.0) or 0.0)
+	billed = getattr(
+		b, "billed_usd", None
+	)  # the sandboxes' lifetimes, start-up and idle included (the audit, Nov 3)
+	return round(max(est, float(billed)) if isinstance(billed, int | float) else est, 6)
 
 
 def _safe_fail(

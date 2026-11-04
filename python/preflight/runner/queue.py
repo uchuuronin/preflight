@@ -605,6 +605,23 @@ class InMemoryJobStore:
 			)
 			if pick is None:
 				return None
+			# the day's cap first (the PM's audit, Nov 3): a queued job or a retry that no longer fits fails before any
+			# GPU time; one that fits once the running jobs' holds come back waits
+			day = et_day(self._clock())
+			spent = self._daily.get(day, {"spent": 0.0})["spent"]
+			cap = self.daily_cap_usd(day)
+			if spent + self.job_budget_usd > cap:
+
+				def refuse():
+					job = self._jobs[pick]
+					self._order.remove(pick)
+					self._requeue_or_fail(job, "Preflight has used today's GPU budget: samples only until midnight ET",
+						False, "limit.daily_spend")  # fmt: skip
+
+				self._txn(refuse)
+				return None
+			if spent + self.job_budget_usd * (len(running) + 1) > cap:
+				return None
 
 			def do():
 				job = self._jobs[pick]

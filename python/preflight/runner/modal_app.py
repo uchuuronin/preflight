@@ -140,6 +140,10 @@ _base = modal.Image.debian_slim(python_version="3.11").env(
 # (Chiya, Oct 30) when the repo has it. Both are baked in, so changing a flag takes a deploy of
 # the runner as well as the API; tests/test_pipeline.py holds the two images to the same files.
 FLAG_ENV = "production"  # api/app.py's PREFLIGHT_ENV
+# the worker's own settings (Chiya, Nov 3, 9:07 PM): the day's GPU cap (queue.daily_gpu_cap_usd: $10 through Nov 4,
+# $8 after, without it) and the judging window's end (judging.py: the warm worker and the A10-first ladder through
+# Nov 10, one day past the Nov 9 live finals). Only the worker image (the queue, the worker, the warm-pool check)
+WORKER_SETTINGS = {"PREFLIGHT_DAILY_GPU_CAP_USD": "15", "PREFLIGHT_JUDGING_TO": "2026-11-10"}
 
 
 def _runner_commit() -> str | None:
@@ -165,7 +169,13 @@ worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
 	.pip_install("matplotlib==3.9.2")  # harness/diagnosis.py renders the plots Muse Spark reads (item 31)
-	.env({"PREFLIGHT_ENV": FLAG_ENV, **({"PREFLIGHT_RUNNER_COMMIT": RUNNER_COMMIT} if RUNNER_COMMIT else {})})
+	.env(
+		{
+			"PREFLIGHT_ENV": FLAG_ENV,
+			**WORKER_SETTINGS,
+			**({"PREFLIGHT_RUNNER_COMMIT": RUNNER_COMMIT} if RUNNER_COMMIT else {}),
+		}
+	)
 	.add_local_dir(ZOO_SRC, "/root/zoo", ignore=_NOT_SOURCE)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 	.add_local_file(FLAGS_SRC, f"{REMOTE_PKG}/flags.json")
