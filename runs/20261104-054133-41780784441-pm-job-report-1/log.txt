@@ -1,0 +1,47 @@
+status HTTP 200
+{
+ "waiting_for_gpu": null,
+ "job_id": "01M6JGH4JKVG6ZN9GD55FSAX3G",
+ "status": "done",
+ "position": null,
+ "record_id": "01M6JGH8QY76Q325D5BBDDJHV1",
+ "error": null,
+ "retryable": null,
+ "error_code": null,
+ "last_seq": 17
+}
+
+events HTTP 200
+{"stage": "queued"}
+{"seq": 1, "stage": "admitted", "message": "attempt 1"}
+{"seq": 2, "stage": "fetching"}
+{"seq": 3, "stage": "mapping"}
+{"seq": 4, "stage": "skeleton", "message": "skeleton from the static reader"}
+{"seq": 5, "stage": "skeleton", "message": "map refined by Muse Spark"}
+{"seq": 6, "stage": "harnessing"}
+{"seq": 7, "stage": "probing", "probe_id": "p1"}
+{"seq": 8, "stage": "probing", "message": "waiting for a free L4 GPU (1 min so far)"}
+{"seq": 9, "stage": "probing", "message": "waiting for a free L4 GPU (2 min so far)"}
+{"seq": 10, "stage": "probing", "message": "A10 GPU ready after 2 min; probe running"}
+{"seq": 11, "stage": "probing", "message": "no L4 could be scheduled; this job's points run on A10"}
+{"seq": 12, "stage": "probing", "probe_id": "p2"}
+{"seq": 13, "stage": "probing", "probe_id": "p3"}
+{"seq": 14, "stage": "probing", "message": "no probe reached its first step: nothing was measured", "error_code": "recorder"}
+{"seq": 15, "stage": "predicting", "message": "measured; predicting"}
+{"seq": 16, "stage": "predicting", "message": "predicted"}
+{"seq": 17, "stage": "done", "error_code": "recorder"}
+
+record HTTP 200
+{"id": "p1", "status": "error", "steps": 0, "error_code": "recorder", "error": "The probe sandbox ended without a result. Step: starting Preflight's recorder. By hand: check the Python that runs probes imports torch (`python -c 'import torch'`), then `preflight run zoo/finetune_lora_hf/train.py`.", "gpu": null}
+{"id": "p2", "status": "error", "steps": 0, "error_code": "recorder", "error": "The probe sandbox ended without a result. Step: starting Preflight's recorder. By hand: check the Python that runs probes imports torch (`python -c 'import torch'`), then `preflight run zoo/finetune_lora_hf/train.py`.", "gpu": null}
+{"id": "p3", "status": "error", "steps": 0, "error_code": "recorder", "error": "The probe sandbox ended without a result. Step: starting Preflight's recorder. By hand: check the Python that runs probes imports torch (`python -c 'import torch'`), then `preflight run zoo/finetune_lora_hf/train.py`.", "gpu": null}
+{"id": "read.eval.no_grad", "severity": "error", "title": "Eval runs with gradients kept", "detail": "Eval forward in PerplexityCallback.on_step_end (zoo/finetune_lora_hf/train.py:79) runs without torch.no_grad(); activations for backward are kept"}
+{"id": "read.eval.batch_large", "severity": "warn", "title": "Eval batch is 8x the train batch", "detail": null}
+{"id": "read.data.no_packing", "severity": "warn", "title": "No sequence packing; batches are padded", "detail": null}
+{"id": "read.data.num_workers_zero", "severity": "warn", "title": "Data loader runs in the training process (num_workers=0)", "detail": null}
+{"id": "triage.p1", "severity": "info", "title": "Spark Open on probe p1: unclear", "detail": "The probe ended in error with no optimizer steps and without producing a result. (log: \"The probe sandbox ended without a result\")"}
+{"id": "triage.p2", "severity": "info", "title": "Spark Open on probe p2: infrastructure", "detail": "Probe p2 failed with recorder error and zero optimizer steps after sandbox ended without a result. (log: \"The probe sandbox ended without a result\")"}
+{"id": "triage.p3", "severity": "info", "title": "Spark Open on probe p3: infrastructure", "detail": "The probe sandbox ended without producing a result and recorded 0 optimizer steps. (log: \"The probe sandbox ended without a result\")"}
+{"id": "source.partial.map", "severity": "info", "title": "Mapped the entry point and what it imports, not every file", "detail": "The source has 3.58 MB of Python in 437 files, more than Preflight maps (2 MB), so the map reads zoo/finetune_lora_hf/train.py and none of the files it imports (0.00 MB). Settings in other files aren't on the map."}
+{"id": "job.nothing_measured", "severity": "error", "title": "Nothing measured", "detail": "No probe reached its first step, so there are no measurements: every readout abstains. The first stopped (recorder). Step: starting Preflight's recorder. By hand: check the Python that runs probes imports torch (`python -c 'import torch'`), then `preflight run zoo/finetune_lora_hf/train.py`. Once it's fixed
+env: {"torch": null, "cuda": null, "gpu": null, "python": null, "image": null}
