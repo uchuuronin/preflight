@@ -2,10 +2,10 @@
 	"name": "",
 	"exit_code": 1,
 	"workflow": "remote-run",
-	"run_id": "41538387180",
-	"ref": "ws-b",
+	"run_id": "41766197282",
+	"ref": "6bdfed6494f20304d7ed649236b460fe236b1a63",
 	"sha": null,
-	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --script vision_timm --bare-steps 300 --recorder-steps 30 --budget-min 25 --install-requirements",
+	"cmd": "modal container list --env main --json",
 	"actor": "uchuuronin",
-	"finished_at": "2026-11-02T22:34:27Z"
+	"finished_at": "2026-11-04T03:17:44Z"
 }
