@@ -77,7 +77,7 @@ def wait_http(url: str, seconds: float) -> bool:
 	t0 = time.monotonic()
 	while time.monotonic() - t0 < seconds:
 		try:
-			with urllib.request.urlopen(url, timeout=5) as r:  # noqa: S310 (localhost)
+			with urllib.request.urlopen(url, timeout=5) as r:  # localhost only
 				if r.status < 500:
 					return True
 		except Exception:
