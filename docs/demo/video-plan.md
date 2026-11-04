@@ -51,8 +51,8 @@ them up to fit 3 minutes.) Every shot that is cut or sped up says so in a small 
 
 | Flow in the video | Real time | Source |
 | --- | --- | --- |
-| Check in a repo link, to the cockpit (Boarding: the GPU starts, the probes run, the logs are read) | about 5 to 11 minutes | measured: production's two LoRA check-ins |
-| The live guide (Muse Spark), one move | about 5 to 15 s a turn, three turns a tour; the panel says "Thinking" meanwhile; after 25 s a turn the rule-based tour takes over (`TIMEOUT_S = 25.0`) | measured: C's D86, nine live turns, Nov 4 |
+| Check in a repo link, to the cockpit (Boarding: the GPU starts, the probes run, the logs are read) | about 5 to 11 minutes; about 8 minutes in the video's take (Check in to "Your flight record is ready") | measured: production's two LoRA check-ins; Chiya's take C1, Nov 4 |
+| The live guide (Muse Spark), one move | about 30 s from Start the tour to Muse Spark's combined move in the video's take; about 5 to 15 s a turn, three turns a tour; the panel says "Thinking" meanwhile; after 25 s a turn the rule-based tour takes over (`TIMEOUT_S = 25.0`) | measured: C's D86, nine live turns, Nov 4 |
 | Muse Code writes the fixes | 30 s to a minute: 28 s and 34 s for the two lanes on Nov 3; about 50 s from "Write the fixes" to both lanes written in the video's take (Nov 4) | measured: C's live check, Nov 3, 7:53 PM (from-c.md); Chiya's take C3 |
 | Moving a knob | at once (139 ms p95 on the live site) | measured: C's stranger test, Nov 3, 7:50 PM (from-c.md, "Live with the LoRA refill") |
 | `preflight run` on a laptop GPU, then `preflight watch` | the probes take a minute or two [guess: Windows loads CUDA slowly the first time]; the watched run goes on until it finishes or you press Ctrl+C | Chiya's RTX 4070 takes, Nov 3 |
