@@ -179,6 +179,7 @@ def prefetch(models: str = "") -> list[str]:
 
 # ---------------------------------------------------------------- startup check (no GPU)
 
+BIG_SPEC_PAD = 17_500_000  # over Modal's 16 MiB stdin buffer (startup_check_sandbox's repo-sized probe)
 _CHECK_LOOP = """
 import torch
 m = torch.nn.Sequential(torch.nn.Linear(16, 32), torch.nn.GELU(), torch.nn.Linear(32, 1))
@@ -338,6 +339,7 @@ def startup_check_sandbox() -> dict:
 	from preflight.probes.local import ProbeSpec
 	from preflight.runner.modal_app import _sandbox_factory
 	from preflight.runner.sandbox_runner import ENTRY, SandboxRunner
+	from preflight.runner.wire import spec_to_wire
 
 	owner = modal.App._get_container_app()
 	out: dict = {"entry": list(ENTRY)}
@@ -364,9 +366,101 @@ def startup_check_sandbox() -> dict:
 	with SandboxRunner(create) as runner:
 		r = runner(ProbeSpec(probe_id="check", files={"train.py": _CHECK_LOOP}, entrypoint="train.py", timeout_s=240),
 			"cpu", should_stop=lambda: False)  # fmt: skip
+		# a repo-sized spec through the same path (Nov 4: this repository's own check-in, a 16.96 MB spec, ended every
+		# probe "without a result" at Modal's 16 MiB stdin buffer; sandbox_runner.write_stdin): the script plus a
+		# generated file it never imports, so the spec on the wire passes that buffer
+		# the real shape of a big repo: many files, each under the 8 MB per-file cap (one 17 MB file is refused by
+		# validate_files, rightly, and that refusal now comes back as the probe's result)
+		pad = {f"docs/pad{i}.txt": "a" * (BIG_SPEC_PAD // 5) for i in range(5)}
+		big = ProbeSpec(probe_id="check-big", files={"train.py": _CHECK_LOOP, **pad}, entrypoint="train.py",
+			timeout_s=300)  # fmt: skip
+		out["big_spec_bytes"] = len(spec_to_wire(big))
+		rb = runner(big, "cpu", should_stop=lambda: False)
 	out.update(probe_status=r.probe.status, probe_steps=r.probe.steps, probe_error=r.probe.error,
-		probe_error_code=r.probe.error_code)  # fmt: skip
+		probe_error_code=r.probe.error_code, big_probe_status=rb.probe.status, big_probe_steps=rb.probe.steps,
+		big_probe_error=rb.probe.error, big_probe_error_code=rb.probe.error_code)  # fmt: skip
 	return out
+
+
+@ops.function(image=worker_image, timeout=900)
+def sandbox_stdin_check_hosted(sizes: list[int], chunk: int = 0, entry: bool = False) -> list[dict]:
+	"""Nov 4 (a repo check-in whose probes all ended "without a result"): write a payload of each size to a CPU probe
+	sandbox's stdin exactly as SandboxRunner does (write, write_eof, drain, read), with a command that only counts the
+	bytes, and report what came back or the exception. No visitor data: the payloads are generated here."""
+	import traceback
+
+	from preflight.runner.modal_app import _sandbox_factory
+
+	owner = modal.App._get_container_app()
+	create = _sandbox_factory(owner)
+	out = []
+	sb = None
+	try:
+		sb = create("cpu")
+		for n in sizes:
+			row: dict = {"bytes": n}
+			try:
+				if entry:  # the real recorder entry on a real spec of this size, its stderr kept (the runner drops it)
+					from dataclasses import replace
+
+					from preflight.probes.local import ProbeSpec
+					from preflight.runner.sandbox_runner import ENTRY
+					from preflight.runner.wire import spec_to_wire
+
+					base = ProbeSpec(
+						probe_id="check",
+						files={"train.py": _CHECK_LOOP},
+						entrypoint="train.py",
+						timeout_s=300,
+					)
+					pad = max(0, n - len(spec_to_wire(base)) - 40)
+					text = spec_to_wire(replace(base, files={**base.files, "docs/pad.txt": "a" * pad}))
+					row["bytes"] = len(text)
+					proc = sb.exec(*ENTRY, timeout=420)
+				else:
+					proc = sb.exec(
+						"python", "-c", "import sys; print('GOT', len(sys.stdin.read()))", timeout=300
+					)
+					text = '{"x": "' + "a" * max(0, n - 9) + '"}'
+				if chunk:  # sandbox_runner's chunked write: a drain after each piece
+					from preflight.runner.sandbox_runner import write_stdin
+
+					write_stdin(proc.stdin, text, chunk=chunk)
+				else:
+					proc.stdin.write(text)
+					proc.stdin.write_eof()
+					proc.stdin.drain()
+				row["stdout"] = proc.stdout.read()[-600:]
+				if entry:
+					row["stderr"] = proc.stderr.read()[-4000:]
+				proc.wait()
+				row["exit"] = proc.returncode
+			except Exception as exc:
+				row["failed"] = f"{type(exc).__name__}: {exc}"[:1500]
+				row["traceback"] = traceback.format_exc()[-2500:]
+			out.append(row)
+	finally:
+		if sb is not None:
+			with contextlib.suppress(Exception):
+				sb.terminate()
+	return out
+
+
+@ops.local_entrypoint()
+def sandbox_stdin_check(
+	sizes: str = "1000000,8000000,16000000,16777000,16957300,24000000", chunk: int = 0, entry: bool = False
+):
+	"""modal run --env main python/preflight/runner/ops_app.py::sandbox_stdin_check
+	Which stdin sizes a probe sandbox takes (sandbox_stdin_check_hosted). Writes out/stdin_check.json."""
+	res = sandbox_stdin_check_hosted.remote([int(x) for x in sizes.split(",") if x], chunk, entry)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/stdin_check.json").write_text(json.dumps(res, indent=2))
+	for r in res:
+		print(
+			f"[stdin] {r['bytes']:>10,} bytes: {r.get('stdout', '').strip()[-300:] or r.get('failed', '')[:300]}"
+			+ (f"\n[stdin] stderr: {r['stderr'][-1500:]}" if r.get("stderr") else ""),
+			flush=True,
+		)
 
 
 @ops.local_entrypoint()
@@ -399,6 +493,7 @@ def startup_check():
 		and w.get("job_store_would_claim_here") is False and "runner_loaded_as" in w
 		and "failed" not in p and p.get("status") == "ok" and p.get("steps", 0) > 0 and p.get("reachable_by_probe_uid")
 		and "failed" not in sb and sb.get("import_exit") == 0 and sb.get("probe_status") == "ok"
+		and sb.get("big_probe_status") == "ok" and sb.get("big_probe_steps", 0) > 0
 		and result["probe_user_ok"] and result["serving_user_ok"]
 	)  # fmt: skip
 	Path("out").mkdir(exist_ok=True)

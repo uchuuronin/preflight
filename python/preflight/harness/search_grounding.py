@@ -73,7 +73,7 @@ PUBLIC_HOSTS = ("github.com", "gitlab.com", "huggingface.co", "pytorch.org", "st
 	"python.org", "pypi.org", "nvidia.com", "apache.org", "numpy.org", "scipy.org", "pypa.io",
 	"pythonhosted.org", "vllm.ai", "deepspeed.ai", "ray.io", "pydata.org", "tensorflow.org")  # fmt: skip
 # Preflight's own failures, which carry no library error to search for
-SKIP_CODES = ("budget", "gpu.", "recorder", "timeout", "too_few_steps", "cancelled")
+SKIP_CODES = ("budget", "gpu.", "recorder", "timeout", "too_few_steps", "cancelled", "submission")
 
 SYSTEM = (
 	"You check whether a failed machine-learning training probe hit a KNOWN, documented issue in a "
