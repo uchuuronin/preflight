@@ -116,7 +116,7 @@ first commit is `11a0ce9`, Oct 26, 22:25 ET.
 On the live site, all of it is on: the script map, the guide, the diagnosis, Muse Spark's search grounding on failed
 probes, the fix loop, Spark Open's triage and number check, and Glimmer's private triage.
 
-## Best Build on Meta Open Weight Models
+## Built on Meta Open Weight Models
 
 **Muse Spark Open (`meta-models/muse-spark-open-1026` on Baseten) triages each probe's log.** After a job's probes, Preflight sends Spark Open the last 3,000 characters of each probe's output
 with its status. Spark Open answers with structured output, at low reasoning effort: a category
@@ -152,7 +152,7 @@ waits 5 to 8 minutes while it starts. On the same 11 failed probes it named the 
 category as Spark Open 9 times. One call that waited through a cold start cost $0.24; the 11 calls
 cost $0.33 together.
 
-## Best Agentic Use-Case
+## Agentic Use-Case
 
 The guide is an agent operating a real tool: Muse Spark calls the same actions a visitor has
 (set a knob, highlight a part of the map, compare, propose a fix) and walks a tour of the levers
